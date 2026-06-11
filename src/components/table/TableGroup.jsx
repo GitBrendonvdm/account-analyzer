@@ -1,0 +1,61 @@
+import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { formatCurrencyAbs } from '../../utils/format';
+import { sortTableItems } from '../../lib/tableSort';
+import { Cell } from './Cell';
+import { getGroupIconConfig, RowIcon } from './rowIcons';
+import { TableSubcategory } from './TableSubcategory';
+import { TransferPairSubcategory } from './TransferPairSubcategory';
+
+export function TableGroup({ group, months, sort }) {
+  const [collapsed, setCollapsed] = useState(true);
+  const groupIcon = getGroupIconConfig(group.name);
+  const sortedSub = sortTableItems(group.sub, sort);
+
+  return (
+    <>
+      <tr
+        className={`cursor-pointer border-t font-bold ${
+          group.isException ? 'bg-amber-100' : group.isTransfer ? 'bg-slate-100 text-slate-500' : 'bg-slate-100'
+        }`}
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <td className="flex items-center gap-2 p-4">
+          <ChevronRight size={16} className={`shrink-0 ${collapsed ? '' : 'rotate-90'}`} />
+          <RowIcon config={groupIcon} size={16} />
+          {group.name}
+        </td>
+        {months.map((m) => (
+          <td
+            key={m}
+            className={`p-4 text-right ${
+              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+            }`}
+          >
+            <Cell val={group.totalsByMonth[m]} absolute />
+          </td>
+        ))}
+        <td className="p-4 text-right font-semibold text-blue-600">
+          {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
+        </td>
+        <td className="p-4 text-right">
+          <Cell val={group.avg} absolute />
+        </td>
+      </tr>
+      {!collapsed &&
+        sortedSub.map((s) =>
+          s.isTransferPair ? (
+            <TransferPairSubcategory key={s.name} sub={s} months={months} sort={sort} />
+          ) : (
+            <TableSubcategory
+              key={s.name}
+              sub={s}
+              months={months}
+              parentGroup={group.name}
+              sort={sort}
+            />
+          ),
+        )}
+    </>
+  );
+}

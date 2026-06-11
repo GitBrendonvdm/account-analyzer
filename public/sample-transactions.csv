@@ -1,0 +1,29 @@
+Account,Pay Month,Date,Description,Amount,Category
+FNB Bank *9986,2026-01,2026-01-15,Salary Payment,85000,Income
+FNB Bank *9986,2026-02,2026-02-15,Salary Payment,85000,Income
+FNB Bank *9986,2026-03,2026-03-15,Salary Payment,85000,Income
+FNB Bank *9986,2026-04,2026-04-15,Salary Payment,85000,Income
+FNB Bank *9986,2026-05,2026-05-15,Salary Payment,85000,Income
+FNB Bank *9986,2026-06,2026-06-15,Salary Payment,85000,Income
+FNB Credit Card *2000,2026-01,2026-01-05,Groceries,-2500,Groceries
+FNB Credit Card *2000,2026-02,2026-02-05,Groceries,-2600,Groceries
+FNB Credit Card *2000,2026-03,2026-03-05,Groceries,-2400,Groceries
+FNB Credit Card *2000,2026-04,2026-04-05,Groceries,-2550,Groceries
+FNB Credit Card *2000,2026-05,2026-05-05,Groceries,-2700,Groceries
+FNB Credit Card *2000,2026-06,2026-06-05,Groceries,-2650,Groceries
+Nedbank Credit Card *4714,2026-01,2026-01-10,Credit Card Repayment,5990,Credit Card Repayment
+Nedbank Credit Card *4714,2026-02,2026-02-10,Credit Card Repayment,5990,Credit Card Repayment
+Nedbank Credit Card *4714,2026-03,2026-03-10,Credit Card Repayment,5990,Credit Card Repayment
+Nedbank Credit Card *4714,2026-04,2026-04-10,Credit Card Repayment,5990,Credit Card Repayment
+Nedbank Credit Card *4714,2026-05,2026-05-10,Credit Card Repayment,5990,Credit Card Repayment
+Nedbank Credit Card *4714,2026-06,2026-06-04,A P O Payment - Thank You,5990,Credit Card Repayment
+Nedbank Savings *1825,2026-01,2026-01-20,Rent,-12000,Housing
+Nedbank Savings *1825,2026-02,2026-02-20,Rent,-12000,Housing
+Nedbank Savings *1825,2026-03,2026-03-20,Rent,-12000,Housing
+Nedbank Savings *1825,2026-04,2026-04-20,Rent,-12000,Housing
+Nedbank Savings *1825,2026-05,2026-05-20,Rent,-12000,Housing
+Nedbank Savings *1825,2026-06,2026-06-20,Rent,-12000,Housing
+FNB Bank *9986,2026-03,2026-03-10,Transfer to Nedbank,-5000,Internal
+Nedbank Savings *1825,2026-03,2026-03-10,Transfer from FNB,5000,Internal
+FNB Bank *9986,2026-05,2026-05-12,Transfer to Nedbank,-3000,Internal
+Nedbank Savings *1825,2026-05,2026-05-12,Transfer from FNB,3000,Internal

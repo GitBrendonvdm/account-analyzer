@@ -1,0 +1,28 @@
+import { BarChart3, Table2 } from 'lucide-react';
+
+const TABS = [
+  { id: 'table', label: 'Table', Icon: Table2 },
+  { id: 'charts', label: 'Charts', Icon: BarChart3 },
+];
+
+export function ViewTabs({ activeTab, onTabChange }) {
+  return (
+    <div className="flex gap-1 rounded-lg border bg-white p-1 shadow-sm">
+      {TABS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onTabChange(id)}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === id
+              ? 'bg-slate-800 text-white'
+              : 'text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Icon size={16} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
