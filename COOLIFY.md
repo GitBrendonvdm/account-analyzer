@@ -12,6 +12,6 @@ Deploy under Coolify project **upshft** → environment **production**.
 Push to `main` on GitHub, then trigger deploy in Coolify or:
 
 ```text
-GET https://coolify.upshft.app/api/v1/deploy?uuid=<APP_UUID>
+GET https://coolify.upshft.app/api/v1/deploy?uuid=o108dqy996z0a944ytg9q5zp
 Authorization: Bearer <COOLIFY_API_TOKEN>
 ```
