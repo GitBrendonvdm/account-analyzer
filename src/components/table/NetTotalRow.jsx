@@ -1,4 +1,4 @@
-import { formatCurrencyAbs } from '../../utils/format';
+import { formatCurrency } from '../../utils/format';
 import { NET_TOTAL_ICON, RowIcon } from './rowIcons';
 
 export function NetTotalRow({ months, netByMonth, netExpected, netAvg }) {
@@ -18,12 +18,12 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg }) {
             key={m}
             className={`p-4 text-right ${isCurrentMonth ? 'border-l-2 border-slate-500' : ''}`}
           >
-            {formatCurrencyAbs(val)}
+            {formatCurrency(val)}
           </td>
         );
       })}
-      <td className="p-4 text-right">{formatCurrencyAbs(netExpected)}</td>
-      <td className="p-4 text-right">{formatCurrencyAbs(netAvg)}</td>
+      <td className="p-4 text-right">{formatCurrency(netExpected)}</td>
+      <td className="p-4 text-right">{formatCurrency(netAvg)}</td>
     </tr>
   );
 }
