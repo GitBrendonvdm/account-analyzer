@@ -37,7 +37,7 @@ function ChartTooltip({ active, payload, label, chartData }) {
             {formatCurrency(chartData.currentMonthProjected)}
           </p>
           <p>
-            Month-end target: {formatCurrency(chartData.priorRunning)} + this month projected ={' '}
+            Next-pay target: {formatCurrency(chartData.priorRunning)} + this cycle projected ={' '}
             {formatCurrency(chartData.monthEndProjectedRunning)}
           </p>
           <p>
@@ -72,7 +72,6 @@ export function NetTotalChart({ chartData }) {
     netExpected,
     incomeRemaining,
     expenseRemaining,
-    priorRunning,
     tableMonthNet,
     monthEndProjectedRunning,
     todayRunning,
@@ -142,8 +141,8 @@ export function NetTotalChart({ chartData }) {
       <div className="space-y-1 text-xs text-slate-500">
         <p>
           Running total uses base transactions through each bucket. The blue line projects from today
-          ({formatCurrency(todayRunning)}) to month-end ({formatCurrency(monthEndProjectedRunning)}
-          ): current month ({formatCurrency(tableMonthNet)}) + remaining ({formatCurrency(netExpected)}
+          ({formatCurrency(todayRunning)}) to next pay ({formatCurrency(monthEndProjectedRunning)}
+          ): current cycle ({formatCurrency(tableMonthNet)}) + remaining ({formatCurrency(netExpected)}
           ).
         </p>
         <p>

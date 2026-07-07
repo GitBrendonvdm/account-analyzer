@@ -56,6 +56,17 @@ export function TransactionTable({ processed }) {
                   />
                 </th>
               ))}
+              {processed.cycleWeeks?.map((wk) => (
+                <th
+                  key={wk.index}
+                  className={`p-4 text-right text-xs font-medium text-blue-600 ${
+                    wk.index === 0 ? 'border-l-2 border-slate-300' : ''
+                  } ${wk.isCurrent ? 'bg-blue-50/60' : ''}`}
+                  title={wk.isCurrent ? 'Current week' : undefined}
+                >
+                  {wk.label}
+                </th>
+              ))}
               <th className="p-4 text-right">
                 <SortHeader
                   label="Remaining"
@@ -82,9 +93,17 @@ export function TransactionTable({ processed }) {
               netByMonth={processed.netByMonth}
               netExpected={processed.netExpected}
               netAvg={processed.netAvg}
+              cycleWeeks={processed.cycleWeeks}
+              weeklyRemaining={processed.netWeeklyRemaining}
             />
             {processed.rows.map((g) => (
-              <TableGroup key={g.name} group={g} months={processed.months} sort={sort} />
+              <TableGroup
+                key={g.name}
+                group={g}
+                months={processed.months}
+                sort={sort}
+                cycleWeeks={processed.cycleWeeks}
+              />
             ))}
           </tbody>
         </table>

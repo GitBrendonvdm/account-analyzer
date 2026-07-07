@@ -1,7 +1,8 @@
 import { formatCurrency } from '../../utils/format';
 import { RowIcon, VARIANT_ICON } from './rowIcons';
+import { WeekCells } from './WeekCells';
 
-export function VariantTransactionRow({ variant, months }) {
+export function VariantTransactionRow({ variant, months, cycleWeeks }) {
   return (
     <tr className="border-t bg-white text-[11px] text-slate-500">
       <td className="p-1.5 pl-28">
@@ -32,6 +33,7 @@ export function VariantTransactionRow({ variant, months }) {
           </td>
         );
       })}
+      <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-1.5" />
       <td />
       <td />
     </tr>

@@ -6,8 +6,9 @@ import { Cell } from './Cell';
 import { getGroupIconConfig, RowIcon } from './rowIcons';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
+import { WeekCells } from './WeekCells';
 
-export function TableGroup({ group, months, sort }) {
+export function TableGroup({ group, months, sort, cycleWeeks }) {
   const [collapsed, setCollapsed] = useState(true);
   const groupIcon = getGroupIconConfig(group.name);
   const sortedSub = sortTableItems(group.sub, sort);
@@ -35,6 +36,11 @@ export function TableGroup({ group, months, sort }) {
             <Cell val={group.totalsByMonth[m]} absolute />
           </td>
         ))}
+        <WeekCells
+          weekly={group.isException || group.isTransfer ? undefined : group.weeklyRemaining}
+          weeks={cycleWeeks ?? []}
+          pad="p-4"
+        />
         <td className="p-4 text-right font-semibold text-blue-600">
           {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
         </td>
@@ -45,7 +51,13 @@ export function TableGroup({ group, months, sort }) {
       {!collapsed &&
         sortedSub.map((s) =>
           s.isTransferPair ? (
-            <TransferPairSubcategory key={s.name} sub={s} months={months} sort={sort} />
+            <TransferPairSubcategory
+              key={s.name}
+              sub={s}
+              months={months}
+              sort={sort}
+              cycleWeeks={cycleWeeks}
+            />
           ) : (
             <TableSubcategory
               key={s.name}
@@ -53,6 +65,7 @@ export function TableGroup({ group, months, sort }) {
               months={months}
               parentGroup={group.name}
               sort={sort}
+              cycleWeeks={cycleWeeks}
             />
           ),
         )}

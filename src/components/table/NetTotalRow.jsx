@@ -1,7 +1,8 @@
 import { formatCurrency } from '../../utils/format';
 import { NET_TOTAL_ICON, RowIcon } from './rowIcons';
+import { WeekCells } from './WeekCells';
 
-export function NetTotalRow({ months, netByMonth, netExpected, netAvg }) {
+export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeeks, weeklyRemaining }) {
   return (
     <tr className="bg-slate-800 font-bold text-white">
       <td className="p-4">
@@ -22,6 +23,7 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg }) {
           </td>
         );
       })}
+      <WeekCells weekly={weeklyRemaining} weeks={cycleWeeks ?? []} pad="p-4" />
       <td className="p-4 text-right">{formatCurrency(netExpected)}</td>
       <td className="p-4 text-right">{formatCurrency(netAvg)}</td>
     </tr>

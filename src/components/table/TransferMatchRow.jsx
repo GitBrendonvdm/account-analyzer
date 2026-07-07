@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format';
 import { RowIcon, TRANSFER_MATCH_ICON } from './rowIcons';
+import { WeekCells } from './WeekCells';
 
 export function groupMatches(matches, months) {
   const groups = new Map();
@@ -19,7 +20,7 @@ export function groupMatches(matches, months) {
   return [...groups.values()];
 }
 
-export function TransferMatchRow({ group, months }) {
+export function TransferMatchRow({ group, months, cycleWeeks }) {
   return (
     <tr className="border-t bg-white text-xs text-slate-600">
       <td className="p-2 pl-16">
@@ -61,6 +62,7 @@ export function TransferMatchRow({ group, months }) {
           </td>
         );
       })}
+      <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-2" />
       <td />
       <td />
     </tr>

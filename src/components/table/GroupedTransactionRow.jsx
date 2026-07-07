@@ -4,8 +4,9 @@ import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
 import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON, RowIcon } from './rowIcons';
 import { VariantTransactionRow } from './VariantTransactionRow';
+import { WeekCells } from './WeekCells';
 
-export function GroupedTransactionRow({ group, months, parentGroup, highlightCells = false, sort }) {
+export function GroupedTransactionRow({ group, months, highlightCells = false, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
   const hasVariants = group.variants.length > 1;
   const rowIcon = group.isException ? EXCEPTION_DESCRIPTION_ICON : DESCRIPTION_ICON;
@@ -66,6 +67,7 @@ export function GroupedTransactionRow({ group, months, parentGroup, highlightCel
             </td>
           );
         })}
+        <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-2" />
         <td className="p-2 text-right">
           {!group.isException && (
             <span className="font-semibold text-blue-600" title="Remaining vs prior-month average">
@@ -77,7 +79,12 @@ export function GroupedTransactionRow({ group, months, parentGroup, highlightCel
       </tr>
       {expanded &&
         sortedVariantRows.map((variant) => (
-          <VariantTransactionRow key={variant.description} variant={variant} months={months} />
+          <VariantTransactionRow
+            key={variant.description}
+            variant={variant}
+            months={months}
+            cycleWeeks={cycleWeeks}
+          />
         ))}
     </>
   );

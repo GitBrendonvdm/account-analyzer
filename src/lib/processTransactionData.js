@@ -1,7 +1,10 @@
 import { GROUP_ORDER } from '../constants';
 import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
-import { computeCurrentMinusAvg, computeExpectedValue, monthlyAvg } from './expected';
+import { monthlyAvg } from './expected';
+import { currentCycleDay, cycleEndForKey, cycleLengthForKey, cycleStarts } from './cycleCurve';
+import { buildWeeklyAvg, mondayOf, mondayWeekIndex, weeklyRemainingByWeek } from './weeklyEnvelope';
+import { isMissedThisCycle } from './missedPayments';
 import { detectTransferPairs } from './transfers';
 
 function totalsForItems(items, months, useEffectiveMonth = true) {
@@ -46,7 +49,7 @@ function hasMonthTotals(totalsByMonth) {
   return Object.values(totalsByMonth).some((value) => Math.abs(value || 0) > 0.001);
 }
 
-export function processTransactionData(data, selectedAccounts, monthRange) {
+export function processTransactionData(data, selectedAccounts, monthRange, asOf = new Date()) {
   if (!data || data.length === 0) return null;
 
   const selected = new Set(selectedAccounts);
@@ -80,14 +83,59 @@ export function processTransactionData(data, selectedAccounts, monthRange) {
     groups[mainGroup].sub[c].totals[m] = (groups[mainGroup].sub[c].totals[m] || 0) + t.AmountNum;
     groups[mainGroup].sub[c].items.push(t);
 
-    if (mainGroup === 'Income' || mainGroup === 'Expense') {
-      totalsByMonth[mainGroup][m] = (totalsByMonth[mainGroup][m] || 0) + t.AmountNum;
-    } else if (mainGroup === 'Income Exceptions') {
-      totalsByMonth.Income[m] = (totalsByMonth.Income[m] || 0) + t.AmountNum;
-    } else if (mainGroup === 'Expense Exceptions') {
-      totalsByMonth.Expense[m] = (totalsByMonth.Expense[m] || 0) + t.AmountNum;
-    }
+    // Income + Expense (exceptions folded into their base flow) drive the net-per-month totals.
+    const flow = mainGroup.includes('Income') ? 'Income' : 'Expense';
+    totalsByMonth[flow][m] = (totalsByMonth[flow][m] || 0) + t.AmountNum;
   });
+
+  // Cycle-phase inputs: learn how far through the current pay-cycle we are, and the
+  // historical spend curve for each flow, so "remaining" projects along the real curve.
+  // Payday-based boundaries: cycle runs from one payday (25th, rolled to Mon on weekends) to the
+  // next. "Next pay" projections and the weekly buckets anchor on these, not on transaction dates.
+  const starts = cycleStarts(calcMonths);
+  const cycleLen = cycleLengthForKey(currentMonth);
+  const curDay = currentCycleDay(asOf, starts[currentMonth], cycleLen);
+  const currentCycleStart = starts[currentMonth] ?? null;
+  const currentCycleEnd = cycleEndForKey(currentMonth);
+  const priorMonths = calcMonths.slice(0, -1);
+  // Each category's "remaining" is projected with the weekly-envelope model, split per Monday-week:
+  // elapsed weeks are locked at their actuals (a quiet week stays quiet), the current week tops up
+  // to its average, and future weeks carry their averages. Group/Net remaining = sums of these.
+  // Weeks are Mon–Sun and only the current week through the cycle end are surfaced (no past weeks).
+  const cycleEndDay = new Date(
+    currentCycleEnd.getFullYear(),
+    currentCycleEnd.getMonth(),
+    currentCycleEnd.getDate() - 1, // last day of this cycle = day before the next payday
+  );
+  const lastWeek = currentCycleStart ? mondayWeekIndex(cycleEndDay, currentCycleStart) : 0;
+  const weekCount = Math.max(1, lastWeek + 1);
+  const currentWeek = currentCycleStart
+    ? Math.max(0, Math.min(lastWeek, mondayWeekIndex(asOf, currentCycleStart)))
+    : 0;
+  const cycleStartMonday = currentCycleStart ? mondayOf(currentCycleStart) : null;
+  // Only the current week onward are shown as columns; past weeks are elapsed.
+  const cycleWeeks = [];
+  for (let w = currentWeek; w <= lastWeek; w++) {
+    const monday = cycleStartMonday
+      ? new Date(cycleStartMonday.getFullYear(), cycleStartMonday.getMonth(), cycleStartMonday.getDate() + w * 7)
+      : null;
+    cycleWeeks.push({
+      index: w,
+      label: monday ? monday.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : `W${w + 1}`,
+      isCurrent: w === currentWeek,
+    });
+  }
+  const zeroWeeks = () => new Array(weekCount).fill(0);
+  const catWeeklyRemaining = (items) => {
+    const catItems = items.filter((t) => !transferIds.has(t.id));
+    return weeklyRemainingByWeek(
+      catItems,
+      currentMonth,
+      starts,
+      currentWeek,
+      buildWeeklyAvg(catItems, priorMonths, starts, weekCount),
+    );
+  };
 
   const { sub: transferSubs, pairedIds } = buildTransferSubcategories(
     pairs,
@@ -124,41 +172,48 @@ export function processTransactionData(data, selectedAccounts, monthRange) {
             .map(([sName, sData]) => {
               const visibleItems = sData.items.filter((t) => selected.has(t.Account));
               if (visibleItems.length === 0) return null;
+              // Per-category weekly-envelope remaining, split by cycle-week; total is the sum.
+              const weeklyRemaining = skipExpected ? zeroWeeks() : catWeeklyRemaining(sData.items);
               return {
                 name: sName,
                 totalsByMonth: totalsForItems(visibleItems, calcMonths),
                 avg: monthlyAvg(sData.totals, calcMonths),
-                expected: skipExpected
-                  ? 0
-                  : computeExpectedValue(
-                      sData.items,
-                      calcMonths,
-                      transferIds,
-                      gName.includes('Income') ? 'income' : 'expense',
-                    ),
+                weeklyRemaining,
+                expected: weeklyRemaining.reduce((s, x) => s + x, 0),
                 items: visibleItems,
                 isException: isExceptionGroup,
                 skipExpected,
+                // Flag-only (no visual, no effect on the estimate): the payment usually lands by
+                // now but hasn't this cycle. See missedPayments.js.
+                missed: skipExpected
+                  ? false
+                  : isMissedThisCycle(sData.items, priorMonths, currentMonth, starts, curDay),
               };
             })
             .filter(Boolean);
     if (sub.length === 0 && gName !== 'Transfers' && !hasMonthTotals(gData.totals)) return null;
+    // Group weekly remaining = element-wise sum of its sub-rows'.
+    const groupWeekly = zeroWeeks();
+    if (!skipExpected) {
+      sub.forEach((s) => s.weeklyRemaining?.forEach((v, w) => (groupWeekly[w] += v)));
+    }
     return {
       name: gName,
       totalsByMonth: gData.totals,
       avg: monthlyAvg(gData.totals, calcMonths),
-      expected: skipExpected
-        ? 0
-        : computeCurrentMinusAvg(
-            gData.totals,
-            calcMonths,
-            gName.includes('Income') ? 'income' : 'expense',
-          ),
+      weeklyRemaining: groupWeekly,
+      expected: groupWeekly.reduce((s, x) => s + x, 0),
       sub,
       isException: isExceptionGroup,
       isTransfer: gName === 'Transfers',
     };
   }).filter(Boolean);
+
+  // Flat list of missed payments (past their usual week, nothing landed this cycle). Not yet
+  // surfaced in the UI — available for a future view.
+  const missedPayments = rows.flatMap((g) =>
+    (g.sub || []).filter((s) => s.missed).map((s) => ({ group: g.name, name: s.name })),
+  );
 
   const calcNetByMonth = calcMonths.map(
     (m) => (totalsByMonth.Income[m] || 0) + (totalsByMonth.Expense[m] || 0),
@@ -171,9 +226,17 @@ export function processTransactionData(data, selectedAccounts, monthRange) {
   const netAvg = incomeAvg + expenseAvg;
   const currentMonthIncome = totalsByMonth.Income[currentMonth] ?? 0;
   const currentMonthExpense = totalsByMonth.Expense[currentMonth] ?? 0;
-  const incomeRemaining = computeCurrentMinusAvg(groups.Income.totals, calcMonths, 'income');
-  const expenseRemaining = computeCurrentMinusAvg(groups.Expense.totals, calcMonths, 'expense');
+
+  // Income / Expense / Net remaining are the sums of their per-week envelope splits.
+  const incomeRow = rows.find((r) => r.name === 'Income');
+  const expenseRow = rows.find((r) => r.name === 'Expense');
+  const incomeRemaining = incomeRow?.expected ?? 0;
+  const expenseRemaining = expenseRow?.expected ?? 0;
   const netExpected = incomeRemaining + expenseRemaining;
+  // Full-length (indexed by week index, since cycleWeeks only carries current→end).
+  const netWeeklyRemaining = zeroWeeks().map(
+    (_, w) => (incomeRow?.weeklyRemaining?.[w] ?? 0) + (expenseRow?.weeklyRemaining?.[w] ?? 0),
+  );
 
   return {
     rows,
@@ -191,6 +254,12 @@ export function processTransactionData(data, selectedAccounts, monthRange) {
     incomeRemaining,
     expenseRemaining,
     netExpected,
+    cycleWeeks,
+    currentWeek,
+    netWeeklyRemaining,
+    currentCycleStart,
+    currentCycleEnd,
+    missedPayments,
     transferIds,
     reversalIds,
   };

@@ -198,6 +198,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
     incomeRemaining,
     expenseRemaining,
     currentMonth,
+    currentCycleEnd,
   } = processed;
   const granularity = chartGranularity(months.length);
   const transactions = netTransactions(data, calcMonths);
@@ -207,7 +208,9 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
   const { year: startYear, monthIndex: startMonthIndex } = parseMonthKey(months[0]);
   const { year: endYear, monthIndex: endMonthIndex } = parseMonthKey(currentMonth);
   const rangeStart = startOfMonth(startYear, startMonthIndex);
-  const monthEnd = endOfMonth(endYear, endMonthIndex);
+  // Projection horizon = the next pay boundary (end of the current pay-cycle). The prediction
+  // must run to the next payday, not stop at today; the calendar month-end is ~3 weeks too far.
+  const monthEnd = currentCycleEnd ? new Date(currentCycleEnd) : endOfMonth(endYear, endMonthIndex);
   const priorRunning = priorMonthsRunning(calcMonths, calcNetByMonth, currentMonth);
   const todayRunning = runningAtDate(transactions, calcMonths, calcNetByMonth, todayEnd);
   const tableMonthNet = currentMonthIncome + currentMonthExpense;
@@ -255,7 +258,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
 
       const endPoint = {
         key: `${key}-end`,
-        label: `${formatBucketLabel(key, granularity)} (projected)`,
+        label: 'Next pay',
         bucketEnd: monthEnd,
         actual: null,
         expectedSolid: null,
@@ -267,6 +270,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
         isMonthEndProjection: true,
       };
       applyExpectedLines(endPoint, expectedCtx);
+      points.push(endPoint);
       return;
     }
 
@@ -295,6 +299,28 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
       granularity,
       expectedCtx,
     });
+  }
+
+  // Guarantee the projection reaches the next-pay horizon. Weekly/daily bucket stepping stops at
+  // the last whole bucket *before* the horizon, cutting the forecast off days short of next pay.
+  const horizonTime = monthEnd.getTime();
+  const reachesHorizon = points.some((p) => p.bucketEnd && p.bucketEnd.getTime() >= horizonTime);
+  if (!reachesHorizon) {
+    const endPoint = {
+      key: 'next-pay',
+      label: 'Next pay',
+      bucketEnd: monthEnd,
+      actual: null,
+      expectedSolid: null,
+      expectedProjected: null,
+      isToday: false,
+      isFuture: true,
+      containsToday: false,
+      inCurrentMonth: true,
+      isMonthEndProjection: true,
+    };
+    applyExpectedLines(endPoint, expectedCtx);
+    points.push(endPoint);
   }
 
   return {

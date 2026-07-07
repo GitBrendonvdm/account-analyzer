@@ -4,6 +4,7 @@ import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
 import { getGroupIconConfig, RowIcon } from './rowIcons';
 import { TransferMatchRow, groupMatches } from './TransferMatchRow';
+import { WeekCells } from './WeekCells';
 
 function transferVolumeByMonth(matches, months) {
   const totals = Object.fromEntries(months.map((m) => [m, 0]));
@@ -15,7 +16,7 @@ function transferVolumeByMonth(matches, months) {
   return totals;
 }
 
-export function TransferPairSubcategory({ sub, months, sort }) {
+export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
   const pairIcon = getGroupIconConfig('Transfers');
   const matchGroups = useMemo(
@@ -67,12 +68,18 @@ export function TransferPairSubcategory({ sub, months, sort }) {
             <Cell val={volumeByMonth[m] || null} />
           </td>
         ))}
+        <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} />
         <td />
         <td />
       </tr>
       {expanded &&
         matchGroups.map((group) => (
-          <TransferMatchRow key={`${group.creditLabel}-${group.debitLabel}`} group={group} months={months} />
+          <TransferMatchRow
+            key={`${group.creditLabel}-${group.debitLabel}`}
+            group={group}
+            months={months}
+            cycleWeeks={cycleWeeks}
+          />
         ))}
     </>
   );
