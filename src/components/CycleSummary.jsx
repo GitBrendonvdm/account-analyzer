@@ -97,7 +97,7 @@ export function CycleSummary({ summary }) {
           label="Projected close"
           value={formatCurrency(projectedClose)}
           tone={overspending ? 'text-red-600' : 'text-green-600'}
-          sub={`${formatCurrencyAbs(income.received + expense.spent * -1)} so far`}
+          sub={`${formatCurrency(income.received - expense.spent)} net so far`}
           title="Income and spend for this cycle, actual so far plus what's still forecast. This is a cycle flow, not a bank balance — the export has no balance column."
         />
         <Stat

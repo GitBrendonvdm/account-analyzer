@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnalyzerToolbar } from './components/AnalyzerToolbar';
 import { ChartsView } from './components/ChartsView';
+import { CycleSummary } from './components/CycleSummary';
+import { deriveCycleSummary } from './lib/cycleSummary';
 import { EmptyState } from './components/EmptyState';
 import { TransactionTable } from './components/TransactionTable';
 import { ViewTabs } from './components/ViewTabs';
@@ -24,6 +26,7 @@ export default function App() {
 
   const processed = useTransactionData(data, selectedAccounts, monthRange);
   const chartData = useChartData(data, selectedAccounts, processed);
+  const summary = useMemo(() => deriveCycleSummary(processed), [processed]);
 
   // Recharts' ResponsiveContainer measures 0x0 under a headless browser, so charts can't be
   // verified from a screenshot. Expose the computed data instead — dev only.
@@ -46,6 +49,7 @@ export default function App() {
         />
         {processed ? (
           <>
+            <CycleSummary summary={summary} />
             <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />
             {activeTab === 'table' ? (
               <TransactionTable processed={processed} />
