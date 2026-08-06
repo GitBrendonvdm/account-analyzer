@@ -15,6 +15,21 @@ export const UNCATEGORIZED_CATEGORY_LABELS = ['Uncategorized', 'Uncategorised'];
 export const AVG_RECENCY_INITIAL_WEIGHT = 0.4;
 export const AVG_RECENCY_DECAY = 0.5;
 
+/**
+ * How much of the current week's remaining expectation follows the pace you're actually running at
+ * versus reverting to the weekly average. 0 = ignore pace entirely, 1 = follow it completely.
+ * Half keeps a floor under the estimate: one quiet start to a week isn't proof of a quiet week.
+ */
+export const PACE_BLEND = 0.5;
+/**
+ * At or below this median transactions-per-cycle a category is treated as discrete events (rent, a
+ * debit order) rather than a stream of spend. Discrete categories are never prorated within a week
+ * — a bill that always lands Friday must not be written off on Thursday.
+ */
+export const DISCRETE_MAX_TXN_PER_CYCLE = 3;
+/** Below this much total spend (ZAR) a weekday shape is noise; fall back to a flat curve. */
+export const WEEKDAY_CURVE_MIN_MASS = 1000;
+
 export const GROUP_ORDER = [
   'Income',
   'Expense',

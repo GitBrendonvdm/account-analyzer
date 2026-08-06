@@ -3,7 +3,15 @@ import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { monthlyAvg } from './expected';
 import { addDays, buildCycleCalendar, cycleDay } from './cycleCurve';
-import { buildWeeklyAvg, mondayOf, mondayWeekIndex, weeklyRemainingByWeek } from './weeklyEnvelope';
+import {
+  buildWeeklyAvg,
+  buildWeekdayCurve,
+  isDiscreteCadence,
+  mondayOf,
+  mondayWeekIndex,
+  weekDayRanges,
+  weeklyRemainingByWeek,
+} from './weeklyEnvelope';
 import { isMissedThisCycle } from './missedPayments';
 import { detectTransferPairs } from './transfers';
 
@@ -124,15 +132,37 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       isCurrent: w === currentWeek,
     });
   }
+  // The day-of-cycle span each Monday column covers. Prior cycles are bucketed against these
+  // spans rather than by week index, because cycles hold 4-6 Monday-weeks depending on which
+  // weekday the boundary lands on.
+  const dayRanges = weekDayRanges(currentCycleStart, currentCycleEnd);
+  const dataThrough = calendar.dataThrough;
+
+  // One weekday shape per flow: how a typical week's spend is distributed Mon→Sun. Per-category
+  // curves would be noise at ~25 observations, so income and expense each get one.
+  const nonTransfer = scopedData.filter((t) => !transferIds.has(t.id));
+  const weekdayCurves = {
+    Income: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum > 0), priorMonths),
+    Expense: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum < 0), priorMonths),
+  };
+
   const zeroWeeks = () => new Array(weekCount).fill(0);
-  const catWeeklyRemaining = (items) => {
+  const catWeeklyRemaining = (items, flow) => {
     const catItems = items.filter((t) => !transferIds.has(t.id));
     return weeklyRemainingByWeek(
       catItems,
       currentMonth,
       starts,
       currentWeek,
-      buildWeeklyAvg(catItems, priorMonths, starts, weekCount),
+      buildWeeklyAvg(catItems, priorMonths, starts, dayRanges),
+      {
+        sign: flow === 'Income' ? 1 : -1,
+        weekdayCurve: weekdayCurves[flow] ?? weekdayCurves.Expense,
+        asOf,
+        dataThrough,
+        dayRanges,
+        discrete: isDiscreteCadence(catItems, priorMonths),
+      },
     );
   };
 
@@ -172,7 +202,9 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
               const visibleItems = sData.items.filter((t) => selected.has(t.Account));
               if (visibleItems.length === 0) return null;
               // Per-category weekly-envelope remaining, split by cycle-week; total is the sum.
-              const weeklyRemaining = skipExpected ? zeroWeeks() : catWeeklyRemaining(sData.items);
+              const weeklyRemaining = skipExpected
+                ? zeroWeeks()
+                : catWeeklyRemaining(sData.items, gName.includes('Income') ? 'Income' : 'Expense');
               return {
                 name: sName,
                 totalsByMonth: totalsForItems(visibleItems, calcMonths),
