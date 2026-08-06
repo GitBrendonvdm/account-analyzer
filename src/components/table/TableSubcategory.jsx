@@ -10,8 +10,8 @@ import { WeekCells } from './WeekCells';
 
 export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
-  const remainingKind = parentGroup?.includes('Income') ? 'income' : 'expense';
-  const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, remainingKind);
+  // The parent's forecast is split across these rows, so the tree adds up.
+  const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, sub);
   const sortedGroupedItems = sortTableItems(groupedItems, sort);
   const subIcon = getSubcategoryIconConfig(parentGroup, sub.name);
   const highlightUnmatchedTransfer = Boolean(sub.isUnmatchedTransfer);

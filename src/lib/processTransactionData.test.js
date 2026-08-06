@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { processTransactionData } from './processTransactionData';
+import { groupTransactionsByDescription } from './groupTransactions';
 import { loadRealExport } from '../test/realData';
 
 const real = loadRealExport();
@@ -45,6 +46,49 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
         expect(subSummed).toBeCloseTo(sub.expected ?? 0, 6);
       });
     });
+  });
+
+  it('splits a category forecast across its description rows without losing any', () => {
+    // These rows used to run an entirely different estimate, so they never summed to their parent.
+    const expense = processed.rows.find((r) => r.name === 'Expense');
+    const withForecast = expense.sub.filter((s) => Math.abs(s.expected) > 1);
+    expect(withForecast.length).toBeGreaterThan(3);
+
+    withForecast.forEach((sub) => {
+      const rows = groupTransactionsByDescription(sub.items, processed.months, false, sub);
+      const summed = rows.reduce((s, r) => s + r.expected, 0);
+      expect(summed).toBeCloseTo(sub.expected, 6);
+
+      processed.cycleWeeks.forEach(({ index }) => {
+        const weekSum = rows.reduce((s, r) => s + (r.weeklyRemaining?.[index] ?? 0), 0);
+        expect(weekSum).toBeCloseTo(sub.weeklyRemaining[index], 6);
+      });
+    });
+  });
+
+  it('scopes every total AND every average to the selected accounts', () => {
+    // Previously only the sub-row month cells were filtered: group rows, the Net Total and all
+    // averages were computed over every account regardless of the chips.
+    const subset = accounts.filter((a) => a.startsWith('FNB'));
+    const few = processTransactionData(real, subset, 6, asOf);
+    const all = processed.rows.find((r) => r.name === 'Expense');
+    const some = few.rows.find((r) => r.name === 'Expense');
+
+    expect(Math.abs(some.totalsByMonth['2026-07'])).toBeLessThan(
+      Math.abs(all.totalsByMonth['2026-07']),
+    );
+    expect(Math.abs(some.avg)).toBeLessThan(Math.abs(all.avg));
+    expect(Math.abs(few.expenseAvg)).toBeLessThan(Math.abs(processed.expenseAvg));
+    expect(Math.abs(some.expected)).toBeLessThan(Math.abs(all.expected));
+  });
+
+  it('scopes the average to the month-range slider', () => {
+    // expected.js claimed the selector controlled the window; it never did, because every average
+    // read calcMonths (the whole file) rather than the visible slice.
+    const wide = processTransactionData(real, accounts, 12, asOf);
+    expect(wide.months).toHaveLength(12);
+    expect(processed.months).toHaveLength(6);
+    expect(wide.expenseAvg).not.toBeCloseTo(processed.expenseAvg, 2);
   });
 
   it('keeps every group Remaining equal to the sum of its subcategories', () => {

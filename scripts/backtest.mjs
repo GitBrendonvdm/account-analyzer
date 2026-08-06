@@ -39,7 +39,9 @@ const calendar = buildCycleCalendar(data, months, new Date());
  * under the FULL dataset, so the same transactions are excluded at every evaluation point.
  * (Commit 5 removes this instability from the app itself by trusting the CSV's Transfer label.)
  */
-const fullTransferIds = processTransactionData(data, accounts, MONTH_RANGE, new Date()).transferIds;
+// Classify over every month, not MONTH_RANGE — otherwise transfers in older cycles stay unlabelled
+// and the artifact reappears exactly where we're trying to measure.
+const fullTransferIds = processTransactionData(data, accounts, months.length, new Date()).transferIds;
 const stable = data.filter((t) => !fullTransferIds.has(t.id));
 
 /** Actual non-transfer expense for a completed cycle, as the pipeline itself would total it. */

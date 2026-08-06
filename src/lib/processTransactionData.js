@@ -62,8 +62,11 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
 
   const selected = new Set(selectedAccounts);
   const allMonths = [...new Set(data.map((t) => t['Pay Month']))].sort();
-  const calcMonths = allMonths;
+  // One window, used for both display and every average. These used to differ — `calcMonths` was
+  // the whole file — so dragging the month slider changed the columns but not the Avg or the
+  // forecast, which is exactly the kind of control that makes a tool feel untrustworthy.
   const months = allMonths.slice(-monthRange);
+  const calcMonths = months;
   const scopedData = enrichWithEffectivePayMonths(data, calcMonths);
   const currentMonth = calcMonths[calcMonths.length - 1];
   const groups = Object.fromEntries(GROUP_ORDER.map((name) => [name, { totals: {}, sub: {} }]));
@@ -73,12 +76,18 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     totalsByMonth.Expense[m] = 0;
   });
 
+  // Classification runs on every account; only aggregation is filtered. A transfer pair spans two
+  // accounts, so detecting pairs on a filtered set would orphan one leg and it would resurface as
+  // phantom income or expense. Exception clustering is likewise kept stable across chip changes.
   const { transferIds, pairs, reversalIds } = detectTransferPairs(data, calcMonths);
   const exceptionState = { ...buildExceptionClusters(scopedData, calcMonths, transferIds), transferIds };
   scopedData.forEach((t) => {
     const mainGroup = resolveMainGroup(t, exceptionState);
     const m = mainGroup === 'Transfers' ? t['Pay Month'] : getPayMonth(t);
     if (!calcMonths.includes(m)) return;
+    // Every total below is account-scoped. Previously only the sub-row month cells were filtered,
+    // so group rows, the Net Total and every average silently ignored the account chips.
+    if (!selected.has(t.Account)) return;
 
     if (mainGroup === 'Transfers') {
       groups.Transfers.totals[m] = (groups.Transfers.totals[m] || 0) + t.AmountNum;
@@ -100,8 +109,13 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   // historical spend curve for each flow, so "remaining" projects along the real curve.
   // Boundaries come from the export's own `Pay Month` bucketing (see cycleCurve.js) rather than a
   // hardcoded payday rule, so the weeks always tile the same period the transactions belong to.
-  const calendar = buildCycleCalendar(data, calcMonths, asOf);
+  // Inference uses every month in the file, not just the visible window — the boundary is a
+  // property of the export, and a wider sample makes the modal day-of-month more reliable.
+  const calendar = buildCycleCalendar(data, allMonths, asOf);
   const starts = calendar.starts;
+  // The first cycle in an export starts mid-stream, so its total is structurally too small to
+  // average against the others.
+  const excludeMonths = new Set(allMonths.filter((m) => calendar.isPartial[m]));
   const cycleLen = calendar.lengths[currentMonth] ?? 0;
   const currentCycleStart = starts[currentMonth] ?? null;
   // Inclusive last day of the cycle (22 Aug), not the next payday — `nextPayDate` is that.
@@ -199,19 +213,19 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         ? transferSubs
         : Object.entries(gData.sub)
             .map(([sName, sData]) => {
-              const visibleItems = sData.items.filter((t) => selected.has(t.Account));
-              if (visibleItems.length === 0) return null;
+              // sData.items is already account-scoped — the filter happens once, at accumulation.
+              if (sData.items.length === 0) return null;
               // Per-category weekly-envelope remaining, split by cycle-week; total is the sum.
               const weeklyRemaining = skipExpected
                 ? zeroWeeks()
                 : catWeeklyRemaining(sData.items, gName.includes('Income') ? 'Income' : 'Expense');
               return {
                 name: sName,
-                totalsByMonth: totalsForItems(visibleItems, calcMonths),
-                avg: monthlyAvg(sData.totals, calcMonths),
+                totalsByMonth: totalsForItems(sData.items, calcMonths),
+                avg: monthlyAvg(sData.totals, calcMonths, { excludeMonths }),
                 weeklyRemaining,
                 expected: weeklyRemaining.reduce((s, x) => s + x, 0),
-                items: visibleItems,
+                items: sData.items,
                 isException: isExceptionGroup,
                 skipExpected,
                 // Flag-only (no visual, no effect on the estimate): the payment usually lands by
@@ -231,7 +245,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     return {
       name: gName,
       totalsByMonth: gData.totals,
-      avg: monthlyAvg(gData.totals, calcMonths),
+      avg: monthlyAvg(gData.totals, calcMonths, { excludeMonths }),
       weeklyRemaining: groupWeekly,
       expected: groupWeekly.reduce((s, x) => s + x, 0),
       sub,
@@ -252,8 +266,8 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const netByMonth = months.map(
     (m) => (totalsByMonth.Income[m] || 0) + (totalsByMonth.Expense[m] || 0),
   );
-  const incomeAvg = monthlyAvg(groups.Income.totals, calcMonths);
-  const expenseAvg = monthlyAvg(groups.Expense.totals, calcMonths);
+  const incomeAvg = monthlyAvg(groups.Income.totals, calcMonths, { excludeMonths });
+  const expenseAvg = monthlyAvg(groups.Expense.totals, calcMonths, { excludeMonths });
   const netAvg = incomeAvg + expenseAvg;
   const currentMonthIncome = totalsByMonth.Income[currentMonth] ?? 0;
   const currentMonthExpense = totalsByMonth.Expense[currentMonth] ?? 0;
