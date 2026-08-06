@@ -1,4 +1,5 @@
 import { parseTransactionDate } from '../utils/date';
+import { compareAccountTypes, parseAccount } from './accounts';
 
 /**
  * Per-account movement over time.
@@ -75,6 +76,78 @@ export function buildAccountMovementSeries(data, selectedAccounts, { from, to } 
     .sort((a, b) => Math.abs(b.max - b.min) - Math.abs(a.max - a.min));
 
   return { accounts, anchorDate, start, end };
+}
+
+/**
+ * Where each account stands at the end of every pay cycle, and how much it moved to get there.
+ *
+ * The level is arbitrary — with no opening balance the running total starts at zero on the first
+ * date in the file — but the month-to-month DELTAS are exact, and they're the thing worth reading.
+ * That matters because a rising net worth can hide the opposite trend on the cards: loans amortise
+ * down every month regardless, so they drag the total up while card debt is quietly growing.
+ *
+ * Direction is uniform once you're looking at a position: higher is better. A card going more
+ * negative is more debt; a loan going less negative is debt repaid; a bank going up is more cash.
+ */
+export function buildAccountPositions(data, selectedAccounts, months) {
+  if (!data?.length || !months?.length) return [];
+  const selected = new Set(selectedAccounts);
+  const visible = new Set(months);
+  const lastMonth = months[months.length - 1];
+
+  const rows = data
+    .filter((t) => selected.has(t.Account))
+    .map((t) => ({ account: t.Account, month: t['Pay Month'], amount: t.AmountNum, date: parse(t) }))
+    .filter((t) => t.date)
+    .sort((a, b) => a.date - b.date);
+
+  const byAccount = new Map();
+  rows.forEach((r) => {
+    if (!byAccount.has(r.account)) byAccount.set(r.account, { running: 0, position: {}, moved: {} });
+    const e = byAccount.get(r.account);
+    e.running += r.amount;
+    // Cycles before the window still accumulate, so the first visible position is truthful
+    // relative to the ones after it.
+    if (visible.has(r.month)) {
+      e.position[r.month] = e.running;
+      e.moved[r.month] = (e.moved[r.month] ?? 0) + r.amount;
+    }
+  });
+
+  return [...byAccount.entries()]
+    .map(([account, e]) => {
+      // Carry the position forward across a cycle with no activity, so the line doesn't break.
+      let carried = null;
+      const positionByMonth = {};
+      months.forEach((m) => {
+        if (e.position[m] != null) carried = e.position[m];
+        positionByMonth[m] = carried;
+      });
+      const meta = parseAccount(account);
+      const deltas = months.map((m) => e.moved[m] ?? 0);
+      // Where the account stood before the first visible cycle. Without this the Change column
+      // wouldn't reconcile with the columns beside it: the first position shown already contains
+      // that cycle's own movement.
+      const firstShown = months.find((m) => e.position[m] != null);
+      const openingPosition = firstShown == null ? 0 : e.position[firstShown] - (e.moved[firstShown] ?? 0);
+      const priorDeltas = deltas.slice(0, -1).filter((_, i) => e.position[months[i]] != null);
+      return {
+        account,
+        ...meta,
+        openingPosition,
+        positionByMonth,
+        deltaByMonth: Object.fromEntries(months.map((m, i) => [m, deltas[i]])),
+        currentDelta: e.moved[lastMonth] ?? 0,
+        typicalDelta: priorDeltas.length
+          ? priorDeltas.reduce((s, v) => s + v, 0) / priorDeltas.length
+          : 0,
+        // Net change across the whole visible window — the headline "better or worse" number.
+        windowChange: months.reduce((s, m) => s + (e.moved[m] ?? 0), 0),
+      };
+    })
+    .sort(
+      (a, b) => compareAccountTypes(a.type, b.type) || a.bank.localeCompare(b.bank) || a.mask.localeCompare(b.mask),
+    );
 }
 
 /**

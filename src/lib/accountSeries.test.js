@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildAccountMovementSeries, buildAccountSummaries } from './accountSeries';
+import {
+  buildAccountMovementSeries,
+  buildAccountPositions,
+  buildAccountSummaries,
+} from './accountSeries';
 
 const tx = (account, date, amount, payMonth = '2026-08', extra = {}) => ({
   Account: account,
@@ -54,6 +58,50 @@ describe('buildAccountMovementSeries', () => {
   it('returns nothing for empty input', () => {
     expect(buildAccountMovementSeries([], []).accounts).toEqual([]);
     expect(buildAccountMovementSeries(null, ['A']).accounts).toEqual([]);
+  });
+});
+
+describe('buildAccountPositions', () => {
+  const months = ['2026-06', '2026-07', '2026-08'];
+  const rows = [
+    tx('Nedbank Credit Card *4714', '2026-05-01', -1000, '2026-05'), // before the window
+    tx('Nedbank Credit Card *4714', '2026-06-01', -500, '2026-06'),
+    tx('Nedbank Credit Card *4714', '2026-07-01', -200, '2026-07'),
+    tx('Nedbank Credit Card *4714', '2026-08-01', 300, '2026-08'),
+  ];
+
+  it('tracks the position at the end of each cycle, carrying pre-window history', () => {
+    const [card] = buildAccountPositions(rows, ['Nedbank Credit Card *4714'], months);
+    expect(card.positionByMonth).toEqual({
+      '2026-06': -1500,
+      '2026-07': -1700,
+      '2026-08': -1400,
+    });
+    expect(card.type).toBe('Credit Card');
+  });
+
+  it('reconciles: opening + change === the last position shown', () => {
+    const [card] = buildAccountPositions(rows, ['Nedbank Credit Card *4714'], months);
+    expect(card.openingPosition).toBe(-1000);
+    expect(card.windowChange).toBe(-400);
+    expect(card.openingPosition + card.windowChange).toBe(card.positionByMonth['2026-08']);
+  });
+
+  it('carries the position through a cycle with no activity', () => {
+    const quiet = [tx('FNB Bank *9986', '2026-06-01', 100, '2026-06')];
+    const [acct] = buildAccountPositions(quiet, ['FNB Bank *9986'], months);
+    expect(acct.positionByMonth['2026-08']).toBe(100);
+    expect(acct.deltaByMonth['2026-08']).toBe(0);
+  });
+
+  it('groups cards ahead of loans and banks', () => {
+    const mixed = [
+      tx('FNB Bank *9986', '2026-06-01', 10, '2026-06'),
+      tx('Nedbank Loan *2801', '2026-06-01', 20, '2026-06'),
+      tx('FNB Credit Card *2000', '2026-06-01', -30, '2026-06'),
+    ];
+    const out = buildAccountPositions(mixed, mixed.map((t) => t.Account), months);
+    expect(out.map((a) => a.type)).toEqual(['Credit Card', 'Loan', 'Bank']);
   });
 });
 
