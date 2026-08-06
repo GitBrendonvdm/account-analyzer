@@ -48,10 +48,44 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     });
   });
 
+  it('nests categories under the export\'s Spending Group column', () => {
+    const expense = processed.rows.find((r) => r.name === 'Expense');
+    expect(expense.sub.every((s) => s.isSpendingGroup)).toBe(true);
+    expect(expense.sub.map((s) => s.name)).toContain('Day-to-day');
+    // The whole point: far fewer rows at the top than the ~24 bare categories it replaced.
+    expect(expense.sub.length).toBeLessThan(12);
+
+    // A spending group is purely the sum of its categories — it runs no model of its own.
+    expense.sub.forEach((sg) => {
+      expect(sg.sub.length).toBeGreaterThan(0);
+      const childSum = sg.sub.reduce((s, c) => s + c.expected, 0);
+      expect(childSum).toBeCloseTo(sg.expected, 6);
+    });
+
+    // Transfers and Exceptions stay flat rather than gaining a level of one-child groups.
+    processed.rows
+      .filter((r) => r.isTransfer || r.isException)
+      .forEach((r) => expect(r.sub.every((s) => !s.isSpendingGroup)).toBe(true));
+  });
+
+  it('falls back to flat categories when the export has no Spending Group column', () => {
+    const stripped = real.map((t) => {
+      const copy = { ...t };
+      delete copy['Spending Group'];
+      return copy;
+    });
+    const flat = processTransactionData(stripped, accounts, 6, asOf);
+    const expense = flat.rows.find((r) => r.name === 'Expense');
+    expect(expense.sub.some((s) => s.isSpendingGroup)).toBe(false);
+    expect(expense.sub.length).toBeGreaterThan(12);
+  });
+
   it('splits a category forecast across its description rows without losing any', () => {
     // These rows used to run an entirely different estimate, so they never summed to their parent.
     const expense = processed.rows.find((r) => r.name === 'Expense');
-    const withForecast = expense.sub.filter((s) => Math.abs(s.expected) > 1);
+    const withForecast = expense.sub
+      .flatMap((sg) => sg.sub ?? [sg])
+      .filter((s) => Math.abs(s.expected) > 1);
     expect(withForecast.length).toBeGreaterThan(3);
 
     withForecast.forEach((sub) => {

@@ -4,6 +4,7 @@ import { formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
 import { getGroupIconConfig, RowIcon } from './rowIcons';
+import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { WeekCells } from './WeekCells';
@@ -55,6 +56,15 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
               key={s.name}
               sub={s}
               months={months}
+              sort={sort}
+              cycleWeeks={cycleWeeks}
+            />
+          ) : s.isSpendingGroup ? (
+            <TableSpendingGroup
+              key={s.name}
+              sub={s}
+              months={months}
+              parentGroup={group.name}
               sort={sort}
               cycleWeeks={cycleWeeks}
             />
