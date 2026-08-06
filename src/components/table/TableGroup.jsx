@@ -53,7 +53,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
         sortedSub.map((s) =>
           s.isTransferPair ? (
             <TransferPairSubcategory
-              key={s.name}
+              key={s.key ?? s.name}
               sub={s}
               months={months}
               sort={sort}
@@ -61,7 +61,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
             />
           ) : s.isSpendingGroup ? (
             <TableSpendingGroup
-              key={s.name}
+              key={s.key ?? s.name}
               sub={s}
               months={months}
               parentGroup={group.name}
@@ -70,7 +70,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
             />
           ) : (
             <TableSubcategory
-              key={s.name}
+              key={s.key ?? s.name}
               sub={s}
               months={months}
               parentGroup={group.name}
