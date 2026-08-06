@@ -1,11 +1,19 @@
 import {
   AlertCircle,
   ArrowLeftRight,
+  Banknote,
+  CreditCard,
   FolderOpen,
   GitBranch,
+  Landmark,
   Link2,
+  PiggyBank,
   Receipt,
+  RefreshCw,
   Scale,
+  ShieldCheck,
+  ShoppingBasket,
+  Smartphone,
   Tag,
   TrendingDown,
   TrendingUp,
@@ -30,6 +38,24 @@ const SUBCATEGORY_TONE = {
 
 export function getGroupIconConfig(groupName) {
   return GROUP_ICON_CONFIG[groupName] || { Icon: FolderOpen, className: 'text-slate-400' };
+}
+
+/** One stable icon per value of the export's `Spending Group` column. */
+const SPENDING_GROUP_ICON_CONFIG = {
+  'Day-to-day': { Icon: ShoppingBasket, className: 'text-sky-500' },
+  Recurring: { Icon: RefreshCw, className: 'text-teal-500' },
+  Debt: { Icon: CreditCard, className: 'text-rose-500' },
+  Insurance: { Icon: ShieldCheck, className: 'text-indigo-500' },
+  Communications: { Icon: Smartphone, className: 'text-cyan-500' },
+  'Bank Fees': { Icon: Landmark, className: 'text-slate-500' },
+  'Invest-save-repay': { Icon: PiggyBank, className: 'text-emerald-500' },
+  Income: { Icon: Banknote, className: 'text-green-600' },
+  Transfer: { Icon: ArrowLeftRight, className: 'text-violet-500' },
+  Exceptions: { Icon: AlertCircle, className: 'text-amber-600' },
+};
+
+export function getSpendingGroupIconConfig(name) {
+  return SPENDING_GROUP_ICON_CONFIG[name] || { Icon: FolderOpen, className: 'text-slate-400' };
 }
 
 export function getSubcategoryIconConfig(parentGroupName, subName) {

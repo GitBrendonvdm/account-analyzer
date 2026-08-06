@@ -67,10 +67,17 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
             </td>
           );
         })}
-        <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-2" />
+        <WeekCells
+          weekly={group.isException ? undefined : group.weeklyRemaining}
+          weeks={cycleWeeks ?? []}
+          pad="p-2"
+        />
         <td className="p-2 text-right">
           {!group.isException && (
-            <span className="font-semibold text-blue-600" title="Remaining vs prior-month average">
+            <span
+              className="font-semibold text-blue-600"
+              title="This row's share of its category's forecast to payday"
+            >
               {formatCurrency(group.expected)}
             </span>
           )}

@@ -1,8 +1,9 @@
-import { BarChart3, Table2 } from 'lucide-react';
+import { BarChart3, Table2, Wallet } from 'lucide-react';
 
 const TABS = [
   { id: 'table', label: 'Table', Icon: Table2 },
   { id: 'charts', label: 'Charts', Icon: BarChart3 },
+  { id: 'accounts', label: 'Accounts', Icon: Wallet },
 ];
 
 export function ViewTabs({ activeTab, onTabChange }) {

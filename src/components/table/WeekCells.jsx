@@ -14,12 +14,12 @@ export function WeekCells({ weekly, weeks, pad = 'p-3' }) {
         return (
           <td
             key={wk.index}
-            className={`${pad} text-right ${wk.isCurrent ? 'bg-blue-50/60' : ''} ${
-              i === 0 ? 'border-l-2 border-slate-300' : ''
+            className={`${pad} text-right ${wk.isCurrent ? 'bg-blue-100/50' : 'bg-blue-50/40'} ${
+              i === 0 ? 'border-l-2 border-blue-200' : ''
             }`}
           >
             {show ? (
-              <span className="text-blue-600">{formatCurrencyAbs(val)}</span>
+              <span className="tabular-nums text-blue-600">{formatCurrencyAbs(val)}</span>
             ) : (
               <span className="text-slate-300">–</span>
             )}

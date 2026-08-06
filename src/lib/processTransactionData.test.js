@@ -1,0 +1,151 @@
+import { describe, expect, it } from 'vitest';
+import { processTransactionData } from './processTransactionData';
+import { groupTransactionsByDescription } from './groupTransactions';
+import { loadRealExport } from '../test/realData';
+
+const real = loadRealExport();
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+describe.skipIf(!real)('processTransactionData against the real export', () => {
+  const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
+  const asOf = new Date(2026, 7, 6); // Thu 6 Aug 2026
+  const processed = processTransactionData(real, accounts, 6, asOf);
+
+  it('anchors the current cycle on the pay-month boundary', () => {
+    expect(processed.currentMonth).toBe('2026-08');
+    expect(iso(processed.currentCycleStart)).toBe('2026-07-23');
+    expect(iso(processed.currentCycleEnd)).toBe('2026-08-22');
+    expect(iso(processed.nextPayDate)).toBe('2026-08-23');
+    expect(processed.cycleLength).toBe(31);
+    expect(processed.cycleDay).toBe(15);
+    expect(processed.daysToPayday).toBe(16);
+    expect(processed.isProjectedCycleEnd).toBe(true);
+    expect(iso(processed.dataThrough)).toBe('2026-08-04');
+  });
+
+  it('surfaces only weeks that fall inside the pay cycle', () => {
+    const labels = processed.cycleWeeks.map((w) => w.label);
+    // The old payday rule (25th rolled forward to Monday) produced a trailing "24 Aug" column
+    // covering 24-30 Aug — entirely outside the 23 Jul - 22 Aug pay month.
+    expect(labels).toEqual(['03 Aug', '10 Aug', '17 Aug']);
+    expect(labels).not.toContain('24 Aug');
+  });
+
+  it('marks the week containing today as current', () => {
+    const current = processed.cycleWeeks.filter((w) => w.isCurrent);
+    expect(current).toHaveLength(1);
+    expect(current[0].label).toBe('03 Aug');
+  });
+
+  it('keeps each row\'s Remaining equal to the sum of its weekly split', () => {
+    processed.rows.forEach((row) => {
+      const summed = (row.weeklyRemaining ?? []).reduce((s, x) => s + x, 0);
+      expect(summed).toBeCloseTo(row.expected ?? 0, 6);
+      (row.sub ?? []).forEach((sub) => {
+        const subSummed = (sub.weeklyRemaining ?? []).reduce((s, x) => s + x, 0);
+        expect(subSummed).toBeCloseTo(sub.expected ?? 0, 6);
+      });
+    });
+  });
+
+  it('nests categories under the export\'s Spending Group column', () => {
+    const expense = processed.rows.find((r) => r.name === 'Expense');
+    expect(expense.sub.every((s) => s.isSpendingGroup)).toBe(true);
+    expect(expense.sub.map((s) => s.name)).toContain('Day-to-day');
+    // The whole point: far fewer rows at the top than the ~24 bare categories it replaced.
+    expect(expense.sub.length).toBeLessThan(12);
+
+    // A spending group is purely the sum of its categories — it runs no model of its own.
+    expense.sub.forEach((sg) => {
+      expect(sg.sub.length).toBeGreaterThan(0);
+      const childSum = sg.sub.reduce((s, c) => s + c.expected, 0);
+      expect(childSum).toBeCloseTo(sg.expected, 6);
+    });
+
+    // Transfers and Exceptions stay flat rather than gaining a level of one-child groups.
+    processed.rows
+      .filter((r) => r.isTransfer || r.isException)
+      .forEach((r) => expect(r.sub.every((s) => !s.isSpendingGroup)).toBe(true));
+  });
+
+  it('routes everything the export calls a Transfer into Transfers', () => {
+    // Pair-matching alone left 15 labelled rows behind — including a R30 561 credit-card
+    // repayment that surfaced as Income Exceptions — because their other leg never matched.
+    const labelled = real.filter(
+      (t) => (t['Spending Group'] ?? '').trim() === 'Transfer' && processed.months.includes(t['Pay Month']),
+    );
+    expect(labelled.length).toBeGreaterThan(0);
+    expect(labelled.filter((t) => !processed.transferIds.has(t.id))).toEqual([]);
+
+    // ...and no spending group named Transfer is left sitting inside a flow.
+    processed.rows
+      .filter((r) => !r.isTransfer)
+      .forEach((r) => expect(r.sub.map((s) => s.name)).not.toContain('Transfer'));
+  });
+
+  it('falls back to flat categories when the export has no Spending Group column', () => {
+    const stripped = real.map((t) => {
+      const copy = { ...t };
+      delete copy['Spending Group'];
+      return copy;
+    });
+    const flat = processTransactionData(stripped, accounts, 6, asOf);
+    const expense = flat.rows.find((r) => r.name === 'Expense');
+    expect(expense.sub.some((s) => s.isSpendingGroup)).toBe(false);
+    expect(expense.sub.length).toBeGreaterThan(12);
+  });
+
+  it('splits a category forecast across its description rows without losing any', () => {
+    // These rows used to run an entirely different estimate, so they never summed to their parent.
+    const expense = processed.rows.find((r) => r.name === 'Expense');
+    const withForecast = expense.sub
+      .flatMap((sg) => sg.sub ?? [sg])
+      .filter((s) => Math.abs(s.expected) > 1);
+    expect(withForecast.length).toBeGreaterThan(3);
+
+    withForecast.forEach((sub) => {
+      const rows = groupTransactionsByDescription(sub.items, processed.months, false, sub);
+      const summed = rows.reduce((s, r) => s + r.expected, 0);
+      expect(summed).toBeCloseTo(sub.expected, 6);
+
+      processed.cycleWeeks.forEach(({ index }) => {
+        const weekSum = rows.reduce((s, r) => s + (r.weeklyRemaining?.[index] ?? 0), 0);
+        expect(weekSum).toBeCloseTo(sub.weeklyRemaining[index], 6);
+      });
+    });
+  });
+
+  it('scopes every total AND every average to the selected accounts', () => {
+    // Previously only the sub-row month cells were filtered: group rows, the Net Total and all
+    // averages were computed over every account regardless of the chips.
+    const subset = accounts.filter((a) => a.startsWith('FNB'));
+    const few = processTransactionData(real, subset, 6, asOf);
+    const all = processed.rows.find((r) => r.name === 'Expense');
+    const some = few.rows.find((r) => r.name === 'Expense');
+
+    expect(Math.abs(some.totalsByMonth['2026-07'])).toBeLessThan(
+      Math.abs(all.totalsByMonth['2026-07']),
+    );
+    expect(Math.abs(some.avg)).toBeLessThan(Math.abs(all.avg));
+    expect(Math.abs(few.expenseAvg)).toBeLessThan(Math.abs(processed.expenseAvg));
+    expect(Math.abs(some.expected)).toBeLessThan(Math.abs(all.expected));
+  });
+
+  it('scopes the average to the month-range slider', () => {
+    // expected.js claimed the selector controlled the window; it never did, because every average
+    // read calcMonths (the whole file) rather than the visible slice.
+    const wide = processTransactionData(real, accounts, 12, asOf);
+    expect(wide.months).toHaveLength(12);
+    expect(processed.months).toHaveLength(6);
+    expect(wide.expenseAvg).not.toBeCloseTo(processed.expenseAvg, 2);
+  });
+
+  it('keeps every group Remaining equal to the sum of its subcategories', () => {
+    processed.rows
+      .filter((r) => !r.isException && !r.isTransfer)
+      .forEach((row) => {
+        const childSum = (row.sub ?? []).reduce((s, x) => s + (x.expected ?? 0), 0);
+        expect(childSum).toBeCloseTo(row.expected ?? 0, 6);
+      });
+  });
+});

@@ -1,34 +1,35 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatCurrencyAbs } from '../../utils/format';
-import { useGroupedTransactions } from '../../hooks/useGroupedTransactions';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
-import { GroupedTransactionRow } from './GroupedTransactionRow';
-import { getSubcategoryIconConfig, RowIcon } from './rowIcons';
+import { getSpendingGroupIconConfig, RowIcon } from './rowIcons';
+import { TableSubcategory } from './TableSubcategory';
 import { WeekCells } from './WeekCells';
 
-export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {
+/**
+ * The Spending Group level — the export's own taxonomy sitting between a flow and its categories.
+ * It carries no model of its own: every figure here is the sum of the categories beneath it.
+ */
+export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
-  // The parent's forecast is split across these rows, so the tree adds up.
-  const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, sub);
-  const sortedGroupedItems = sortTableItems(groupedItems, sort);
-  const subIcon = getSubcategoryIconConfig(parentGroup, sub.name);
-  const highlightUnmatchedTransfer = Boolean(sub.isUnmatchedTransfer);
+  const sortedCategories = sortTableItems(sub.sub ?? [], sort);
+  const icon = getSpendingGroupIconConfig(sub.name);
 
   return (
     <>
       <tr
-        className={`cursor-pointer border-t text-slate-700 hover:bg-slate-50 ${
-          highlightUnmatchedTransfer ? 'bg-amber-50' : ''
-        }`}
+        className="cursor-pointer border-t bg-slate-50 font-medium text-slate-700 hover:bg-slate-100"
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="p-3 pl-12 font-medium">
+        <td className="p-3 pl-8">
           <span className="flex items-center gap-2">
             <ChevronRight size={14} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />
-            <RowIcon config={subIcon} />
+            <RowIcon config={icon} size={14} />
             {sub.name}
+            <span className="text-[10px] font-normal text-slate-400">
+              {sortedCategories.length}
+            </span>
           </span>
         </td>
         {months.map((m) => (
@@ -38,7 +39,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
               m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
             }`}
           >
-            <Cell val={sub.totalsByMonth[m]} absolute highlight={highlightUnmatchedTransfer} />
+            <Cell val={sub.totalsByMonth[m]} absolute />
           </td>
         ))}
         <WeekCells
@@ -53,12 +54,12 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
         </td>
       </tr>
       {expanded &&
-        sortedGroupedItems.map((g) => (
-          <GroupedTransactionRow
-            key={g.description}
-            group={g}
+        sortedCategories.map((c) => (
+          <TableSubcategory
+            key={c.name}
+            sub={c}
             months={months}
-            highlightCells={highlightUnmatchedTransfer}
+            parentGroup={parentGroup}
             sort={sort}
             cycleWeeks={cycleWeeks}
           />
