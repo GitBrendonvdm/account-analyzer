@@ -25,6 +25,10 @@ export default function App() {
   const processed = useTransactionData(data, selectedAccounts, monthRange);
   const chartData = useChartData(data, selectedAccounts, processed);
 
+  // Recharts' ResponsiveContainer measures 0x0 under a headless browser, so charts can't be
+  // verified from a screenshot. Expose the computed data instead — dev only.
+  if (import.meta.env.DEV) window.__mv = { data, processed, chartData };
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="w-full space-y-6">

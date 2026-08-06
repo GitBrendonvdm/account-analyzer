@@ -198,7 +198,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
     incomeRemaining,
     expenseRemaining,
     currentMonth,
-    currentCycleEnd,
+    nextPayDate,
   } = processed;
   const granularity = chartGranularity(months.length);
   const transactions = netTransactions(data, calcMonths);
@@ -208,9 +208,9 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
   const { year: startYear, monthIndex: startMonthIndex } = parseMonthKey(months[0]);
   const { year: endYear, monthIndex: endMonthIndex } = parseMonthKey(currentMonth);
   const rangeStart = startOfMonth(startYear, startMonthIndex);
-  // Projection horizon = the next pay boundary (end of the current pay-cycle). The prediction
-  // must run to the next payday, not stop at today; the calendar month-end is ~3 weeks too far.
-  const monthEnd = currentCycleEnd ? new Date(currentCycleEnd) : endOfMonth(endYear, endMonthIndex);
+  // Projection horizon = the next pay boundary (the day after the current cycle's last day). The
+  // prediction must run to the next payday, not stop at today; a calendar month-end is ~3 weeks off.
+  const monthEnd = nextPayDate ? new Date(nextPayDate) : endOfMonth(endYear, endMonthIndex);
   const priorRunning = priorMonthsRunning(calcMonths, calcNetByMonth, currentMonth);
   const todayRunning = runningAtDate(transactions, calcMonths, calcNetByMonth, todayEnd);
   const tableMonthNet = currentMonthIncome + currentMonthExpense;

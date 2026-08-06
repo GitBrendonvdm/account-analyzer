@@ -2,7 +2,7 @@ import { GROUP_ORDER } from '../constants';
 import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { monthlyAvg } from './expected';
-import { currentCycleDay, cycleEndForKey, cycleLengthForKey, cycleStarts } from './cycleCurve';
+import { addDays, buildCycleCalendar, cycleDay } from './cycleCurve';
 import { buildWeeklyAvg, mondayOf, mondayWeekIndex, weeklyRemainingByWeek } from './weeklyEnvelope';
 import { isMissedThisCycle } from './missedPayments';
 import { detectTransferPairs } from './transfers';
@@ -90,24 +90,23 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
 
   // Cycle-phase inputs: learn how far through the current pay-cycle we are, and the
   // historical spend curve for each flow, so "remaining" projects along the real curve.
-  // Payday-based boundaries: cycle runs from one payday (25th, rolled to Mon on weekends) to the
-  // next. "Next pay" projections and the weekly buckets anchor on these, not on transaction dates.
-  const starts = cycleStarts(calcMonths);
-  const cycleLen = cycleLengthForKey(currentMonth);
-  const curDay = currentCycleDay(asOf, starts[currentMonth], cycleLen);
+  // Boundaries come from the export's own `Pay Month` bucketing (see cycleCurve.js) rather than a
+  // hardcoded payday rule, so the weeks always tile the same period the transactions belong to.
+  const calendar = buildCycleCalendar(data, calcMonths, asOf);
+  const starts = calendar.starts;
+  const cycleLen = calendar.lengths[currentMonth] ?? 0;
   const currentCycleStart = starts[currentMonth] ?? null;
-  const currentCycleEnd = cycleEndForKey(currentMonth);
+  // Inclusive last day of the cycle (22 Aug), not the next payday — `nextPayDate` is that.
+  const currentCycleEnd = calendar.ends[currentMonth] ?? null;
+  const nextPayDate = currentCycleEnd ? addDays(currentCycleEnd, 1) : null;
+  const curDay = cycleDay(asOf, currentCycleStart, cycleLen);
   const priorMonths = calcMonths.slice(0, -1);
   // Each category's "remaining" is projected with the weekly-envelope model, split per Monday-week:
   // elapsed weeks are locked at their actuals (a quiet week stays quiet), the current week tops up
   // to its average, and future weeks carry their averages. Group/Net remaining = sums of these.
   // Weeks are Mon–Sun and only the current week through the cycle end are surfaced (no past weeks).
-  const cycleEndDay = new Date(
-    currentCycleEnd.getFullYear(),
-    currentCycleEnd.getMonth(),
-    currentCycleEnd.getDate() - 1, // last day of this cycle = day before the next payday
-  );
-  const lastWeek = currentCycleStart ? mondayWeekIndex(cycleEndDay, currentCycleStart) : 0;
+  const lastWeek =
+    currentCycleStart && currentCycleEnd ? mondayWeekIndex(currentCycleEnd, currentCycleStart) : 0;
   const weekCount = Math.max(1, lastWeek + 1);
   const currentWeek = currentCycleStart
     ? Math.max(0, Math.min(lastWeek, mondayWeekIndex(asOf, currentCycleStart)))
@@ -259,6 +258,12 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     netWeeklyRemaining,
     currentCycleStart,
     currentCycleEnd,
+    nextPayDate,
+    cycleLength: cycleLen,
+    cycleDay: curDay,
+    daysToPayday: Math.max(0, cycleLen - curDay),
+    isProjectedCycleEnd: calendar.isProjected[currentMonth] ?? false,
+    dataThrough: calendar.dataThrough,
     missedPayments,
     transferIds,
     reversalIds,

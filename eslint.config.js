@@ -18,4 +18,9 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Tests and their helpers run under Node, not the browser.
+    files: ['**/*.test.{js,jsx}', 'src/test/**/*.js', 'scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
 ])
