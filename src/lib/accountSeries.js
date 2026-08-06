@@ -1,0 +1,127 @@
+import { parseTransactionDate } from '../utils/date';
+
+/**
+ * Per-account movement over time.
+ *
+ * The export carries no balance column, so this is NOT a balance — it is the cumulative sum of an
+ * account's transactions from zero at the first date in the file. The shape and the direction are
+ * real; the level is not, and the UI must say so.
+ *
+ * Two deliberate differences from the net-total chart:
+ *
+ *  - Transfers are INCLUDED. `netTransactions` strips them because moving money between your own
+ *    accounts isn't income or spend. But from a single account's point of view a transfer is a
+ *    real movement of that account's money, and excluding it would draw a line that never happened.
+ *  - The anchor is the first date in the whole dataset, not the visible window. Anchoring to the
+ *    window would make every curve jump each time the month slider moved.
+ */
+
+function parse(t) {
+  return t.DateObj ?? parseTransactionDate(t.Date);
+}
+
+export function buildAccountMovementSeries(data, selectedAccounts, { from, to } = {}) {
+  if (!data?.length) return { accounts: [], anchorDate: null };
+
+  const selected = new Set(selectedAccounts);
+  const rows = data
+    .filter((t) => selected.has(t.Account))
+    .map((t) => ({ account: t.Account, date: parse(t), amount: t.AmountNum }))
+    .filter((t) => t.date && !Number.isNaN(t.date.getTime()))
+    .sort((a, b) => a.date - b.date);
+
+  if (!rows.length) return { accounts: [], anchorDate: null };
+
+  const anchorDate = rows[0].date;
+  const start = from ?? anchorDate;
+  const end = to ?? rows[rows.length - 1].date;
+
+  const byAccount = new Map();
+  rows.forEach((r) => {
+    if (!byAccount.has(r.account)) {
+      byAccount.set(r.account, { running: 0, baseline: null, points: [] });
+    }
+    const entry = byAccount.get(r.account);
+    const before = entry.running;
+    entry.running += r.amount;
+    // Only keep points inside the window, but keep accumulating outside it so the curve enters the
+    // window at the right height. The baseline is where it entered.
+    if (r.date >= start && r.date <= end) {
+      if (entry.baseline === null) entry.baseline = before;
+      entry.points.push({ t: r.date.getTime(), value: entry.running, date: r.date });
+    }
+  });
+
+  const accounts = [...byAccount.entries()]
+    .map(([account, entry]) => {
+      const points = entry.points;
+      const values = points.map((p) => p.value);
+      const last = points[points.length - 1];
+      const baseline = entry.baseline ?? 0;
+      return {
+        account,
+        points,
+        baseline,
+        // Movement across the visible window, not since the beginning of the file.
+        change: points.length ? last.value - baseline : 0,
+        endValue: points.length ? last.value : 0,
+        min: values.length ? Math.min(...values) : 0,
+        max: values.length ? Math.max(...values) : 0,
+        lastActivity: last?.date ?? null,
+        count: points.length,
+      };
+    })
+    // Biggest movers first — the flat ones are rarely what you opened the page for.
+    .sort((a, b) => Math.abs(b.max - b.min) - Math.abs(a.max - a.min));
+
+  return { accounts, anchorDate, start, end };
+}
+
+/**
+ * One row per account for the Accounts table: what it did this cycle, what it typically does, and
+ * when it last moved. Transfers are included for the same reason as above.
+ */
+export function buildAccountSummaries(data, selectedAccounts, months, currentMonth) {
+  if (!data?.length) return [];
+  const selected = new Set(selectedAccounts);
+  const visible = new Set(months);
+  const byAccount = new Map();
+
+  data.forEach((t) => {
+    if (!selected.has(t.Account)) return;
+    const m = t['Pay Month'];
+    if (!visible.has(m)) return;
+    if (!byAccount.has(t.Account)) {
+      byAccount.set(t.Account, {
+        account: t.Account,
+        netByMonth: {},
+        cycleIn: 0,
+        cycleOut: 0,
+        count: 0,
+        lastActivity: null,
+      });
+    }
+    const e = byAccount.get(t.Account);
+    e.netByMonth[m] = (e.netByMonth[m] ?? 0) + t.AmountNum;
+    e.count += 1;
+    if (m === currentMonth) {
+      if (t.AmountNum >= 0) e.cycleIn += t.AmountNum;
+      else e.cycleOut += t.AmountNum;
+    }
+    const d = parse(t);
+    if (d && (!e.lastActivity || d > e.lastActivity)) e.lastActivity = d;
+  });
+
+  const prior = months.slice(0, -1);
+  return [...byAccount.values()]
+    .map((e) => {
+      const priorNets = prior.map((m) => e.netByMonth[m] ?? 0);
+      return {
+        ...e,
+        cycleNet: e.netByMonth[currentMonth] ?? 0,
+        typicalNet: priorNets.length ? priorNets.reduce((s, v) => s + v, 0) / priorNets.length : 0,
+        sparkline: months.map((m) => e.netByMonth[m] ?? 0),
+      };
+    })
+    .sort((a, b) => Math.abs(b.cycleNet) - Math.abs(a.cycleNet));
+}
