@@ -3,7 +3,7 @@ import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 export function Cell({ val, absolute = false, highlight = false }) {
   return (
     <span
-      className={`${
+      className={`tabular-nums ${
         val > 0.01 ? 'text-green-600' : val < -0.01 ? 'text-red-600' : 'text-slate-400'
       } ${
         highlight && Math.abs(val || 0) > 0.001
