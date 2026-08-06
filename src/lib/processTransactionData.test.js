@@ -68,6 +68,21 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
       .forEach((r) => expect(r.sub.every((s) => !s.isSpendingGroup)).toBe(true));
   });
 
+  it('routes everything the export calls a Transfer into Transfers', () => {
+    // Pair-matching alone left 15 labelled rows behind — including a R30 561 credit-card
+    // repayment that surfaced as Income Exceptions — because their other leg never matched.
+    const labelled = real.filter(
+      (t) => (t['Spending Group'] ?? '').trim() === 'Transfer' && processed.months.includes(t['Pay Month']),
+    );
+    expect(labelled.length).toBeGreaterThan(0);
+    expect(labelled.filter((t) => !processed.transferIds.has(t.id))).toEqual([]);
+
+    // ...and no spending group named Transfer is left sitting inside a flow.
+    processed.rows
+      .filter((r) => !r.isTransfer)
+      .forEach((r) => expect(r.sub.map((s) => s.name)).not.toContain('Transfer'));
+  });
+
   it('falls back to flat categories when the export has no Spending Group column', () => {
     const stripped = real.map((t) => {
       const copy = { ...t };

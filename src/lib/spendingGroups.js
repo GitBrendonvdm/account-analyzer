@@ -10,6 +10,7 @@
  */
 
 export const UNCLASSIFIED_SPENDING_GROUP = 'Unclassified';
+export const TRANSFER_SPENDING_GROUP = 'Transfer';
 
 /** Roughly committed-to-discretionary; unknown values are appended alphabetically. */
 export const SPENDING_GROUP_ORDER = [
