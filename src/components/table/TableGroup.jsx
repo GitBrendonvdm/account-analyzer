@@ -26,6 +26,11 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
           <ChevronRight size={16} className={`shrink-0 ${collapsed ? '' : 'rotate-90'}`} />
           <RowIcon config={groupIcon} size={16} />
           {group.name}
+          {group.isTransfer && (
+            <span className="text-xs font-normal text-slate-400">
+              always 0 — money moving between your own accounts
+            </span>
+          )}
         </td>
         {months.map((m) => (
           <td
@@ -33,8 +38,13 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
             className={`p-4 text-right ${
               m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
             }`}
+            title={
+              group.isTransfer
+                ? 'A transfer has two legs that cancel out, so it never adds to or subtracts from anything. The rows below show what moved.'
+                : undefined
+            }
           >
-            <Cell val={group.totalsByMonth[m]} absolute />
+            <Cell val={group.totalsByMonth[m]} absolute neutral={group.isTransfer} />
           </td>
         ))}
         <WeekCells

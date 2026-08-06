@@ -38,7 +38,12 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
               m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
             }`}
           >
-            <Cell val={sub.totalsByMonth[m]} absolute highlight={highlightUnmatchedTransfer} />
+            <Cell
+              val={sub.totalsByMonth[m]}
+              absolute
+              neutral={Boolean(sub.isVolume)}
+              highlight={highlightUnmatchedTransfer}
+            />
           </td>
         ))}
         <WeekCells

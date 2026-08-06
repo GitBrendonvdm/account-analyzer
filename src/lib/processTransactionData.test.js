@@ -68,14 +68,64 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
       .forEach((r) => expect(r.sub.every((s) => !s.isSpendingGroup)).toBe(true));
   });
 
-  it('routes everything the export calls a Transfer into Transfers', () => {
-    // Pair-matching alone left 15 labelled rows behind — including a R30 561 credit-card
-    // repayment that surfaced as Income Exceptions — because their other leg never matched.
+  it('charges loan instalments as spend, so switching loan accounts off changes nothing', () => {
+    const noLoans = accounts.filter((a) => !/\bLoan\b/i.test(a));
+    expect(noLoans.length).toBeLessThan(accounts.length);
+    const without = processTransactionData(real, noLoans, 6, asOf);
+
+    // The instalment is charged to the account it left, and a loan account holds nothing else that
+    // counts — so the flows are identical with the loan chips on or off. This was the whole bug:
+    // dropping the loan accounts previously removed ~R30k/cycle of cost from the table.
+    expect(without.totalsByMonth.Expense).toEqual(processed.totalsByMonth.Expense);
+    expect(without.totalsByMonth.Income).toEqual(processed.totalsByMonth.Income);
+
+    // ...and the instalment is counted once, as an expense, not as an internal movement.
+    const loanAccounts = accounts.filter((a) => /\bLoan\b/i.test(a));
+    const cents = (n) => Math.round(Math.abs(n) * 100);
+    const credited = new Set(
+      real
+        .filter((t) => loanAccounts.includes(t.Account) && t.AmountNum > 0)
+        .map((t) => `${t['Pay Month']}|${cents(t.AmountNum)}`),
+    );
+    const instalments = real.filter(
+      (t) =>
+        !loanAccounts.includes(t.Account) &&
+        t.AmountNum < 0 &&
+        processed.months.includes(t['Pay Month']) &&
+        credited.has(`${t['Pay Month']}|${cents(t.AmountNum)}`),
+    );
+    expect(instalments.length).toBeGreaterThan(0);
+    expect(instalments.filter((t) => processed.transferIds.has(t.id))).toEqual([]);
+
+    // Nothing inside a loan account reaches a flow — the interest and fees are already inside the
+    // instalment, and counting both would bill the same money twice.
+    const loanRows = processed.rows.flatMap((g) =>
+      (g.sub ?? []).flatMap((s) => (s.isSpendingGroup ? (s.sub ?? []) : [s])),
+    );
+    expect(
+      loanRows.flatMap((c) => (c.items ?? []).filter((t) => loanAccounts.includes(t.Account))),
+    ).toEqual([]);
+  });
+
+  it('keeps the export Transfer label only where the row is a movement', () => {
     const labelled = real.filter(
       (t) => (t['Spending Group'] ?? '').trim() === 'Transfer' && processed.months.includes(t['Pay Month']),
     );
     expect(labelled.length).toBeGreaterThan(0);
-    expect(labelled.filter((t) => !processed.transferIds.has(t.id))).toEqual([]);
+
+    // Pair-matching alone left labelled rows behind — including a R30 561 credit-card repayment
+    // that surfaced as Income Exceptions — because their other leg never matched. Those still get
+    // the label from their category.
+    const movements = labelled.filter((t) => /transfer|repayment/i.test(t.Category ?? ''));
+    expect(movements.length).toBeGreaterThan(0);
+    expect(movements.filter((t) => !processed.transferIds.has(t.id))).toEqual([]);
+
+    // But a labelled row whose category is real spending stays spending — the label is wrong on
+    // groceries, and honouring it deleted them from Expense.
+    const groceries = labelled.filter(
+      (t) => t.Category === 'Groceries' && !processed.transferIds.has(t.id),
+    );
+    expect(groceries.length).toBeGreaterThan(0);
 
     // ...and no spending group named Transfer is left sitting inside a flow.
     processed.rows

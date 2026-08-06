@@ -163,6 +163,19 @@ export function isTransferDescription(description = '') {
   return /\btransf\w*|\btrans\b/i.test(description);
 }
 
+/**
+ * Does the row's own category describe money moving between the user's accounts?
+ *
+ * The export's `Spending Group` column labels some rows "Transfer" that plainly aren't: groceries at
+ * Makro, a hosting invoice, a bet. Those rows carry `Type = Expense` and a real spending category,
+ * and the same merchant is filed as "Day-to-day" elsewhere in the same export — the label is simply
+ * wrong on them, and trusting it deleted R13 194 of real spend over four cycles. The category is the
+ * corroborating signal: keep the label where the row itself says internal movement.
+ */
+export function isInternalMovementCategory(category = '') {
+  return /transfer|repayment/i.test(category);
+}
+
 function markDescriptionTransfers(scoped, transferIds) {
   scoped.forEach((t) => {
     if (isTransferDescription(t.Description)) transferIds.add(t.id);

@@ -6,16 +6,6 @@ import { getGroupIconConfig, RowIcon } from './rowIcons';
 import { TransferMatchRow, groupMatches } from './TransferMatchRow';
 import { WeekCells } from './WeekCells';
 
-function transferVolumeByMonth(matches, months) {
-  const totals = Object.fromEntries(months.map((m) => [m, 0]));
-  matches.forEach((match) => {
-    if (months.includes(match.month)) {
-      totals[match.month] = (totals[match.month] || 0) + Math.abs(match.amount);
-    }
-  });
-  return totals;
-}
-
 export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
   const pairIcon = getGroupIconConfig('Transfers');
@@ -23,10 +13,9 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
     () => sortTableItems(groupMatches(sub.matches || [], months), sort),
     [sub.matches, months, sort],
   );
-  const volumeByMonth = useMemo(
-    () => transferVolumeByMonth(sub.matches || [], months),
-    [sub.matches, months],
-  );
+  // Gross volume, computed once in processTransactionData so sorting by a month column orders by
+  // the number actually on screen.
+  const volumeByMonth = sub.totalsByMonth ?? {};
 
   return (
     <>
@@ -65,7 +54,7 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
               m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
             }`}
           >
-            <Cell val={volumeByMonth[m] || null} />
+            <Cell val={volumeByMonth[m] || null} neutral />
           </td>
         ))}
         <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} />
