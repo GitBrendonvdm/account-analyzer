@@ -15,9 +15,7 @@
   },
   "dependencies": {
     "dexie": "^4.4.5",
-    "imapflow": "^1.7.1",
     "lucide-react": "^1.17.0",
-    "mailparser": "^3.9.15",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1"
