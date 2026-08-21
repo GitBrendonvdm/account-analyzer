@@ -3,7 +3,7 @@ import { PeriodNetChart } from './charts/PeriodNetChart';
 
 export function ChartsView({ chartData }) {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       <div className="glass overflow-hidden p-6">
         <NetTotalChart chartData={chartData?.running} />
       </div>

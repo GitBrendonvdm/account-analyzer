@@ -24,7 +24,7 @@ import { buildBudgetProgress } from './lib/budgets';
 import { buildGapClosers, buildTrajectory } from './lib/trajectory';
 import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
-import { TransactionTable } from './components/TransactionTable';
+import { LedgerView } from './components/LedgerView';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -191,7 +191,7 @@ export default function App() {
                 />
               )}
               {activeTab !== 'today' && <Headlines headlines={headlines} />}
-              {activeTab === 'table' && <TransactionTable processed={processed} />}
+              {activeTab === 'table' && <LedgerView processed={processed} positions={balanced} />}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
               {activeTab === 'habits' && <HabitsView habits={habits} />}
             {activeTab === 'plan' && (

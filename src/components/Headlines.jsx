@@ -22,7 +22,7 @@ export function Headlines({ headlines }) {
         const tone = TONE[h.tone] ?? TONE.neutral;
         const { Icon } = tone;
         return (
-          <div key={h.id} className={`flex gap-2.5 rounded-xl border p-4 ${tone.box}`}>
+          <div key={h.id} className={`flex gap-2.5 rounded-[22px] border p-4 ${tone.box}`}>
             <Icon size={16} className={`mt-0.5 shrink-0 ${tone.icon}`} />
             <div className="min-w-0">
               <p className={`text-sm leading-snug font-medium ${tone.text}`}>{h.text}</p>

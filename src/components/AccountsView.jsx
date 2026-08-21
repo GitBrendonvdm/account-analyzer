@@ -21,7 +21,7 @@ export function AccountsView({
   const suspicious = positions.filter((p) => p.type === 'Loan' && p.positionByMonth[currentMonth] > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       <BalancesEditor
         accounts={accounts}
         onSave={onSaveAccount}

@@ -19,7 +19,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
     <>
       <tr
         className={`cursor-pointer border-t font-bold ${
-          group.isException ? 'bg-amber-100' : group.isTransfer ? 'bg-fill text-label-2' : 'bg-fill'
+          group.isException ? 'bg-warn/12' : group.isTransfer ? 'bg-fill text-label-2' : 'bg-fill'
         }`}
         onClick={() => setCollapsed(!collapsed)}
       >

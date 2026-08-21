@@ -18,8 +18,8 @@ export function CostOfDebtPanel({ cost }) {
     <div className="glass p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-label">What the debt costs</h2>
-          <p className="mt-1 max-w-prose text-xs text-label-2">
+          <h2 className="t-head">What the debt costs</h2>
+          <p className="t-label mt-1.5 max-w-prose">
             Interest, fees and credit insurance across every account, including the loans. Kept out
             of the spending table because it is already inside the instalments — counting it there
             would bill the same money twice.
@@ -29,7 +29,7 @@ export function CostOfDebtPanel({ cost }) {
           <div className="text-2xl font-semibold text-bad tabular-nums">
             {formatCurrencyAbs(cost.perCycle)}
           </div>
-          <div className="text-xs text-label-2">
+          <div className="t-label">
             per cycle · {formatCurrencyAbs(cost.perYear)} a year
           </div>
         </div>

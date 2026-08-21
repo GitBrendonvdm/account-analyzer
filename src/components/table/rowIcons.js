@@ -48,11 +48,11 @@ export function getGroupIconConfig(groupName) {
 
 /** One stable icon per value of the export's `Spending Group` column. */
 const SPENDING_GROUP_ICON_CONFIG = {
-  'Day-to-day': { Icon: ShoppingBasket, className: 'text-sky-500' },
-  Recurring: { Icon: RefreshCw, className: 'text-teal-500' },
-  Debt: { Icon: CreditCard, className: 'text-rose-500' },
-  Insurance: { Icon: ShieldCheck, className: 'text-indigo-500' },
-  Communications: { Icon: Smartphone, className: 'text-cyan-500' },
+  'Day-to-day': { Icon: ShoppingBasket, className: 'text-info' },
+  Recurring: { Icon: RefreshCw, className: 'text-mint' },
+  Debt: { Icon: CreditCard, className: 'text-pink' },
+  Insurance: { Icon: ShieldCheck, className: 'text-deep' },
+  Communications: { Icon: Smartphone, className: 'text-mint' },
   'Bank Fees': { Icon: Landmark, className: 'text-label-2' },
   'Invest-save-repay': { Icon: PiggyBank, className: 'text-good' },
   Income: { Icon: Banknote, className: 'text-good' },

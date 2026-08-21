@@ -18,8 +18,8 @@ export function AccountsTable({ summaries, currentMonth, dataThrough }) {
   return (
     <div className="glass overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b p-4">
-        <h2 className="text-lg font-semibold text-label">Accounts</h2>
-        <p className="text-xs text-label-2">
+        <h2 className="t-head">Accounts</h2>
+        <p className="t-label">
           This cycle ({currentMonth}) against the typical cycle in range. Transfers included.
         </p>
       </div>

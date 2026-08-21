@@ -41,13 +41,25 @@ function Delta({ value }) {
   );
 }
 
-export function AccountPositionsTable({ positions, months, currentMonth }) {
+/**
+ * @param types restrict to these account types. The ledger shows only the accounts you actually
+ *   transact on — a bond's amortisation schedule sitting next to card spending is a different
+ *   subject, and belongs on the Accounts view where the whole balance sheet is the point.
+ */
+export function AccountPositionsTable({
+  positions,
+  months,
+  currentMonth,
+  types = ACCOUNT_TYPE_ORDER,
+  title = 'Position by pay cycle',
+  subtitle = 'Grouped by type, cards first. Higher is always better.',
+}) {
   if (!positions?.length) return null;
 
-  const byType = ACCOUNT_TYPE_ORDER.map((type) => ({
-    type,
-    accounts: positions.filter((p) => p.type === type),
-  })).filter((g) => g.accounts.length > 0);
+  const byType = types
+    .map((type) => ({ type, accounts: positions.filter((p) => p.type === type) }))
+    .filter((g) => g.accounts.length > 0);
+  if (byType.length === 0) return null;
 
   const groupTotal = (accounts, month) =>
     accounts.reduce((s, a) => s + (a.positionByMonth[month] ?? 0), 0);
@@ -57,15 +69,13 @@ export function AccountPositionsTable({ positions, months, currentMonth }) {
 
   return (
     <div className="glass overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b p-4">
-        <h2 className="text-lg font-semibold text-label">Position by pay cycle</h2>
-        <p className="text-xs text-label-2">
-          Grouped by type, cards first. Higher is always better.
-        </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-6 py-5">
+        <h2 className="t-head">{title}</h2>
+        <p className="t-label">{subtitle}</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="bg-fill text-xs tracking-wide text-label-2 uppercase">
+          <thead className="sticky-head text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">
             <tr>
               <th className="border-b p-3 font-medium">Account</th>
               <th className="border-b p-3 text-right font-medium text-label-3" title="Where the account stood before the first cycle shown.">

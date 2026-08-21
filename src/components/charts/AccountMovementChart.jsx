@@ -58,7 +58,7 @@ export function AccountMovementChart({ series }) {
   if (accounts.length === 0) {
     return (
       <div className="glass p-6">
-        <h2 className="text-lg font-semibold text-label">Account movement</h2>
+        <h2 className="t-head">Account movement</h2>
         <div className="flex h-40 items-center justify-center text-sm text-label-2">
           No account activity in the selected range.
         </div>
@@ -69,19 +69,19 @@ export function AccountMovementChart({ series }) {
   return (
     <div className="glass p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-label">Account movement</h2>
-        <p className="text-xs text-label-2">
+        <h2 className="t-head">Account movement</h2>
+        <p className="t-label">
           Cumulative change per account, each on its own scale. Transfers included.
         </p>
       </div>
-      <p className="mt-1 text-xs text-label-2">
+      <p className="t-label mt-1.5">
         This is movement, not a balance — the export has no balance column, so every line starts
         from zero at the beginning of the range.
       </p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {accounts.map((a) => (
-          <div key={a.account} className="rounded-lg border border-hair p-3">
+          <div key={a.account} className="rounded-xl border border-hair p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-sm font-medium text-label-2" title={a.account}>
                 {a.account}

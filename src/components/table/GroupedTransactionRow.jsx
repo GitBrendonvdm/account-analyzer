@@ -55,7 +55,7 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
                     val > 0 ? 'text-good' : 'text-bad'
                   } ${
                     highlightCells
-                      ? 'rounded bg-amber-100 px-1.5 py-0.5 ring-1 ring-amber-300'
+                      ? 'rounded bg-warn/15 px-1.5 py-0.5 ring-1 ring-warn/40'
                       : ''
                   }`}
                   title={group.datesByMonth[m]}

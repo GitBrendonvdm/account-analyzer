@@ -16,7 +16,7 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
       <button
         type="button"
         onClick={onAddBalances}
-        className="flex w-full items-center gap-3 rounded-xl border border-dashed border-hair bg-transparent p-5 text-left transition-colors hover:border-info/30 hover:bg-info/8"
+        className="flex w-full items-center gap-3 rounded-[22px] border border-dashed border-hair bg-transparent p-5 text-left transition-colors hover:border-info/30 hover:bg-info/8"
       >
         <Landmark size={20} className="shrink-0 text-label-3" />
         <div>
@@ -37,7 +37,7 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-wrap items-end gap-8">
           <div>
-            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">
+            <div className="text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">
               Net worth
             </div>
             <div
@@ -47,19 +47,19 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">Held</div>
+            <div className="text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">Held</div>
             <div className="mt-1 text-xl font-semibold text-good tabular-nums">
               {formatCurrencyAbs(assets)}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">Owed</div>
+            <div className="text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">Owed</div>
             <div className="mt-1 text-xl font-semibold text-bad tabular-nums">
               {formatCurrencyAbs(debt)}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">
+            <div className="text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">
               Over the window
             </div>
             <div
@@ -78,7 +78,7 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
           <button
             type="button"
             onClick={onAddBalances}
-            className="flex items-center gap-1.5 rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 text-xs text-warn hover:bg-amber-100"
+            className="flex items-center gap-1.5 rounded-xl border border-warn/25 bg-warn/10 px-3 py-2 text-xs text-warn hover:bg-warn/20"
           >
             <HelpCircle size={13} />
             {knownCount} of {totalCount} accounts valued — add {missing.slice(0, 2).join(', ')}

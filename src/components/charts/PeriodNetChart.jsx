@@ -62,12 +62,12 @@ export function PeriodNetChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-label">Net Per Month</h2>
+          <h2 className="t-head">Net Per Month</h2>
           <p className="text-sm text-label-2">
             Income minus expense per pay month · transfers excluded
           </p>
         </div>
-        <p className="text-xs text-label-2">
+        <p className="t-label">
           Weighted avg (excl. current):{' '}
           <span className="font-medium text-label-2">{formatCurrency(netAvg)}</span>
         </p>
@@ -116,7 +116,7 @@ export function PeriodNetChart({ chartData }) {
         </ResponsiveContainer>
       </div>
 
-      <p className="text-xs text-label-2">
+      <p className="t-label">
         Each bar is that month&apos;s net only (not cumulative). The current month stacks actual
         (green/red) with remaining (blue) to show the projected month-end net.
       </p>

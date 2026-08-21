@@ -108,10 +108,10 @@ export function BalancesEditor({ accounts, onSave, typeOverrideHint }) {
 
   return (
     <div className="glass overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-fill px-6 py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
         <div className="flex items-center gap-2">
           <Landmark size={16} className="text-label-3" />
-          <h2 className="text-sm font-semibold text-label">Balances</h2>
+          <h2 className="t-head">Balances</h2>
         </div>
         <p className="max-w-prose text-xs text-label-2">
           What each account holds <b>today</b>. Every past cycle is re-based from it, so re-entering

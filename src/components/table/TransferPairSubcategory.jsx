@@ -22,7 +22,7 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
   return (
     <>
       <tr
-        className="cursor-pointer border-t border-violet-100 bg-violet-50/60 text-label-2 hover:bg-violet-50"
+        className="cursor-pointer border-t border-deep/25 bg-deep/12/60 text-label-2 hover:bg-deep/12"
         onClick={() => setExpanded(!expanded)}
       >
         <td className="p-3 pl-12">

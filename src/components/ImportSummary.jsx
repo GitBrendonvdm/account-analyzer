@@ -16,7 +16,7 @@ export function ImportSummary({ summary, onDismiss }) {
   const examples = summary.updatedExamples ?? [];
 
   return (
-    <div className="rounded-xl border border-good/25 bg-good/10 p-4">
+    <div className="rounded-[22px] border border-good/25 bg-good/10 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <CircleCheck size={18} className="mt-0.5 shrink-0 text-good" />

@@ -33,7 +33,7 @@ export function AnalyzerToolbar({
           <FileSpreadsheet className="text-info" />
           Analyzer
         </h1>
-        {fileName && <p className="mt-1 text-xs text-label-2">Last import: {fileName}</p>}
+        {fileName && <p className="t-label mt-1.5">Last import: {fileName}</p>}
       </div>
       <div className="flex items-center gap-2 text-xs text-label-2">
         <span>{draftMonthRange} cycles</span>
@@ -69,7 +69,7 @@ export function AnalyzerToolbar({
           );
         })}
       </div>
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white">
+      <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-info px-4 py-2 text-sm text-white">
         {importing ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
         {importing ? 'Importing' : 'Import'}
         <input

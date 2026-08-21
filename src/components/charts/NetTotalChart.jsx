@@ -81,12 +81,12 @@ export function NetTotalChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-label">Net Total Over Time</h2>
+          <h2 className="t-head">Net Total Over Time</h2>
           <p className="text-sm text-label-2">
             Running net total ({granularityLabel[granularity]} buckets) · transfers excluded
           </p>
         </div>
-        <p className="text-xs text-label-2">
+        <p className="t-label">
           Avg monthly net (excl. current):{' '}
           <span className="font-medium text-label-2">{formatCurrency(netAvg)}</span>
         </p>

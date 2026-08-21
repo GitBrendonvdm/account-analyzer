@@ -28,7 +28,7 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeek
         return (
           <td
             key={m}
-            className={`p-4 text-right ${isCurrentMonth ? 'border-l-2 border-slate-500' : ''}`}
+            className={`p-4 text-right ${isCurrentMonth ? 'border-l-2 border-hair-strong' : ''}`}
             title={
               isCurrentMonth
                 ? 'Income minus expenses so far this cycle — actual, like every other row in this column. Add"Left to payday" for the projected close.'

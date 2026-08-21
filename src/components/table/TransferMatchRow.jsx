@@ -38,7 +38,7 @@ export function TransferMatchRow({ group, months, cycleWeeks }) {
             }`}
           >
             {val != null && Math.abs(val) > 0.001 ? (
-              <span className="font-medium text-violet-700">{formatCurrency(Math.abs(val))}</span>
+              <span className="font-medium text-deep">{formatCurrency(Math.abs(val))}</span>
             ) : (
               ''
             )}

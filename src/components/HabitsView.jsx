@@ -8,10 +8,10 @@ const fmtDate = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
 function Panel({ title, subtitle, children, right }) {
   return (
     <section className="glass overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-fill px-6 py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
         <div>
-          <h2 className="text-sm font-semibold text-label">{title}</h2>
-          {subtitle && <p className="mt-1 max-w-prose text-xs text-label-2">{subtitle}</p>}
+          <h2 className="t-head">{title}</h2>
+          {subtitle && <p className="t-label mt-1.5 max-w-prose">{subtitle}</p>}
         </div>
         {right}
       </div>
@@ -28,7 +28,7 @@ function Spark({ values }) {
       {values.map((v, i) => (
         <span
           key={i}
-          className="w-1.5 rounded-sm bg-slate-300"
+          className="w-1.5 rounded-sm bg-fill-2"
           style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
         />
       ))}
@@ -88,7 +88,7 @@ export function HabitsView({ habits }) {
   const down = movers.filter((m) => m.delta < 0).slice(0, 6);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       <Panel
         title="Where the money goes"
         subtitle="Grouped by merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so the same shop reads as one line."
@@ -123,13 +123,13 @@ export function HabitsView({ habits }) {
             <div className="text-xl font-semibold text-label tabular-nums">
               {formatCurrencyAbs(subscriptions.total)}
             </div>
-            <div className="text-xs text-label-2">
+            <div className="t-label">
               per cycle · {formatCurrencyAbs(subscriptions.total * 12)} a year
             </div>
           </div>
         }
       >
-        <div className="flex flex-wrap gap-x-8 gap-y-3 border-b bg-fill px-6 py-4">
+        <div className="flex flex-wrap gap-x-8 gap-y-3 border-b px-6 py-5">
           {subscriptions.byGroup.map((g) => (
             <div key={g.group}>
               <div className="text-[11px] tracking-wide text-label-2 uppercase">{g.group}</div>
@@ -203,7 +203,7 @@ export function HabitsView({ habits }) {
                     {Math.round(w.perCycle / 1000)}k
                   </span>
                   <div
-                    className={`w-full rounded-t ${w.day === busiest.day ? 'bg-info' : 'bg-slate-200'}`}
+                    className={`w-full rounded-t ${w.day === busiest.day ? 'bg-info' : 'bg-fill'}`}
                     style={{ height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%` }}
                     title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
                   />

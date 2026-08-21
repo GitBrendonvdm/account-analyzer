@@ -18,7 +18,7 @@ const STALE_TONE = {
 function Stat({ label, value, tone = 'text-label', sub, title }) {
   return (
     <div className="min-w-0" title={title}>
-      <div className="text-xs font-medium tracking-wide text-label-2 uppercase">{label}</div>
+      <div className="text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">{label}</div>
       <div className={`mt-1 truncate text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
       {sub && <div className="mt-0.5 truncate text-xs text-label-2">{sub}</div>}
     </div>
@@ -156,7 +156,7 @@ export function CycleSummary({ summary }) {
       </div>
 
       {missedPayments.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-warn/10 p-3 text-xs text-warn">
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-warn/10 p-3 text-xs text-warn">
           <AlertTriangle size={14} className="shrink-0" />
           <span className="font-medium">Usually paid by now:</span>
           {missedPayments.map((m) => (
