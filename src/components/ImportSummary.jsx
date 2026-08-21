@@ -1,0 +1,80 @@
+import { X, FilePlus2, RefreshCw, CircleCheck } from 'lucide-react';
+
+/**
+ * What the last import actually did.
+ *
+ * Imports used to be invisible and destructive — you uploaded a file, the dataset was replaced, and
+ * nothing told you that rows had fallen off the far end of the window. Now nothing is deleted, and
+ * the app says what changed: how much was genuinely new, what was revised (a Pending charge
+ * settling, a category re-assigned upstream), and whether an account arrived or was renamed.
+ */
+export function ImportSummary({ summary, onDismiss }) {
+  if (!summary) return null;
+  const { fileName, rowsTotal, added, updated, unchanged, dateFrom, dateTo } = summary;
+  const renamed = summary.accountsRenamed ?? [];
+  const created = summary.accountsNew ?? [];
+  const examples = summary.updatedExamples ?? [];
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <CircleCheck size={18} className="mt-0.5 shrink-0 text-emerald-600" />
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-emerald-900">
+              Imported {fileName} · {rowsTotal.toLocaleString('en-ZA')} rows read
+              {dateFrom && dateTo && (
+                <span className="font-normal text-emerald-700">
+                  {' '}
+                  covering {dateFrom} to {dateTo}
+                </span>
+              )}
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-emerald-800">
+              <li className="flex items-center gap-1.5">
+                <FilePlus2 size={12} />
+                <b className="font-semibold">{added.toLocaleString('en-ZA')}</b> new
+              </li>
+              <li className="flex items-center gap-1.5">
+                <RefreshCw size={12} />
+                <b className="font-semibold">{updated.toLocaleString('en-ZA')}</b> revised
+              </li>
+              <li>
+                <b className="font-semibold">{unchanged.toLocaleString('en-ZA')}</b> already held
+              </li>
+            </ul>
+
+            {examples.length > 0 && (
+              <ul className="mt-2 space-y-0.5 text-xs text-emerald-700">
+                {examples.map((ex) => (
+                  <li key={`${ex.date}-${ex.description}`} className="truncate">
+                    {ex.date} · {ex.description} — {ex.fields.join('; ')}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {created.length > 0 && (
+              <p className="mt-2 text-xs text-emerald-800">
+                New account{created.length > 1 ? 's' : ''}: {created.join(', ')}
+              </p>
+            )}
+            {renamed.length > 0 && (
+              <p className="mt-1 text-xs text-emerald-800">
+                Renamed by the export, kept as one account: {renamed.join(', ')}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="shrink-0 rounded p-1 text-emerald-700 hover:bg-emerald-100"
+          aria-label="Dismiss import summary"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}

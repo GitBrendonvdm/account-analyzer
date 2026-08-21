@@ -30,6 +30,19 @@ export function parseAccount(raw) {
   };
 }
 
+/**
+ * Stable identity for an account across exports: bank + mask, never the full display string.
+ *
+ * The 21 August export renamed "FNB Savings *9547" to "FNB Bank *9547" — same account, same mask,
+ * new type label. Keyed on the display string that reads as one account vanishing and another
+ * appearing, splitting its history and detaching anything stored against it.
+ */
+export function accountIdOf(rawName) {
+  const { bank, mask } = parseAccount(rawName);
+  if (!bank || !mask) return `raw|${(rawName ?? '').trim().toLowerCase()}`;
+  return `${bank.toLowerCase()}|${mask.toLowerCase()}`;
+}
+
 export function compareAccountTypes(a, b) {
   const ia = ACCOUNT_TYPE_ORDER.indexOf(a);
   const ib = ACCOUNT_TYPE_ORDER.indexOf(b);

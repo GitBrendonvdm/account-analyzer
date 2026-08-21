@@ -10,6 +10,8 @@
  * hence "projected close" rather than "available", and "left to spend" rather than "balance".
  */
 
+import { STALE_ALARM_DAYS, STALE_WARN_DAYS } from '../constants';
+
 const DAY_MS = 86400000;
 
 function wholeDaysBetween(from, to) {
@@ -53,6 +55,8 @@ export function deriveCycleSummary(processed, asOf = new Date()) {
   const typicalSpend = Math.abs(expenseAvg);
 
   const staleDays = dataThrough ? Math.max(0, wholeDaysBetween(dataThrough, asOf)) : 0;
+  const staleLevel =
+    staleDays >= STALE_ALARM_DAYS ? 'alarm' : staleDays >= STALE_WARN_DAYS ? 'warn' : 'fresh';
 
   // How the cycle is tracking: >1 means spending faster than a typical cycle by this point.
   // Uses share-of-cycle rather than share-of-days, because spend is heavily front-loaded.
@@ -72,6 +76,7 @@ export function deriveCycleSummary(processed, asOf = new Date()) {
 
     dataThrough,
     staleDays,
+    staleLevel,
 
     income: {
       received: currentMonthIncome,

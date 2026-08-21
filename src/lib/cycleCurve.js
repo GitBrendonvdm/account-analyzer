@@ -125,10 +125,15 @@ export function buildCycleCalendar(transactions, months, asOf = new Date()) {
     return dayOfMonth(year, monthIndex + startMonthOffset, boundaryDom);
   };
 
-  const dataThrough = present.reduce(
+  // The last date the export reaches — never later than the moment we're reporting as of. An
+  // export can legitimately contain rows dated after `asOf` when time is being simulated (the
+  // backtest replays past cycles against the full file), and "data through tomorrow" would both
+  // read as nonsense and let the overdue check treat unobserved days as observed.
+  const latestPresent = present.reduce(
     (latest, m) => (latest && latest > ranges[m].max ? latest : ranges[m].max),
     null,
   );
+  const dataThrough = latestPresent && asOf && latestPresent > asOf ? asOf : latestPresent;
   const currentMonth = present[present.length - 1];
 
   const starts = {};

@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, Undo2 } from 'lucide-react';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
-import { getGroupIconConfig, RowIcon } from './rowIcons';
-import { TransferMatchRow, groupMatches } from './TransferMatchRow';
+import { RowIcon } from './RowIcon';
+import { getGroupIconConfig } from './rowIcons';
+import { TransferMatchRow } from './TransferMatchRow';
+import { groupMatches } from './groupMatches';
 import { WeekCells } from './WeekCells';
 
 export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
-import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON, RowIcon } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON } from './rowIcons';
 import { VariantTransactionRow } from './VariantTransactionRow';
 import { WeekCells } from './WeekCells';
 
