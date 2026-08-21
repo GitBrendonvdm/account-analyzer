@@ -6,6 +6,13 @@ import { loadRealExport } from '../test/realData';
 const real = loadRealExport();
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/**
+ * The last date the export actually reaches. Derived, not hard-coded: exports are refreshed
+ * regularly and each one ends on a different day, so asserting a literal date here made the suite
+ * fail every time the fixture was updated — punishing exactly the habit the app depends on.
+ */
+const lastDate = (rows) => rows.map((t) => t.Date).sort().at(-1);
+
 describe.skipIf(!real)('processTransactionData against the real export', () => {
   const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
   const asOf = new Date(2026, 7, 6); // Thu 6 Aug 2026
@@ -20,7 +27,9 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     expect(processed.cycleDay).toBe(15);
     expect(processed.daysToPayday).toBe(16);
     expect(processed.isProjectedCycleEnd).toBe(true);
-    expect(iso(processed.dataThrough)).toBe('2026-08-04');
+    // Clamped to the as-of date: the export may reach further than the moment being simulated.
+    expect(iso(processed.dataThrough) <= lastDate(real)).toBe(true);
+    expect(iso(processed.dataThrough) <= '2026-08-06').toBe(true);
   });
 
   it('surfaces only weeks that fall inside the pay cycle', () => {

@@ -4,6 +4,17 @@ import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 const DAY_MONTH = { day: 'numeric', month: 'short' };
 const fmtDate = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
 
+/**
+ * Staleness is the one condition that silently invalidates every other figure on this card, so it
+ * escalates rather than sitting at a constant grey whisper: the previous badge looked identical at
+ * two days behind and at seventeen.
+ */
+const STALE_TONE = {
+  fresh: 'bg-slate-50 text-slate-500',
+  warn: 'bg-amber-50 text-amber-700',
+  alarm: 'bg-red-50 font-medium text-red-700',
+};
+
 function Stat({ label, value, tone = 'text-slate-800', sub, title }) {
   return (
     <div className="min-w-0" title={title}>
@@ -31,6 +42,7 @@ export function CycleSummary({ summary }) {
     isProjectedEnd,
     dataThrough,
     staleDays,
+    staleLevel,
     income,
     expense,
     projectedClose,
@@ -61,7 +73,9 @@ export function CycleSummary({ summary }) {
             Day {cycleDay} of {cycleLength}
           </span>
           <span className="text-slate-400">·</span>
-          <span>{daysToPayday} days to payday</span>
+          <span>
+            {daysToPayday} day{daysToPayday === 1 ? '' : 's'} to payday
+          </span>
           {isProjectedEnd && (
             <span
               className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500"
@@ -73,10 +87,12 @@ export function CycleSummary({ summary }) {
         </div>
         {dataThrough && (
           <div
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
-              staleDays >= 2 ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-500'
-            }`}
-            title="Nothing after this date is in the file, so recent spend may not be reflected yet."
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${STALE_TONE[staleLevel]}`}
+            title={
+              staleLevel === 'fresh'
+                ? 'Nothing after this date is in the file, so recent spend may not be reflected yet.'
+                : `The export is ${staleDays} days old. Everything under "so far" is missing that much spend, and the forecast is filling the gap with averages rather than what you actually did.`
+            }
           >
             <Clock size={12} />
             Data through {fmtDate(dataThrough)}
@@ -104,7 +120,7 @@ export function CycleSummary({ summary }) {
           label="Still to spend"
           value={formatCurrencyAbs(expense.remaining)}
           tone="text-blue-600"
-          sub={`${formatCurrencyAbs(forecastPerDay)} / day over ${daysToPayday} days`}
+          sub={`${formatCurrencyAbs(forecastPerDay)} / day over ${daysToPayday} day${daysToPayday === 1 ? '' : 's'}`}
           title="Forecast spend between now and payday. Completed weeks are locked at what actually happened; the current week is prorated by how much of it is left."
         />
         <Stat

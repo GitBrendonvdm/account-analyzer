@@ -38,6 +38,20 @@ export const DISCRETE_MAX_TXN_PER_CYCLE = 3;
 /** Below this much total spend (ZAR) a weekday shape is noise; fall back to a flat curve. */
 export const WEEKDAY_CURVE_MIN_MASS = 1000;
 
+/**
+ * A scheduled payment is not just a category that shows up often — it repeats at a stable amount.
+ * Dispersion is measured robustly (median absolute deviation over the median) so one double
+ * payment doesn't disqualify a real debit order, and the gate is what separates "Vehicle Loan,
+ * R4 991 every cycle" from "Clothing, somewhere between R100 and R4 202".
+ */
+export const MISSED_MAX_AMOUNT_DISPERSION = 0.25;
+/** And it lands in nearly every cycle, not merely a majority of them. */
+export const MISSED_MIN_OCCURRENCE_RATE = 0.8;
+
+/** Days behind before the staleness badge escalates from a note to a warning, then to an alarm. */
+export const STALE_WARN_DAYS = 3;
+export const STALE_ALARM_DAYS = 7;
+
 export const GROUP_ORDER = [
   'Income',
   'Expense',
