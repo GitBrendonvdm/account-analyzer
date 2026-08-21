@@ -98,7 +98,7 @@ export default function App() {
   );
 
   const curve = useMemo(
-    () => (processed ? buildCycleCurve(data, selectedAccounts, processed) : null),
+    () => (processed ? buildCycleCurve(data, selectedAccounts, processed, { cycles: 3 }) : null),
     [data, selectedAccounts, processed],
   );
 

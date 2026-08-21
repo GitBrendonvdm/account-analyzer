@@ -52,6 +52,13 @@ export const MISSED_MIN_OCCURRENCE_RATE = 0.8;
 export const STALE_WARN_DAYS = 3;
 export const STALE_ALARM_DAYS = 7;
 
+/**
+ * Colours for overlaid pay cycles. Three clearly separated hues rather than three shades of one —
+ * neighbouring blues read as the same line at a glance, which defeats the comparison. Order is
+ * newest first: the current cycle is the blue.
+ */
+export const CYCLE_TONES = ['#0a84ff', '#ff9f0a', '#63e6e2', '#ff375f'];
+
 export const GROUP_ORDER = [
   'Income',
   'Expense',
