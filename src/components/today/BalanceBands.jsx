@@ -1,61 +1,66 @@
+import { useMemo } from 'react';
 import { CycleLegend, CycleOverlay } from './CycleOverlay';
-import { formatCurrencyAbs } from '../../utils/format';
 
 /**
- * What the accounts held, three cycles overlaid.
+ * What the accounts did, three cycles overlaid, each starting at zero.
  *
- * Every account summed into one line — cash, savings and cards together — because the question is
- * "how much is there", and one number answers it. Overlaying the cycles on a day-of-cycle axis then
- * shows whether this month is running above or below the last two at the same point, which a single
- * continuous line across three months cannot show.
+ * Every account is summed into a single line — cash, savings and cards together — because the
+ * question is how much moved, and one number answers it. Loans are excluded and not optional.
+ *
+ * EVERY CYCLE STARTS AT ZERO. Drawn as a raw running balance, cycles begin wherever the previous
+ * one ended, and those openings differ by tens of thousands: the chart became three roughly
+ * parallel lines at different heights, which reads as enormous differences when it is mostly just
+ * the starting height. It also made this chart incomparable with the spend curve above it, which
+ * has always started each cycle at zero. Rebasing to the opening balance puts both charts on the
+ * same footing — day 1 is the origin in each, and the lines compare what a cycle DID rather than
+ * where it happened to begin.
+ *
+ * The level is not lost: the legend carries where each cycle finished, which is the number you
+ * would have read off the y-axis anyway.
  */
 export function BalanceBands({ series }) {
-  if (!series?.series?.length) return null;
+  const shown = useMemo(
+    () =>
+      series?.series?.map((s) => ({
+        ...s,
+        points: s.change,
+        total: s.total - s.opening,
+      })) ?? null,
+    [series],
+  );
 
-  const against = series.againstPrevious;
-  const previous = series.series.find((s) => !s.isCurrent);
+  if (!shown?.length) return null;
 
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="t-head">What the accounts hold</h2>
+          <h2 className="t-head">What the accounts did</h2>
           <p className="t-label mt-1.5">
             {series.anchored
-              ? 'Every account except the loans, summed.'
-              : `Movement, not balances — ${series.anchoredCount} of ${series.accountCount} accounts have a balance entered, so the shape is exact and the level is anchored at zero.`}
+              ? 'Every account except the loans, summed — each cycle from zero at its opening.'
+              : `Each cycle from zero at its opening. ${series.anchoredCount} of ${series.accountCount} accounts have a balance entered, so the movement is exact even where the level is not.`}
           </p>
         </div>
-        <CycleLegend
-          series={series.series}
-          tone={(s) => (s.total < 0 ? 'text-bad' : 'text-good')}
-        />
+        <CycleLegend series={shown} tone={(s) => (s.total < 0 ? 'text-bad' : 'text-good')} />
       </div>
 
       <div className="mt-5">
         <CycleOverlay
-          series={series.series}
-          length={series.length}
-          min={series.min}
-          max={series.max}
+          series={shown}
+          length={series.changeLength}
+          min={series.changeMin}
+          max={series.changeMax}
           idPrefix="bal"
           deltaMode="peak"
+          dayLabel={(d) => (d === 0 ? 'Start' : `Day ${d}`)}
         />
       </div>
 
       <p className="t-caption mt-4 border-t pt-4">
         Loans excluded — a bond amortises on its own schedule and its size would flatten everything
-        else against the axis.
-        {against != null && previous && (
-          <>
-            {' '}
-            This cycle is{' '}
-            <span className={against >= 0 ? 'text-good' : 'text-bad'}>
-              {formatCurrencyAbs(against)} {against >= 0 ? 'above' : 'below'}
-            </span>{' '}
-            where {previous.label} finished.
-          </>
-        )}
+        else against the axis. Each line starts at zero at its own opening, so they compare what each cycle moved rather
+        than where it began.
       </p>
     </div>
   );

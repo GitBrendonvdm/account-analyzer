@@ -162,12 +162,20 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
       depth: i,
       isCurrent,
       points,
+      // The same line rebased so every cycle begins at zero.
+      //
+      // A leading origin point matters: each stored point is the CLOSE of a day, so without it the
+      // line starts at day one's net rather than at nothing — and when the cycle boundary is payday
+      // that is a R75 000 jump before the chart has drawn anything. Index 0 is the opening balance
+      // (zero by definition), index i is the close of day i.
+      change: [0, ...points.map((v) => (v == null ? null : v - opening))],
       total: known.length ? known[known.length - 1] : opening,
       opening,
     };
   });
 
   const values = series.flatMap((s) => s.points.filter((v) => v != null));
+  const changes = series.flatMap((s) => s.change.filter((v) => v != null));
   if (values.length === 0) return null;
 
   const current = series.find((s) => s.isCurrent);
@@ -181,6 +189,10 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
     // draws a zero line only when zero actually falls inside the range.
     max: Math.max(...values),
     min: Math.min(...values),
+    changeMax: Math.max(...changes, 0),
+    changeMin: Math.min(...changes, 0),
+    // One longer than the day axis: the extra slot at the front is the opening.
+    changeLength: length + 1,
     cycles: window.length,
     anchored: present.length > 0 && anchored === present.length,
     anchoredCount: anchored,
