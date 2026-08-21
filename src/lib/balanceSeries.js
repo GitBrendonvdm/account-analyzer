@@ -115,6 +115,7 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
       month,
       label: isCurrent ? 'This cycle' : cycleLabel(month),
       colour: CYCLE_TONES[i % CYCLE_TONES.length],
+      depth: i,
       isCurrent,
       points,
       total: known.length ? known[known.length - 1] : 0,

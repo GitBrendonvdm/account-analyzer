@@ -39,6 +39,7 @@ export function BalanceBands({ series }) {
           min={series.min}
           max={series.max}
           idPrefix="bal"
+          deltaMode="peak"
         />
       </div>
 
