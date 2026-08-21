@@ -1,5 +1,5 @@
 import { parseTransactionDate } from '../utils/date';
-import { compareAccountTypes, parseAccount } from './accounts';
+import { accountIdOf, compareAccountTypes, parseAccount } from './accounts';
 
 /**
  * Per-account movement over time.
@@ -124,6 +124,7 @@ export function buildAccountPositions(data, selectedAccounts, months) {
         positionByMonth[m] = carried;
       });
       const meta = parseAccount(account);
+      const accountId = accountIdOf(account);
       const deltas = months.map((m) => e.moved[m] ?? 0);
       // Where the account stood before the first visible cycle. Without this the Change column
       // wouldn't reconcile with the columns beside it: the first position shown already contains
@@ -133,6 +134,7 @@ export function buildAccountPositions(data, selectedAccounts, months) {
       const priorDeltas = deltas.slice(0, -1).filter((_, i) => e.position[months[i]] != null);
       return {
         account,
+        accountId,
         ...meta,
         openingPosition,
         positionByMonth,
