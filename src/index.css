@@ -148,6 +148,21 @@ body {
   border-radius: var(--radius-chip);
 }
 
+/**
+ * Chart height scales with the window.
+ *
+ * Fixed at 210px, the charts left a growing band of empty ground under the page as screens got
+ * taller — a 1440px-tall window had 150px of nothing below the last card, and a 4K screen far more.
+ * Nothing was capping the page; it simply ran out of content. So the frame grows into whatever
+ * height is available and never drops below the height it used to have.
+ */
+.chart-frame {
+  flex: 1 1 auto;
+  min-height: 210px;
+  /* And a ceiling, so growing to fill does not itself push the page into a scrollbar. */
+  max-height: 30vh;
+}
+
 /* Content scrolls under floating chrome; a gradient mask replaces the 1px divider. */
 .chrome-fade {
   background: linear-gradient(to bottom, var(--color-ground) 30%, transparent);

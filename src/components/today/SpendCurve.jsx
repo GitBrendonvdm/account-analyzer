@@ -21,7 +21,7 @@ export function SpendCurve({ curve }) {
           : `Level with ${curve.comparedWith} at the same point`;
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="t-head">Spend through the cycle</h2>
@@ -30,7 +30,7 @@ export function SpendCurve({ curve }) {
         <CycleLegend series={curve.series} />
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 flex min-h-0 flex-grow flex-col">
         <CycleOverlay
           series={curve.series}
           length={curve.length}

@@ -215,16 +215,18 @@ export function CycleOverlay({
 
   return (
     <div
+      className="flex min-h-0 flex-grow flex-col"
       onKeyDown={(e) => {
         if (e.key === 'Escape') reset();
       }}
     >
-      <div className="relative">
+      <div className="relative flex min-h-0 flex-grow flex-col">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
-          className="block h-[210px] w-full touch-none select-none"
+          className="chart-frame block w-full touch-none select-none"
+          height="100%"
           style={{ cursor: drag ? 'ew-resize' : 'crosshair' }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}

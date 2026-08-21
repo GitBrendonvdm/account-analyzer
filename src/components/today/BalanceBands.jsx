@@ -32,7 +32,7 @@ export function BalanceBands({ series }) {
   if (!shown?.length) return null;
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="t-head">What the accounts did</h2>
@@ -45,7 +45,7 @@ export function BalanceBands({ series }) {
         <CycleLegend series={shown} tone={(s) => (s.total < 0 ? 'text-bad' : 'text-good')} />
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 flex min-h-0 flex-grow flex-col">
         <CycleOverlay
           series={shown}
           length={series.changeLength}

@@ -82,9 +82,11 @@ export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt
   return (
     /* On an ultrawide a column of full-width bands strands the content in empty space, so past
        1800px the page becomes a 12-track grid and the blocks pair up instead of stacking. */
-    <div className="grid grid-cols-1 gap-5 3xl:grid-cols-12">
+    /* flex-grow + a stretching chart row is what stops the page ending early and leaving bare
+       ground below it — nothing was capping the height, there simply was not enough content. */
+    <div className="grid flex-grow grid-cols-1 gap-5 3xl:grid-cols-12 3xl:grid-rows-[auto_minmax(0,1fr)_auto_auto]">
       {/* hero */}
-      <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-7 3xl:grid-cols-[1.15fr_0.85fr]">
+      <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-12 3xl:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <div className="t-label">Safe to spend before payday</div>
           <div className={`t-hero num mt-2.5 ${negative ? 'text-bad' : 'text-good'}`}>
@@ -127,18 +129,18 @@ export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt
       </Card>
 
       {curve && (
-        <Card className="materialize p-7 sm:p-8 3xl:col-span-5 3xl:flex 3xl:flex-col 3xl:justify-center">
+        <Card className="materialize flex flex-col p-7 sm:p-8 3xl:col-span-6">
           <SpendCurve curve={curve} />
         </Card>
       )}
 
       {balances && (
-        <Card className="materialize p-7 sm:p-8 3xl:col-span-12">
+        <Card className="materialize flex flex-col p-7 sm:p-8 3xl:col-span-6">
           <BalanceBands series={balances} />
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3 3xl:col-span-5 3xl:grid-cols-1">
+      <div className="grid gap-4 md:grid-cols-3 3xl:col-span-12">
         <Tile className="rise p-6">
           <Figure
             label="Came in"
@@ -186,7 +188,7 @@ export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt
         </Tile>
       </div>
 
-      <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} className="3xl:col-span-7" />
+      <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} className="3xl:col-span-12" />
     </div>
   );
 }

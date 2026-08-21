@@ -180,7 +180,7 @@ export default function App() {
           dataThrough={processed?.dataThrough}
           staleLevel={summary?.staleLevel}
         />
-        <div className="flex flex-col gap-5 pt-2">
+        <div className="flex min-h-[calc(100vh-9.5rem)] flex-col gap-5 pt-2">
           <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
           {processed ? (
             <>
