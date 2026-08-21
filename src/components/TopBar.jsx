@@ -5,6 +5,7 @@ import { accountLabel } from '../db/accountIdentity';
 const VIEWS = [
   { id: 'today', label: 'Today' },
   { id: 'table', label: 'Ledger' },
+  { id: 'charts', label: 'Trends' },
   { id: 'habits', label: 'Habits' },
   { id: 'plan', label: 'Plan' },
   { id: 'accounts', label: 'Accounts' },

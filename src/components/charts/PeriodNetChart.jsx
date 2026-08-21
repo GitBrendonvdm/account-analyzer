@@ -12,11 +12,11 @@ import {
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
 
-const REMAINING_COLOR = '#2563eb';
+const REMAINING_COLOR = '#0a84ff';
 
 function actualBarColor(value) {
-  if (value > 0.01) return '#16a34a';
-  if (value < -0.01) return '#dc2626';
+  if (value > 0.01) return '#30d158';
+  if (value < -0.01) return '#ff453a';
   return 'rgba(235,235,245,0.4)';
 }
 

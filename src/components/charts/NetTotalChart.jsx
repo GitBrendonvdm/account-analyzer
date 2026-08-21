@@ -81,8 +81,8 @@ export function NetTotalChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="t-head">Net Total Over Time</h2>
-          <p className="text-sm text-label-2">
+          <h2 className="t-head">Net total over time</h2>
+          <p className="t-label mt-1.5">
             Running net total ({granularityLabel[granularity]} buckets) · transfers excluded
           </p>
         </div>
@@ -128,10 +128,10 @@ export function NetTotalChart({ chartData }) {
               type="monotone"
               dataKey="expectedProjected"
               name="Remaining projection"
-              stroke="#2563eb"
+              stroke="#0a84ff"
               strokeWidth={2}
               strokeDasharray="6 4"
-              dot={{ r: 3, fill: '#2563eb' }}
+              dot={{ r: 3, fill: '#0a84ff' }}
               connectNulls
             />
           </LineChart>

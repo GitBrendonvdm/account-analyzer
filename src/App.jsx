@@ -183,6 +183,7 @@ export default function App() {
                   summary={summary}
                   safe={safe}
                   curve={curve}
+                  chartData={chartData}
                   netWorth={netWorth}
                   costOfDebt={costOfDebt}
                   positions={balanced.map((p) => ({ ...p, currentMonthKey: processed.currentMonth }))}

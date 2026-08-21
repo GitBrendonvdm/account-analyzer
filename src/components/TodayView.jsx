@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowRight, Clock } from 'lucide-react';
 import { Card, Figure, Tile } from './ui/Surface';
 import { CycleDial } from './today/CycleDial';
 import { SpendCurve } from './today/SpendCurve';
+import { NetTotalChart } from './charts/NetTotalChart';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
@@ -60,7 +61,7 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
  * than being the front page. That inversion is the point of the rework — the table answers "what
  * exactly", which is a question you go looking for, not one you need answered on arrival.
  */
-export function TodayView({ summary, safe, curve, netWorth, costOfDebt, positions, habits, onOpenLedger }) {
+export function TodayView({ summary, safe, curve, chartData, netWorth, costOfDebt, positions, habits, onOpenLedger }) {
   if (!summary) return null;
 
   const negative = (safe?.safe ?? 0) <= 0;
@@ -128,6 +129,12 @@ export function TodayView({ summary, safe, curve, netWorth, costOfDebt, position
       {curve && (
         <Card className="materialize p-7 sm:p-8 3xl:col-span-5 3xl:flex 3xl:flex-col 3xl:justify-center">
           <SpendCurve curve={curve} />
+        </Card>
+      )}
+
+      {chartData?.running?.points?.length > 0 && (
+        <Card className="materialize p-7 sm:p-8 3xl:col-span-12">
+          <NetTotalChart chartData={chartData.running} />
         </Card>
       )}
 

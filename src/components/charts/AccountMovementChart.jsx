@@ -37,7 +37,7 @@ function Sparkline({ points, positive }) {
 
   const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.t).toFixed(1)},${sy(p.value).toFixed(1)}`).join(' ');
   const area = `${line} L${W},${H} L0,${H} Z`;
-  const stroke = positive ? '#16a34a' : '#dc2626';
+  const stroke = positive ? '#30d158' : '#ff453a';
   // Where zero sits, when the curve actually crosses it.
   const zeroY = y0 <= 0 && y1 >= 0 ? sy(0) : null;
 
