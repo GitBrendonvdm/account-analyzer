@@ -24,6 +24,8 @@ const DAY_MS = 86400000;
 
 const INCLUDED = new Set(['Bank', 'Savings', 'Credit Card', 'Other']);
 
+const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
 function cycleLabel(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' });
@@ -55,12 +57,7 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
 
   // Accumulate from the first row in the file so each cycle's line enters at the right height.
   const running = new Map();
-  const closingByDate = new Map();
-  rows.forEach((r) => {
-    running.set(r.account, (running.get(r.account) ?? 0) + r.amount);
-    const key = `${r.date.getFullYear()}-${r.date.getMonth()}-${r.date.getDate()}`;
-    closingByDate.set(key, new Map(running));
-  });
+  rows.forEach((r) => running.set(r.account, (running.get(r.account) ?? 0) + r.amount));
 
   // The offset that turns positions into balances, where a balance has been given.
   const present = [...new Set(rows.map((r) => r.account))];
@@ -74,16 +71,70 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
   });
   const totalOffset = present.reduce((s, a) => s + (offsets.get(a) ?? 0), 0);
 
+  /**
+   * A closing total for EVERY day the file covers, carried forward across quiet days.
+   *
+   * A sparse map of transaction days can only answer "what was the position on a day something
+   * happened". The opening balance of a cycle is the position on the day BEFORE it starts, which is
+   * usually a quiet day — and reading the opening off the cycle's own first day instead means the
+   * first day's activity is already inside it. On a boundary that lands on payday, that silently
+   * excluded a R78 000 salary from the movement.
+   */
+  const dayKey = (d) => Math.round(midnight(d) / DAY_MS);
+  const firstDay = dayKey(rows[0].date);
+  const lastDay = dayKey(rows[rows.length - 1].date);
+  const dailyTotal = new Array(lastDay - firstDay + 1);
+  {
+    let total = 0;
+    let cursor = 0;
+    for (let i = 0; i <= lastDay - firstDay; i += 1) {
+      while (cursor < rows.length && dayKey(rows[cursor].date) === firstDay + i) {
+        total += rows[cursor].amount;
+        cursor += 1;
+      }
+      dailyTotal[i] = total + totalOffset;
+    }
+  }
+  /** The position at the close of a given day; before the file starts, nothing had happened yet. */
+  const totalAt = (date) => {
+    const i = dayKey(date) - firstDay;
+    if (i < 0) return totalOffset;
+    return dailyTotal[Math.min(i, dailyTotal.length - 1)];
+  };
+
   const window = months.slice(-cycles).filter((m) => cycleStarts[m]);
   if (window.length === 0) return null;
 
   const through = processed.dataThrough ?? currentCycleEnd;
 
+  /**
+   * Each cycle's OWN length, in days.
+   *
+   * The x-axis is 31 days because that is the current cycle, but cycles are 28-31 days depending on
+   * where the boundary falls. Running every series to the full axis pushed a 30-day cycle one day
+   * past its own end — onto the 23rd, which is payday — so July's line absorbed August's salary and
+   * closed R78 000 too high. Anything past a cycle's own end is null and simply is not drawn.
+   */
+  const lengthOf = (month) => {
+    const start = cycleStarts[month];
+    const i = months.indexOf(month);
+    const nextStart = i >= 0 && i < months.length - 1 ? cycleStarts[months[i + 1]] : null;
+    const end = nextStart
+      ? new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() - 1)
+      : currentCycleEnd;
+    return Math.max(1, Math.round((end - start) / DAY_MS) + 1);
+  };
+
   const seriesFor = (month) => {
     const start = cycleStarts[month];
+    const ownLength = lengthOf(month);
     const points = [];
-    let last = null;
     for (let i = 0; i < length; i += 1) {
+      // Past this cycle's own end there is no cycle left to draw.
+      if (i >= ownLength) {
+        points.push(null);
+        continue;
+      }
       const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       // Past the data's last date there is nothing to draw — a flat line would read as a quiet
       // spell rather than as an absence.
@@ -91,18 +142,8 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
         points.push(null);
         continue;
       }
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      const snapshot = closingByDate.get(key);
-      if (snapshot) {
-        last = [...snapshot.values()].reduce((s, v) => s + v, 0) + totalOffset;
-      }
-      points.push(last);
+      points.push(totalAt(d));
     }
-    // Carry the entry level backwards over any opening days with no activity, so a quiet start
-    // begins on the line rather than dropping to zero. Trailing nulls (past the data's last date)
-    // are left alone — those are an absence, not a flat spell.
-    const firstKnown = points.findIndex((v) => v != null);
-    if (firstKnown > 0) points.fill(points[firstKnown], 0, firstKnown);
     return points;
   };
 
@@ -110,6 +151,9 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
     const points = seriesFor(month);
     const known = points.filter((v) => v != null);
     const isCurrent = month === currentMonth;
+    const start = cycleStarts[month];
+    // The day before the cycle opened — so the first day's movement counts as movement.
+    const opening = totalAt(new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1));
     return {
       id: month,
       month,
@@ -118,8 +162,8 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
       depth: i,
       isCurrent,
       points,
-      total: known.length ? known[known.length - 1] : 0,
-      opening: known.length ? known[0] : 0,
+      total: known.length ? known[known.length - 1] : opening,
+      opening,
     };
   });
 
