@@ -16,12 +16,12 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
       <button
         type="button"
         onClick={onAddBalances}
-        className="flex w-full items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-left transition-colors hover:border-blue-400 hover:bg-blue-50/40"
+        className="flex w-full items-center gap-3 rounded-xl border border-dashed border-hair bg-transparent p-5 text-left transition-colors hover:border-info/30 hover:bg-info/8"
       >
-        <Landmark size={20} className="shrink-0 text-slate-400" />
+        <Landmark size={20} className="shrink-0 text-label-3" />
         <div>
-          <p className="text-sm font-medium text-slate-800">Add your balances to see net worth</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="text-sm font-medium text-label">Add your balances to see net worth</p>
+          <p className="mt-0.5 text-xs text-label-2">
             One number per account — what it holds today. Everything else, including every past
             cycle, is worked out from there.
           </p>
@@ -33,38 +33,38 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
   const Trend = change >= 0 ? TrendingUp : TrendingDown;
 
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
+    <div className="glass p-6">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-wrap items-end gap-8">
           <div>
-            <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">
               Net worth
             </div>
             <div
-              className={`mt-1 text-3xl font-semibold tabular-nums ${net < 0 ? 'text-red-600' : 'text-slate-900'}`}
+              className={`mt-1 text-3xl font-semibold tabular-nums ${net < 0 ? 'text-bad' : 'text-label'}`}
             >
               {formatCurrency(net)}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">Held</div>
-            <div className="mt-1 text-xl font-semibold text-emerald-600 tabular-nums">
+            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">Held</div>
+            <div className="mt-1 text-xl font-semibold text-good tabular-nums">
               {formatCurrencyAbs(assets)}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">Owed</div>
-            <div className="mt-1 text-xl font-semibold text-red-600 tabular-nums">
+            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">Owed</div>
+            <div className="mt-1 text-xl font-semibold text-bad tabular-nums">
               {formatCurrencyAbs(debt)}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <div className="text-xs font-medium tracking-wide text-label-2 uppercase">
               Over the window
             </div>
             <div
               className={`mt-1 flex items-center gap-1.5 text-xl font-semibold tabular-nums ${
-                change >= 0 ? 'text-emerald-600' : 'text-red-600'
+                change >= 0 ? 'text-good' : 'text-bad'
               }`}
             >
               <Trend size={18} />
@@ -78,7 +78,7 @@ export function NetWorthStrip({ netWorth, onAddBalances }) {
           <button
             type="button"
             onClick={onAddBalances}
-            className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 hover:bg-amber-100"
+            className="flex items-center gap-1.5 rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 text-xs text-warn hover:bg-amber-100"
           >
             <HelpCircle size={13} />
             {knownCount} of {totalCount} accounts valued — add {missing.slice(0, 2).join(', ')}

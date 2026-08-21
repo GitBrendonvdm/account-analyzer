@@ -1,7 +1,7 @@
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 
 /**
- * Renders one <td> per cycle-week (the "Remaining, split by week" columns). `weekly` is a
+ * Renders one <td> per cycle-week (the"Remaining, split by week" columns). `weekly` is a
  * per-week remaining array aligned to `weeks`; rows without a weekly split (transfers, exceptions,
  * drill-down rows) pass nothing and get muted placeholders so the columns stay aligned.
  *
@@ -17,20 +17,20 @@ export function WeekCells({ weekly, weeks, pad = 'p-3', signed = false }) {
         return (
           <td
             key={wk.index}
-            className={`${pad} text-right ${wk.isCurrent ? 'bg-blue-100/50' : 'bg-blue-50/40'} ${
-              i === 0 ? 'border-l-2 border-blue-200' : ''
+            className={`${pad} text-right ${wk.isCurrent ? 'bg-info/15' : 'bg-info/8'} ${
+              i === 0 ? 'border-l-2 border-info/30' : ''
             }`}
           >
             {show ? (
               <span
                 className={`tabular-nums ${
-                  signed ? (val > 0 ? 'text-green-400' : 'text-red-400') : 'text-blue-600'
+                  signed ? (val > 0 ? 'text-good' : 'text-bad') : 'text-info'
                 }`}
               >
                 {signed ? formatCurrency(val) : formatCurrencyAbs(val)}
               </span>
             ) : (
-              <span className="text-slate-300">–</span>
+              <span className="text-label-4">–</span>
             )}
           </td>
         );

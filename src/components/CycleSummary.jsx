@@ -10,17 +10,17 @@ const fmtDate = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
  * two days behind and at seventeen.
  */
 const STALE_TONE = {
-  fresh: 'bg-slate-50 text-slate-500',
-  warn: 'bg-amber-50 text-amber-700',
-  alarm: 'bg-red-50 font-medium text-red-700',
+  fresh: 'bg-fill text-label-2',
+  warn: 'bg-warn/10 text-warn',
+  alarm: 'bg-bad/10 font-medium text-bad',
 };
 
-function Stat({ label, value, tone = 'text-slate-800', sub, title }) {
+function Stat({ label, value, tone = 'text-label', sub, title }) {
   return (
     <div className="min-w-0" title={title}>
-      <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</div>
+      <div className="text-xs font-medium tracking-wide text-label-2 uppercase">{label}</div>
       <div className={`mt-1 truncate text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
-      {sub && <div className="mt-0.5 truncate text-xs text-slate-500">{sub}</div>}
+      {sub && <div className="mt-0.5 truncate text-xs text-label-2">{sub}</div>}
     </div>
   );
 }
@@ -61,24 +61,24 @@ export function CycleSummary({ summary }) {
           : 'tracking typical pace';
 
   return (
-    <div className="rounded-xl border bg-white p-6 shadow-sm">
+    <div className="glass p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <CalendarClock size={16} className="text-slate-400" />
-          <span className="font-medium text-slate-800">
+        <div className="flex items-center gap-2 text-sm text-label-2">
+          <CalendarClock size={16} className="text-label-3" />
+          <span className="font-medium text-label">
             {fmtDate(start)} – {fmtDate(end)}
           </span>
-          <span className="text-slate-400">·</span>
+          <span className="text-label-3">·</span>
           <span>
             Day {cycleDay} of {cycleLength}
           </span>
-          <span className="text-slate-400">·</span>
+          <span className="text-label-3">·</span>
           <span>
             {daysToPayday} day{daysToPayday === 1 ? '' : 's'} to payday
           </span>
           {isProjectedEnd && (
             <span
-              className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500"
+              className="rounded bg-fill px-1.5 py-0.5 text-[11px] text-label-2"
               title="This cycle hasn't closed yet — the end date follows the boundary the export uses."
             >
               projected
@@ -91,7 +91,7 @@ export function CycleSummary({ summary }) {
             title={
               staleLevel === 'fresh'
                 ? 'Nothing after this date is in the file, so recent spend may not be reflected yet.'
-                : `The export is ${staleDays} days old. Everything under "so far" is missing that much spend, and the forecast is filling the gap with averages rather than what you actually did.`
+                : `The export is ${staleDays} days old. Everything under"so far" is missing that much spend, and the forecast is filling the gap with averages rather than what you actually did.`
             }
           >
             <Clock size={12} />
@@ -101,9 +101,9 @@ export function CycleSummary({ summary }) {
         )}
       </div>
 
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-fill">
         <div
-          className="h-full rounded-full bg-slate-700 transition-[width]"
+          className="h-full rounded-full bg-fill-2 transition-[width]"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
@@ -112,28 +112,28 @@ export function CycleSummary({ summary }) {
         <Stat
           label="Projected close"
           value={formatCurrency(projectedClose)}
-          tone={overspending ? 'text-red-600' : 'text-green-600'}
+          tone={overspending ? 'text-bad' : 'text-good'}
           sub={`${formatCurrency(income.received - expense.spent)} net so far`}
           title="Income and spend for this cycle, actual so far plus what's still forecast. This is a cycle flow, not a bank balance — the export has no balance column."
         />
         <Stat
           label="Still to spend"
           value={formatCurrencyAbs(expense.remaining)}
-          tone="text-blue-600"
+          tone="text-info"
           sub={`${formatCurrencyAbs(forecastPerDay)} / day over ${daysToPayday} day${daysToPayday === 1 ? '' : 's'}`}
           title="Forecast spend between now and payday. Completed weeks are locked at what actually happened; the current week is prorated by how much of it is left."
         />
         <Stat
           label="Spent"
           value={formatCurrencyAbs(expense.spent)}
-          tone="text-slate-800"
+          tone="text-label"
           sub={paceLabel ?? `of ${formatCurrencyAbs(expense.projected)} expected`}
           title={`Typical for a full cycle is ${formatCurrencyAbs(expense.typical)}.`}
         />
         <Stat
           label="Income"
           value={formatCurrencyAbs(income.received)}
-          tone="text-green-600"
+          tone="text-good"
           sub={
             Math.abs(income.remaining) > 1
               ? `${formatCurrencyAbs(income.remaining)} still expected`
@@ -144,7 +144,7 @@ export function CycleSummary({ summary }) {
         <Stat
           label="Overdue"
           value={String(missedPayments.length)}
-          tone={missedPayments.length ? 'text-amber-600' : 'text-slate-400'}
+          tone={missedPayments.length ? 'text-warn' : 'text-label-3'}
           sub={
             missedPayments.length
               ? missedPayments.slice(0, 2).map((m) => m.name).join(', ') +
@@ -156,11 +156,11 @@ export function CycleSummary({ summary }) {
       </div>
 
       {missedPayments.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-warn/10 p-3 text-xs text-warn">
           <AlertTriangle size={14} className="shrink-0" />
           <span className="font-medium">Usually paid by now:</span>
           {missedPayments.map((m) => (
-            <span key={`${m.group}-${m.name}`} className="rounded bg-white/70 px-1.5 py-0.5">
+            <span key={`${m.group}-${m.name}`} className="rounded bg-fill-2 px-1.5 py-0.5">
               {m.name}
               {Math.abs(m.expected) > 1 && ` · ${formatCurrencyAbs(m.expected)}`}
             </span>

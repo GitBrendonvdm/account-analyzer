@@ -5,7 +5,7 @@ import { WeekCells } from './WeekCells';
 
 export function TransferMatchRow({ group, months, cycleWeeks }) {
   return (
-    <tr className="border-t bg-white text-xs text-slate-600">
+    <tr className="border-t bg-transparent text-xs text-label-2">
       <td className="p-2 pl-16">
         <div className="flex items-start gap-2">
           <span className="mt-0.5">
@@ -13,16 +13,16 @@ export function TransferMatchRow({ group, months, cycleWeeks }) {
           </span>
           <div className="flex flex-col gap-0.5">
             {group.isReversal && (
-              <span className="text-[10px] font-medium uppercase tracking-wide text-amber-600">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-warn">
                 Reversed pair
               </span>
             )}
-          <span className="text-green-700">
-            <span className="text-slate-400">+ </span>
+          <span className="text-good">
+            <span className="text-label-3">+ </span>
             {group.creditLabel}
           </span>
-          <span className="text-red-700">
-            <span className="text-slate-400">− </span>
+          <span className="text-bad">
+            <span className="text-label-3">− </span>
             {group.debitLabel}
           </span>
           </div>
@@ -34,7 +34,7 @@ export function TransferMatchRow({ group, months, cycleWeeks }) {
           <td
             key={m}
             className={`p-2 text-right align-top ${
-              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+              m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
             }`}
           >
             {val != null && Math.abs(val) > 0.001 ? (

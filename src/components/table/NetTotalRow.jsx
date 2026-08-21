@@ -10,13 +10,13 @@ import { WeekCells } from './WeekCells';
  */
 function NetAmount({ val }) {
   const v = val || 0;
-  const tone = v > 0.01 ? 'text-green-400' : v < -0.01 ? 'text-red-400' : 'text-slate-400';
+  const tone = v > 0.01 ? 'text-good' : v < -0.01 ? 'text-bad' : 'text-label-3';
   return <span className={`tabular-nums ${tone}`}>{formatCurrency(v)}</span>;
 }
 
 export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeeks, weeklyRemaining }) {
   return (
-    <tr className="bg-slate-800 font-bold text-white">
+    <tr className="bg-fill-2 font-bold text-white">
       <td className="p-4">
         <span className="flex items-center gap-2">
           <RowIcon config={NET_TOTAL_ICON} size={16} />
@@ -31,12 +31,12 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeek
             className={`p-4 text-right ${isCurrentMonth ? 'border-l-2 border-slate-500' : ''}`}
             title={
               isCurrentMonth
-                ? 'Income minus expenses so far this cycle — actual, like every other row in this column. Add "Left to payday" for the projected close.'
+                ? 'Income minus expenses so far this cycle — actual, like every other row in this column. Add"Left to payday" for the projected close.'
                 : undefined
             }
           >
             {/* Actual, including the current cycle. This cell used to add the forecast on top, which
-                put a projected number under the "Actual" header and stopped the row reconciling
+                put a projected number under the"Actual" header and stopped the row reconciling
                 with the Income and Expense rows directly beneath it. */}
             <NetAmount val={netByMonth[i]} />
           </td>

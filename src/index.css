@@ -1,5 +1,305 @@
 @import "tailwindcss";
 
+/**
+ * Aurora — the app's design system.
+ *
+ * Apple's idiom, translated to the web: colour lives on the ground and surfaces float above it as
+ * translucent material, so blur and saturation do the separating that borders used to. Type carries
+ * hierarchy through weight and size-specific tracking rather than through boxes. Motion is
+ * critically damped by default and only bounces when a gesture carried momentum into it.
+ *
+ * Everything below is a token. Components reference them and never hardcode a colour, so the whole
+ * app can be re-toned from this file.
+ */
+
+@theme {
+  /* ---- ground and material ------------------------------------------------------------- */
+  --color-ground: #08080a;
+  --color-ground-lift: #0e0e12;
+
+  /* ---- label colours, iOS's four levels of emphasis ------------------------------------ */
+  --color-label: #f5f5f7;
+  --color-label-2: rgba(235, 235, 245, 0.68);
+  --color-label-3: rgba(235, 235, 245, 0.46);
+  --color-label-4: rgba(235, 235, 245, 0.28);
+
+  /* ---- semantic, from the iOS dark system palette --------------------------------------- */
+  --color-good: #30d158;
+  --color-bad: #ff453a;
+  --color-warn: #ff9f0a;
+  --color-info: #0a84ff;
+  --color-deep: #5e5ce6;
+  --color-mint: #63e6e2;
+  --color-pink: #ff375f;
+
+  /* ---- separators ------------------------------------------------------------------------ */
+  --color-hair: rgba(255, 255, 255, 0.08);
+  --color-hair-strong: rgba(255, 255, 255, 0.14);
+  --color-fill: rgba(255, 255, 255, 0.07);
+  --color-fill-2: rgba(255, 255, 255, 0.12);
+
+  --radius-card: 26px;
+  --radius-tile: 22px;
+  --radius-chip: 999px;
+
+  --font-sans: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* Tailwind v4 defaults borders to currentColor; every bare `border` in the app wants the hairline. */
+*,
+*::before,
+*::after {
+  border-color: var(--color-hair);
+}
+
 body {
   margin: 0;
+  background: var(--color-ground);
+  color: var(--color-label);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Type. Tracking is size-specific — large text reads too loose without negative tracking, small
+ * text needs a touch of positive. A single letter-spacing value is wrong somewhere.
+ * ------------------------------------------------------------------------------------------ */
+
+.t-hero {
+  font-size: clamp(44px, 5.4vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.038em;
+  font-weight: 700;
+}
+.t-title {
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  font-weight: 600;
+}
+.t-head {
+  font-size: 21px;
+  line-height: 1.2;
+  letter-spacing: -0.014em;
+  font-weight: 600;
+}
+.t-sub {
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: -0.008em;
+  font-weight: 600;
+}
+.t-label {
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.005em;
+  font-weight: 500;
+  color: var(--color-label-2);
+}
+.t-caption {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-label-3);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Material. Bigger surfaces read thicker: more blur and a deeper shadow than the small chips.
+ * Never stack one translucent surface directly on another — legibility collapses.
+ * ------------------------------------------------------------------------------------------ */
+
+.glass {
+  background: rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  border: 1px solid var(--color-hair);
+  /* A brighter top edge reads as light catching the lip of the material. */
+  border-top-color: rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.44);
+}
+
+.glass-tile {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--color-hair);
+  border-top-color: rgba(255, 255, 255, 0.13);
+  border-radius: var(--radius-tile);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+}
+
+.glass-chip {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--color-hair);
+  border-radius: var(--radius-chip);
+}
+
+/* Content scrolls under floating chrome; a gradient mask replaces the 1px divider. */
+.chrome-fade {
+  background: linear-gradient(to bottom, var(--color-ground) 30%, transparent);
+}
+
+/**
+ * A sticky table header is chrome, not a surface: rows pass underneath it. A translucent fill would
+ * let them show through and turn the header illegible, so it gets its own blurred material with
+ * enough body behind it to read against anything scrolling past.
+ */
+.sticky-head {
+  background: rgba(20, 20, 25, 0.82);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sticky-head {
+    background: #14141a;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Motion. Critically damped by default (no overshoot); the springy curve is reserved for things a
+ * gesture threw. Every interactive surface responds on press, not on release.
+ * ------------------------------------------------------------------------------------------ */
+
+:root {
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.52, 1);
+}
+
+.press {
+  transition:
+    transform 140ms var(--ease-out),
+    background-color 140ms var(--ease-out),
+    border-color 140ms var(--ease-out);
+}
+.press:active {
+  transform: scale(0.975);
+}
+
+.rise {
+  animation: rise 520ms var(--ease-out) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Glass should materialise — blur and scale together — rather than plainly fade in. */
+.materialize {
+  animation: materialize 620ms var(--ease-out) both;
+}
+@keyframes materialize {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(10px);
+    backdrop-filter: blur(0) saturate(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Accessibility. Reduced motion means a gentler equivalent, not the absence of feedback; reduced
+ * transparency means frostier surfaces, not broken ones.
+ * ------------------------------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .materialize {
+    animation: fade 200ms ease both;
+  }
+  .press:active {
+    transform: none;
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 120ms !important;
+  }
+}
+
+/**
+ * Transparency off — the common case on Windows, where "Transparency effects" is frequently
+ * disabled. Without blur, depth has to come from somewhere else, so the surfaces get a real
+ * elevation ramp: a top-lit gradient, the same bright lip, and the shadow kept. Flat grey boxes
+ * would be a downgrade for a large share of people, not an edge case.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: linear-gradient(180deg, #1b1b21 0%, #141418 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-tile {
+    background: linear-gradient(180deg, #191920 0%, #131317 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-chip {
+    background: #1c1c22;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass,
+  .glass-tile,
+  .glass-chip {
+    background: #101014;
+    border-color: rgba(255, 255, 255, 0.34);
+  }
+}
+
+/* Scrollbars, so they belong to the material rather than the OS. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+*::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+  background-clip: content-box;
 }

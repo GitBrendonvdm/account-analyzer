@@ -16,21 +16,21 @@ export function ImportSummary({ summary, onDismiss }) {
   const examples = summary.updatedExamples ?? [];
 
   return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+    <div className="rounded-xl border border-good/25 bg-good/10 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <CircleCheck size={18} className="mt-0.5 shrink-0 text-emerald-600" />
+          <CircleCheck size={18} className="mt-0.5 shrink-0 text-good" />
           <div className="min-w-0 text-sm">
-            <p className="font-medium text-emerald-900">
+            <p className="font-medium text-good">
               Imported {fileName} · {rowsTotal.toLocaleString('en-ZA')} rows read
               {dateFrom && dateTo && (
-                <span className="font-normal text-emerald-700">
+                <span className="font-normal text-good">
                   {' '}
                   covering {dateFrom} to {dateTo}
                 </span>
               )}
             </p>
-            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-emerald-800">
+            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-good">
               <li className="flex items-center gap-1.5">
                 <FilePlus2 size={12} />
                 <b className="font-semibold">{added.toLocaleString('en-ZA')}</b> new
@@ -45,7 +45,7 @@ export function ImportSummary({ summary, onDismiss }) {
             </ul>
 
             {examples.length > 0 && (
-              <ul className="mt-2 space-y-0.5 text-xs text-emerald-700">
+              <ul className="mt-2 space-y-0.5 text-xs text-good">
                 {examples.map((ex) => (
                   <li key={`${ex.date}-${ex.description}`} className="truncate">
                     {ex.date} · {ex.description} — {ex.fields.join('; ')}
@@ -55,12 +55,12 @@ export function ImportSummary({ summary, onDismiss }) {
             )}
 
             {created.length > 0 && (
-              <p className="mt-2 text-xs text-emerald-800">
+              <p className="mt-2 text-xs text-good">
                 New account{created.length > 1 ? 's' : ''}: {created.join(', ')}
               </p>
             )}
             {renamed.length > 0 && (
-              <p className="mt-1 text-xs text-emerald-800">
+              <p className="mt-1 text-xs text-good">
                 Renamed by the export, kept as one account: {renamed.join(', ')}
               </p>
             )}
@@ -69,7 +69,7 @@ export function ImportSummary({ summary, onDismiss }) {
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 rounded p-1 text-emerald-700 hover:bg-emerald-100"
+          className="shrink-0 rounded p-1 text-good hover:bg-good/15"
           aria-label="Dismiss import summary"
         >
           <X size={16} />

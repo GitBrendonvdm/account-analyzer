@@ -17,29 +17,29 @@ const REMAINING_COLOR = '#2563eb';
 function actualBarColor(value) {
   if (value > 0.01) return '#16a34a';
   if (value < -0.01) return '#dc2626';
-  return '#94a3b8';
+  return 'rgba(235,235,245,0.4)';
 }
 
 function PeriodTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
   return (
-    <div className="rounded-lg border bg-white p-3 text-sm shadow-md">
-      <p className="mb-2 font-medium text-slate-700">{label}</p>
+    <div className="glass-tile p-3 text-sm shadow-md">
+      <p className="mb-2 font-medium text-label-2">{label}</p>
       {row.isCurrentMonth ? (
         <>
-          <p className="text-slate-800">
+          <p className="text-label">
             Actual: <span className="font-semibold">{formatCurrency(row.actual)}</span>
           </p>
-          <p className="text-blue-600">
+          <p className="text-info">
             Remaining: <span className="font-semibold">{formatCurrency(row.remaining)}</span>
           </p>
-          <p className="mt-1 border-t pt-1 text-slate-800">
+          <p className="mt-1 border-t pt-1 text-label">
             Projected: <span className="font-semibold">{formatCurrency(row.display)}</span>
           </p>
         </>
       ) : (
-        <p className="text-slate-800">
+        <p className="text-label">
           Net: <span className="font-semibold">{formatCurrency(row.actual)}</span>
         </p>
       )}
@@ -50,7 +50,7 @@ function PeriodTooltip({ active, payload, label }) {
 export function PeriodNetChart({ chartData }) {
   if (!chartData?.points.length) {
     return (
-      <div className="flex h-80 items-center justify-center text-sm text-slate-500">
+      <div className="flex h-80 items-center justify-center text-sm text-label-2">
         No chart data for the selected range.
       </div>
     );
@@ -62,24 +62,24 @@ export function PeriodNetChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Net Per Month</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-lg font-semibold text-label">Net Per Month</h2>
+          <p className="text-sm text-label-2">
             Income minus expense per pay month · transfers excluded
           </p>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-label-2">
           Weighted avg (excl. current):{' '}
-          <span className="font-medium text-slate-700">{formatCurrency(netAvg)}</span>
+          <span className="font-medium text-label-2">{formatCurrency(netAvg)}</span>
         </p>
       </div>
 
       <div className="h-80 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }} />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }}
               tickFormatter={(v) =>
                 new Intl.NumberFormat('en-ZA', {
                   notation: 'compact',
@@ -87,7 +87,7 @@ export function PeriodNetChart({ chartData }) {
                 }).format(v)
               }
             />
-            <Tooltip content={<PeriodTooltip />} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 12, background: '#16161c', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7' }} itemStyle={{ color: '#f5f5f7' }} labelStyle={{ color: 'rgba(235,235,245,0.6)' }} content={<PeriodTooltip />} />
             <Legend />
             <ReferenceLine
               y={netAvg}
@@ -116,7 +116,7 @@ export function PeriodNetChart({ chartData }) {
         </ResponsiveContainer>
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-label-2">
         Each bar is that month&apos;s net only (not cumulative). The current month stacks actual
         (green/red) with remaining (blue) to show the projected month-end net.
       </p>

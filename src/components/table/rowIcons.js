@@ -27,23 +27,23 @@ import {
 } from 'lucide-react';
 
 export const GROUP_ICON_CONFIG = {
-  Income: { Icon: TrendingUp, className: 'text-green-600' },
-  Expense: { Icon: TrendingDown, className: 'text-red-600' },
-  Transfers: { Icon: ArrowLeftRight, className: 'text-violet-500' },
-  'Income Exceptions': { Icon: AlertCircle, className: 'text-amber-600' },
-  'Expense Exceptions': { Icon: AlertCircle, className: 'text-amber-600' },
+  Income: { Icon: TrendingUp, className: 'text-good' },
+  Expense: { Icon: TrendingDown, className: 'text-bad' },
+  Transfers: { Icon: ArrowLeftRight, className: 'text-deep' },
+  'Income Exceptions': { Icon: AlertCircle, className: 'text-warn' },
+  'Expense Exceptions': { Icon: AlertCircle, className: 'text-warn' },
 };
 
 const SUBCATEGORY_TONE = {
-  Income: 'text-green-500',
-  Expense: 'text-red-500',
-  Transfers: 'text-violet-500',
-  'Income Exceptions': 'text-amber-500',
-  'Expense Exceptions': 'text-amber-500',
+  Income: 'text-good',
+  Expense: 'text-bad',
+  Transfers: 'text-deep',
+  'Income Exceptions': 'text-warn',
+  'Expense Exceptions': 'text-warn',
 };
 
 export function getGroupIconConfig(groupName) {
-  return GROUP_ICON_CONFIG[groupName] || { Icon: FolderOpen, className: 'text-slate-400' };
+  return GROUP_ICON_CONFIG[groupName] || { Icon: FolderOpen, className: 'text-label-3' };
 }
 
 /** One stable icon per value of the export's `Spending Group` column. */
@@ -53,26 +53,26 @@ const SPENDING_GROUP_ICON_CONFIG = {
   Debt: { Icon: CreditCard, className: 'text-rose-500' },
   Insurance: { Icon: ShieldCheck, className: 'text-indigo-500' },
   Communications: { Icon: Smartphone, className: 'text-cyan-500' },
-  'Bank Fees': { Icon: Landmark, className: 'text-slate-500' },
-  'Invest-save-repay': { Icon: PiggyBank, className: 'text-emerald-500' },
-  Income: { Icon: Banknote, className: 'text-green-600' },
-  Transfer: { Icon: ArrowLeftRight, className: 'text-violet-500' },
-  Exceptions: { Icon: AlertCircle, className: 'text-amber-600' },
+  'Bank Fees': { Icon: Landmark, className: 'text-label-2' },
+  'Invest-save-repay': { Icon: PiggyBank, className: 'text-good' },
+  Income: { Icon: Banknote, className: 'text-good' },
+  Transfer: { Icon: ArrowLeftRight, className: 'text-deep' },
+  Exceptions: { Icon: AlertCircle, className: 'text-warn' },
 };
 
 export function getSpendingGroupIconConfig(name) {
-  return SPENDING_GROUP_ICON_CONFIG[name] || { Icon: FolderOpen, className: 'text-slate-400' };
+  return SPENDING_GROUP_ICON_CONFIG[name] || { Icon: FolderOpen, className: 'text-label-3' };
 }
 
 export function getSubcategoryIconConfig(parentGroupName, subName) {
   if (subName === 'Unmatched single leg') {
-    return { Icon: Unlink, className: 'text-slate-400' };
+    return { Icon: Unlink, className: 'text-label-3' };
   }
-  return { Icon: Tag, className: SUBCATEGORY_TONE[parentGroupName] || 'text-slate-400' };
+  return { Icon: Tag, className: SUBCATEGORY_TONE[parentGroupName] || 'text-label-3' };
 }
 
-export const DESCRIPTION_ICON = { Icon: Receipt, className: 'text-slate-400' };
-export const EXCEPTION_DESCRIPTION_ICON = { Icon: AlertCircle, className: 'text-amber-500' };
-export const VARIANT_ICON = { Icon: GitBranch, className: 'text-slate-400' };
-export const TRANSFER_MATCH_ICON = { Icon: Link2, className: 'text-violet-400' };
-export const NET_TOTAL_ICON = { Icon: Scale, className: 'text-slate-300' };
+export const DESCRIPTION_ICON = { Icon: Receipt, className: 'text-label-3' };
+export const EXCEPTION_DESCRIPTION_ICON = { Icon: AlertCircle, className: 'text-warn' };
+export const VARIANT_ICON = { Icon: GitBranch, className: 'text-label-3' };
+export const TRANSFER_MATCH_ICON = { Icon: Link2, className: 'text-deep' };
+export const NET_TOTAL_ICON = { Icon: Scale, className: 'text-label-4' };

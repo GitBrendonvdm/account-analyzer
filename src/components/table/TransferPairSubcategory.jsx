@@ -22,7 +22,7 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
   return (
     <>
       <tr
-        className="cursor-pointer border-t border-violet-100 bg-violet-50/60 text-slate-700 hover:bg-violet-50"
+        className="cursor-pointer border-t border-violet-100 bg-violet-50/60 text-label-2 hover:bg-violet-50"
         onClick={() => setExpanded(!expanded)}
       >
         <td className="p-3 pl-12">
@@ -31,20 +31,20 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
             <RowIcon config={pairIcon} />
             {sub.isReversal ? (
               <>
-                <span className="text-slate-700">{sub.fromAccount}</span>
-                <span className="flex items-center gap-1 text-xs font-normal text-amber-600">
+                <span className="text-label-2">{sub.fromAccount}</span>
+                <span className="flex items-center gap-1 text-xs font-normal text-warn">
                   <Undo2 size={12} />
                   Reversed
                 </span>
               </>
             ) : (
               <>
-                <span className="text-slate-500">{sub.fromAccount}</span>
-                <span className="text-violet-400">→</span>
-                <span className="text-slate-700">{sub.toAccount}</span>
+                <span className="text-label-2">{sub.fromAccount}</span>
+                <span className="text-deep">→</span>
+                <span className="text-label-2">{sub.toAccount}</span>
               </>
             )}
-            <span className="text-xs font-normal text-slate-400">
+            <span className="text-xs font-normal text-label-3">
               ({matchGroups.length} match{matchGroups.length === 1 ? '' : 'es'})
             </span>
           </span>
@@ -53,7 +53,7 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
           <td
             key={m}
             className={`p-3 text-right ${
-              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+              m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
             }`}
           >
             <Cell val={volumeByMonth[m] || null} neutral />

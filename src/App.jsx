@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnalyzerToolbar } from './components/AnalyzerToolbar';
+import { useEffect, useMemo, useState } from 'react';
+import { Aurora } from './components/Aurora';
+import { TopBar } from './components/TopBar';
+import { TodayView } from './components/TodayView';
 import { ChartsView } from './components/ChartsView';
 import { AccountsView } from './components/AccountsView';
-import { CycleSummary } from './components/CycleSummary';
 import { Headlines } from './components/Headlines';
+import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { HabitsView } from './components/HabitsView';
 import { ImportSummary } from './components/ImportSummary';
-import { NetWorthStrip } from './components/NetWorthStrip';
 import { PlanView } from './components/PlanView';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
@@ -24,14 +25,13 @@ import { buildGapClosers, buildTrajectory } from './lib/trajectory';
 import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
 import { TransactionTable } from './components/TransactionTable';
-import { ViewTabs } from './components/ViewTabs';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
 import { usePlanState } from './hooks/usePlanState';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('table');
+  const [activeTab, setActiveTab] = useState('today');
   const {
     ready,
     data,
@@ -40,7 +40,6 @@ export default function App() {
     selectedAccounts,
     monthRange,
     setMonthRange,
-    fileName,
     availableMonthCount,
     toggleAccount,
     handleFileUpload,
@@ -97,6 +96,11 @@ export default function App() {
     [data, selectedAccounts, processed],
   );
 
+  const curve = useMemo(
+    () => (processed ? buildCycleCurve(data, selectedAccounts, processed) : null),
+    [data, selectedAccounts, processed],
+  );
+
   const headlines = useMemo(
     () => buildHeadlines({ summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits }),
     [summary, processed, balanced, netWorth, costOfDebt, headroom, habits],
@@ -131,7 +135,6 @@ export default function App() {
     [goals, processed],
   );
 
-  const showBalances = useCallback(() => setActiveTab('accounts'), []);
 
   // Recharts' ResponsiveContainer measures 0x0 under a headless browser, so charts can't be
   // verified from a screenshot. Expose the computed data instead — dev only.
@@ -146,36 +149,51 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
-        Loading your data…
+      <div className="flex min-h-screen items-center justify-center text-sm text-label-3">
+        <Aurora />
+        <span className="relative">Loading your data…</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="w-full space-y-6">
-        <AnalyzerToolbar
-          fileName={fileName}
-          monthRange={monthRange}
-          availableMonthCount={availableMonthCount}
-          onMonthRangeChange={setMonthRange}
+    <div className="relative min-h-screen">
+      <Aurora />
+      <div className="relative mx-auto w-full max-w-[1360px] px-5 pb-16 sm:px-8">
+        <TopBar
+          activeView={activeTab}
+          onViewChange={setActiveTab}
           accounts={accounts}
           selectedIds={selectedIds}
           onToggleAccount={toggleAccount}
           onFileUpload={handleFileUpload}
           importing={importing}
+          monthRange={monthRange}
+          onMonthRangeChange={setMonthRange}
+          availableMonthCount={availableMonthCount}
+          dataThrough={processed?.dataThrough}
+          staleLevel={summary?.staleLevel}
         />
-        <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
-        {processed ? (
-          <>
-            <Headlines headlines={headlines} />
-            <NetWorthStrip netWorth={netWorth} onAddBalances={showBalances} />
-            <CycleSummary summary={summary} />
-            <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />
-            {activeTab === 'table' && <TransactionTable processed={processed} />}
-            {activeTab === 'charts' && <ChartsView chartData={chartData} />}
-            {activeTab === 'habits' && <HabitsView habits={habits} />}
+        <div className="flex flex-col gap-5 pt-2">
+          <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
+          {processed ? (
+            <>
+              {activeTab === 'today' && (
+                <TodayView
+                  summary={summary}
+                  safe={safe}
+                  curve={curve}
+                  netWorth={netWorth}
+                  costOfDebt={costOfDebt}
+                  positions={balanced.map((p) => ({ ...p, currentMonthKey: processed.currentMonth }))}
+                  habits={habits}
+                  onOpenLedger={() => setActiveTab('table')}
+                />
+              )}
+              {activeTab !== 'today' && <Headlines headlines={headlines} />}
+              {activeTab === 'table' && <TransactionTable processed={processed} />}
+              {activeTab === 'charts' && <ChartsView chartData={chartData} />}
+              {activeTab === 'habits' && <HabitsView habits={habits} />}
             {activeTab === 'plan' && (
               <PlanView
                 safe={safe}
@@ -191,23 +209,24 @@ export default function App() {
                 onRemoveGoal={removeGoal}
               />
             )}
-            {activeTab === 'accounts' && (
-              <AccountsView
-                series={accountSeries}
-                summaries={accountSummaries}
-                positions={balanced}
-                months={processed.months}
-                currentMonth={processed.currentMonth}
-                dataThrough={processed.dataThrough}
-                accounts={accounts}
-                onSaveAccount={updateAccount}
-                costOfDebt={costOfDebt}
-              />
-            )}
-          </>
-        ) : (
-          <EmptyState />
-        )}
+              {activeTab === 'accounts' && (
+                <AccountsView
+                  series={accountSeries}
+                  summaries={accountSummaries}
+                  positions={balanced}
+                  months={processed.months}
+                  currentMonth={processed.currentMonth}
+                  dataThrough={processed.dataThrough}
+                  accounts={accounts}
+                  onSaveAccount={updateAccount}
+                  costOfDebt={costOfDebt}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyState />
+          )}
+        </div>
       </div>
     </div>
   );

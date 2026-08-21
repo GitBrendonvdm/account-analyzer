@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Karla:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #1c4b8f; } a:hover { color: #0f2f5c; }
+    .num { font-variant-numeric: tabular-nums; font-family: 'Karla', sans-serif; }
+  </style>
+</helmet>
+
+<div style="width: 1160px; min-height: 900px; background: #f6f7f8; color: #101418; font-family: 'Karla', system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column;">
+
+  <!-- masthead -->
+  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 26px 44px 18px; border-bottom: 2px solid #101418;">
+    <div style="font-family: 'Newsreader', Georgia, serif; font-size: 21px; font-weight: 600; letter-spacing: -0.015em;">Money&#8202;Visualizer</div>
+    <div style="display: flex; gap: 26px; font-size: 12px; color: #5d666e; letter-spacing: 0.04em;">
+      <span>23 Jul – 22 Aug</span>
+      <span>Day 30 of 31</span>
+      <span>Data through 18 Aug</span>
+    </div>
+  </div>
+
+  <!-- lede -->
+  <div style="padding: 40px 44px 34px; border-bottom: 1px solid #d6dade; display: grid; grid-template-columns: 1.35fr 1fr; gap: 56px; align-items: start;">
+    <div>
+      <div style="font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #8a939b; margin-bottom: 16px;">This cycle</div>
+      <div style="font-family: 'Newsreader', Georgia, serif; font-size: 42px; line-height: 1.14; font-weight: 500; letter-spacing: -0.021em; text-wrap: balance;">
+        You spend <span style="color: #a5251c;">R17&#8239;024</span> more than you earn in a typical cycle.
+      </div>
+      <p style="margin: 18px 0 0; font-size: 15px; line-height: 1.62; color: #4a545c; max-width: 54ch;">
+        It is being carried by the Nedbank card, which took on <strong style="font-weight: 600; color: #101418;">R95&#8239;985</strong>
+        more debt over six cycles. Interest and fees cost R32&#8239;306 a cycle — R387&#8239;676 a year.
+      </p>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid #d6dade;">
+        <span style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6d767e;">Income</span>
+        <span class="num" style="font-size: 21px; font-weight: 600;">R86&#8239;836</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid #d6dade;">
+        <span style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6d767e;">Expense</span>
+        <span class="num" style="font-size: 21px; font-weight: 600;">R103&#8239;861</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid #d6dade;">
+        <span style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6d767e;">Card debt held</span>
+        <span class="num" style="font-size: 21px; font-weight: 600; color: #a5251c;">R131&#8239;475</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 2px solid #101418;">
+        <span style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6d767e;">Safe to spend</span>
+        <span class="num" style="font-size: 21px; font-weight: 600; color: #a5251c;">−R16&#8239;065</span>
+      </div>
+      <div style="margin-top: 14px; font-size: 12px; color: #8a939b; line-height: 1.55;">
+        One day to payday. Bills still due come to more than what is left.
+      </div>
+    </div>
+  </div>
+
+  <!-- ledger -->
+  <div style="padding: 30px 44px 0;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+      <div style="font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 600;">The ledger</div>
+      <div style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #8a939b;">
+        <span>Actual</span>
+        <span style="margin: 0 10px; color: #c4cad0;">|</span>
+        <span style="color: #1c4b8f;">Forecast to 22 Aug</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.7fr repeat(4, minmax(0, 1fr)) 1.05fr 1fr;">
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding-bottom: 9px; border-bottom: 1px solid #101418; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6d767e;">
+        <div>Group</div>
+        <div style="text-align: right;">May</div>
+        <div style="text-align: right;">Jun</div>
+        <div style="text-align: right;">Jul</div>
+        <div style="text-align: right; color: #101418;">So far</div>
+        <div style="text-align: right; color: #1c4b8f;">To payday</div>
+        <div style="text-align: right;">Typical</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 15px 0; border-bottom: 1px solid #d6dade; font-weight: 700;">
+        <div>Net total</div>
+        <div class="num" style="text-align: right; color: #a5251c;">−37 024</div>
+        <div class="num" style="text-align: right; color: #a5251c;">−3 358</div>
+        <div class="num" style="text-align: right; color: #a5251c;">−12 914</div>
+        <div class="num" style="text-align: right; color: #a5251c;">−13 728</div>
+        <div class="num" style="text-align: right; color: #1c4b8f;">−5 983</div>
+        <div class="num" style="text-align: right; color: #a5251c;">−17 024</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 13px 0; border-bottom: 1px solid #e3e6e9; font-weight: 600;">
+        <div>Income</div>
+        <div class="num" style="text-align: right;">82 410</div>
+        <div class="num" style="text-align: right;">102 566</div>
+        <div class="num" style="text-align: right;">81 527</div>
+        <div class="num" style="text-align: right;">87 312</div>
+        <div class="num" style="text-align: right; color: #aeb5bb;">—</div>
+        <div class="num" style="text-align: right;">86 836</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 13px 0; border-bottom: 1px solid #e3e6e9; font-weight: 600;">
+        <div>Expense</div>
+        <div class="num" style="text-align: right;">106 434</div>
+        <div class="num" style="text-align: right;">106 028</div>
+        <div class="num" style="text-align: right;">103 742</div>
+        <div class="num" style="text-align: right;">87 393</div>
+        <div class="num" style="text-align: right; color: #1c4b8f;">5 983</div>
+        <div class="num" style="text-align: right;">103 861</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 11px 0; border-bottom: 1px solid #edf0f2; color: #4a545c;">
+        <div style="padding-left: 20px;">Home Loan / Bond</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">29 529</div>
+        <div class="num" style="text-align: right; color: #aeb5bb;">—</div>
+        <div class="num" style="text-align: right;">29 143</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 11px 0; border-bottom: 1px solid #edf0f2; color: #4a545c;">
+        <div style="padding-left: 20px;">Groceries</div>
+        <div class="num" style="text-align: right;">12 970</div>
+        <div class="num" style="text-align: right;">10 095</div>
+        <div class="num" style="text-align: right;">12 465</div>
+        <div class="num" style="text-align: right;">6 596</div>
+        <div class="num" style="text-align: right; color: #1c4b8f;">184</div>
+        <div class="num" style="text-align: right;">12 970</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 11px 0; border-bottom: 1px solid #edf0f2; color: #4a545c;">
+        <div style="padding-left: 20px;">Eating Out &amp; Takeaways</div>
+        <div class="num" style="text-align: right;">3 709</div>
+        <div class="num" style="text-align: right;">4 120</div>
+        <div class="num" style="text-align: right;">3 298</div>
+        <div class="num" style="text-align: right;">2 136</div>
+        <div class="num" style="text-align: right; color: #1c4b8f;">340</div>
+        <div class="num" style="text-align: right;">3 709</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- standing commitments, as a column note -->
+  <div style="margin-top: auto; padding: 26px 44px 30px; border-top: 2px solid #101418; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 34px;">
+    <div>
+      <div style="font-family: 'Newsreader', Georgia, serif; font-size: 15px; font-weight: 600; margin-bottom: 6px;">Standing commitments</div>
+      <div style="font-size: 12px; line-height: 1.55; color: #6d767e;">41 merchants bill you every cycle.</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a939b;">Debt</div>
+      <div class="num" style="font-size: 18px; font-weight: 600; margin-top: 4px;">R39 277</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a939b;">Day-to-day</div>
+      <div class="num" style="font-size: 18px; font-weight: 600; margin-top: 4px;">R14 640</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a939b;">Optional services</div>
+      <div class="num" style="font-size: 18px; font-weight: 600; margin-top: 4px; color: #1c4b8f;">R4 816</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -17,7 +17,7 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
     <>
       <tr
         className={`border-t text-xs ${
-          group.isException ? 'bg-amber-50 text-slate-700' : 'bg-slate-50 text-slate-600'
+          group.isException ? 'bg-warn/10 text-label-2' : 'bg-fill text-label-2'
         } ${hasVariants ? 'cursor-pointer hover:brightness-95' : ''}`}
         onClick={() => hasVariants && setExpanded(!expanded)}
       >
@@ -30,12 +30,12 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
             <span>
               {group.description}
               {hasVariants && (
-                <span className="ml-1 text-[10px] text-slate-400">({group.variants.length} variants)</span>
+                <span className="ml-1 text-[10px] text-label-3">({group.variants.length} variants)</span>
               )}
             </span>
           </span>
           {group.isException && (
-            <span className="ml-2 text-[10px] font-medium text-amber-600">
+            <span className="ml-2 text-[10px] font-medium text-warn">
               {group.monthCount}/{group.totalMonths} months
             </span>
           )}
@@ -46,13 +46,13 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
             <td
               key={m}
               className={`p-2 text-right ${
-                m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+                m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
               }`}
             >
               {val != null && Math.abs(val) > 0.001 ? (
                 <span
                   className={`${
-                    val > 0 ? 'text-green-600' : 'text-red-600'
+                    val > 0 ? 'text-good' : 'text-bad'
                   } ${
                     highlightCells
                       ? 'rounded bg-amber-100 px-1.5 py-0.5 ring-1 ring-amber-300'
@@ -76,7 +76,7 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
         <td className="p-2 text-right">
           {!group.isException && (
             <span
-              className="font-semibold text-blue-600"
+              className="font-semibold text-info"
               title="This row's share of its category's forecast to payday"
             >
               {formatCurrency(group.expected)}

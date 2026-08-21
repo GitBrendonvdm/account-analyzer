@@ -1,0 +1,187 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #ffb454; } a:hover { color: #ffcc80; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1160px; min-height: 900px; background: #0a0c0d; color: #dfe4e8; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; display: flex; flex-direction: column;">
+
+  <!-- masthead -->
+  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 20px 28px; border-bottom: 1px solid #1e2429;">
+    <div style="display: flex; align-items: baseline; gap: 18px;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: #ffb454;">MONEYVISUALIZER</span>
+      <span style="color: #4a555e;">23 JUL — 22 AUG</span>
+      <span style="color: #4a555e;">DAY 30/31</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="width: 6px; height: 6px; background: #4ec9b0; border-radius: 50%;"></span>
+      <span style="color: #6b7780; font-size: 11px; letter-spacing: 0.08em;">DATA THROUGH 18 AUG · 3D BEHIND</span>
+    </div>
+  </div>
+
+  <!-- the one sentence -->
+  <div style="padding: 30px 28px; border-bottom: 1px solid #1e2429; display: flex; gap: 40px; align-items: flex-start;">
+    <div style="flex-grow: 1;">
+      <div style="font-size: 10px; letter-spacing: 0.2em; color: #6b7780; margin-bottom: 14px;">WHAT IS HAPPENING</div>
+      <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 27px; line-height: 1.28; font-weight: 500; letter-spacing: -0.01em; max-width: 30ch;">
+        You spend <span style="color: #f07178;">R17 024</span> more than you earn in a typical cycle.
+      </div>
+      <div style="margin-top: 14px; color: #8b959d; font-size: 12px; line-height: 1.7; max-width: 52ch;">
+        Carried by the Nedbank card, which took on R95 985 more debt over six cycles.
+        Interest and fees cost R32 306 a cycle — R387 676 a year.
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #1e2429; border: 1px solid #1e2429; width: 400px;">
+      <div style="background: #0e1113; padding: 14px 16px;">
+        <div style="font-size: 10px; letter-spacing: 0.14em; color: #6b7780;">IN</div>
+        <div class="num" style="font-size: 22px; font-weight: 600; color: #4ec9b0; margin-top: 4px;">R86 836</div>
+      </div>
+      <div style="background: #0e1113; padding: 14px 16px;">
+        <div style="font-size: 10px; letter-spacing: 0.14em; color: #6b7780;">OUT</div>
+        <div class="num" style="font-size: 22px; font-weight: 600; color: #f07178; margin-top: 4px;">R103 861</div>
+      </div>
+      <div style="background: #0e1113; padding: 14px 16px;">
+        <div style="font-size: 10px; letter-spacing: 0.14em; color: #6b7780;">CARD DEBT</div>
+        <div class="num" style="font-size: 22px; font-weight: 600; margin-top: 4px;">R131 475</div>
+      </div>
+      <div style="background: #0e1113; padding: 14px 16px;">
+        <div style="font-size: 10px; letter-spacing: 0.14em; color: #6b7780;">SAFE TO SPEND</div>
+        <div class="num" style="font-size: 22px; font-weight: 600; color: #ffb454; margin-top: 4px;">−R16 065</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- cycle progress as a rule -->
+  <div style="padding: 0 28px;">
+    <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #1e2429;">
+      <span style="font-size: 10px; letter-spacing: 0.16em; color: #6b7780;">CYCLE</span>
+      <span style="flex-grow: 1; height: 3px; background: #1e2429; position: relative; display: block;">
+        <span style="position: absolute; inset: 0 3% 0 0; background: #ffb454;"></span>
+      </span>
+      <span class="num" style="color: #8b959d; font-size: 11px;">1 DAY TO PAYDAY</span>
+    </div>
+  </div>
+
+  <!-- the table -->
+  <div style="padding: 22px 28px 0;">
+    <div style="display: grid; grid-template-columns: 1.6fr repeat(5, minmax(0, 1fr)) 1.1fr; gap: 0; font-size: 12px;">
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding-bottom: 8px; border-bottom: 1px solid #2a3238; font-size: 10px; letter-spacing: 0.14em; color: #6b7780;">
+        <div>GROUP</div>
+        <div style="text-align: right;">MAY</div>
+        <div style="text-align: right;">JUN</div>
+        <div style="text-align: right;">JUL</div>
+        <div style="text-align: right; color: #dfe4e8;">SO FAR</div>
+        <div style="text-align: right; color: #ffb454;">TO PAYDAY</div>
+        <div style="text-align: right;">TYPICAL</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 13px 0; border-bottom: 1px solid #1e2429; font-weight: 600;">
+        <div>Net total</div>
+        <div class="num" style="text-align: right; color: #f07178;">−37 024</div>
+        <div class="num" style="text-align: right; color: #f07178;">−3 358</div>
+        <div class="num" style="text-align: right; color: #f07178;">−12 914</div>
+        <div class="num" style="text-align: right; color: #f07178;">−13 728</div>
+        <div class="num" style="text-align: right; color: #ffb454;">−5 983</div>
+        <div class="num" style="text-align: right; color: #f07178;">−17 024</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 11px 0; border-bottom: 1px solid #1e2429;">
+        <div style="color: #4ec9b0;">▸ Income</div>
+        <div class="num" style="text-align: right;">82 410</div>
+        <div class="num" style="text-align: right;">102 566</div>
+        <div class="num" style="text-align: right;">81 527</div>
+        <div class="num" style="text-align: right;">87 312</div>
+        <div class="num" style="text-align: right; color: #4a555e;">—</div>
+        <div class="num" style="text-align: right;">86 836</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 11px 0; border-bottom: 1px solid #1e2429;">
+        <div style="color: #f07178;">▾ Expense</div>
+        <div class="num" style="text-align: right;">106 434</div>
+        <div class="num" style="text-align: right;">106 028</div>
+        <div class="num" style="text-align: right;">103 742</div>
+        <div class="num" style="text-align: right;">87 393</div>
+        <div class="num" style="text-align: right; color: #ffb454;">5 983</div>
+        <div class="num" style="text-align: right;">103 861</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 9px 0; border-bottom: 1px solid #14181b; color: #9aa4ac;">
+        <div style="padding-left: 22px;">Home Loan / Bond</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">28 955</div>
+        <div class="num" style="text-align: right;">29 529</div>
+        <div class="num" style="text-align: right; color: #4a555e;">—</div>
+        <div class="num" style="text-align: right;">29 143</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 9px 0; border-bottom: 1px solid #14181b; color: #9aa4ac;">
+        <div style="padding-left: 22px;">Groceries</div>
+        <div class="num" style="text-align: right;">12 970</div>
+        <div class="num" style="text-align: right;">10 095</div>
+        <div class="num" style="text-align: right;">12 465</div>
+        <div class="num" style="text-align: right;">6 596</div>
+        <div class="num" style="text-align: right; color: #ffb454;">184</div>
+        <div class="num" style="text-align: right;">12 970</div>
+      </div>
+
+      <div style="grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding: 9px 0; border-bottom: 1px solid #14181b; color: #9aa4ac;">
+        <div style="padding-left: 22px;">Eating Out &amp; Takeaways</div>
+        <div class="num" style="text-align: right;">3 709</div>
+        <div class="num" style="text-align: right;">4 120</div>
+        <div class="num" style="text-align: right;">3 298</div>
+        <div class="num" style="text-align: right;">2 136</div>
+        <div class="num" style="text-align: right; color: #ffb454;">340</div>
+        <div class="num" style="text-align: right;">3 709</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- footer strip: the debt cost -->
+  <div style="margin-top: auto; display: flex; align-items: stretch; border-top: 1px solid #1e2429;">
+    <div style="padding: 18px 28px; border-right: 1px solid #1e2429;">
+      <div style="font-size: 10px; letter-spacing: 0.16em; color: #6b7780;">COST OF DEBT / CYCLE</div>
+      <div class="num" style="font-size: 20px; font-weight: 600; color: #f07178; margin-top: 5px;">R32 306</div>
+    </div>
+    <div style="flex-grow: 1; padding: 18px 28px; display: flex; flex-direction: column; gap: 7px; justify-content: center;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="width: 92px; font-size: 11px; color: #8b959d;">Ned Loan</span>
+        <span style="flex-grow: 1; height: 7px; background: #14181b; display: block;"><span style="display: block; width: 100%; height: 100%; background: #f07178; opacity: .85;"></span></span>
+        <span class="num" style="width: 62px; text-align: right; font-size: 11px;">20 830</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="width: 92px; font-size: 11px; color: #8b959d;">FNB *6996</span>
+        <span style="flex-grow: 1; height: 7px; background: #14181b; display: block;"><span style="display: block; width: 23%; height: 100%; background: #f07178; opacity: .85;"></span></span>
+        <span class="num" style="width: 62px; text-align: right; font-size: 11px;">4 802</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="width: 92px; font-size: 11px; color: #8b959d;">FNB *1143</span>
+        <span style="flex-grow: 1; height: 7px; background: #14181b; display: block;"><span style="display: block; width: 12%; height: 100%; background: #f07178; opacity: .85;"></span></span>
+        <span class="num" style="width: 62px; text-align: right; font-size: 11px;">2 570</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

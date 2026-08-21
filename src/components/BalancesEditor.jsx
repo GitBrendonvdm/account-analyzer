@@ -41,17 +41,17 @@ function AccountRow({ account, onSave }) {
           onBlur={commit}
           placeholder={accountLabel(account)}
           aria-label={`Name for ${accountLabel(account)}`}
-          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-slate-200 focus:border-blue-400 focus:bg-white focus:outline-none"
+          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-hair focus:border-info/30 focus:bg-transparent focus:outline-none"
         />
-        <div className="px-1.5 text-[11px] text-slate-400">
+        <div className="px-1.5 text-[11px] text-label-3">
           {account.rawName}
           {account.seenNames?.length > 1 && ' · renamed by the export'}
         </div>
       </td>
-      <td className="px-4 py-2.5 text-xs text-slate-500">{account.type}</td>
+      <td className="px-4 py-2.5 text-xs text-label-2">{account.type}</td>
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-400">{owed ? 'owe R' : 'R'}</span>
+          <span className="text-xs text-label-3">{owed ? 'owe R' : 'R'}</span>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -60,14 +60,14 @@ function AccountRow({ account, onSave }) {
             inputMode="decimal"
             placeholder="—"
             aria-label={`Current balance for ${accountLabel(account)}`}
-            className="w-28 rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-blue-400 focus:outline-none"
+            className="w-28 rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none"
           />
         </div>
       </td>
       <td className="px-4 py-2.5">
         {account.type === 'Credit Card' ? (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400">R</span>
+            <span className="text-xs text-label-3">R</span>
             <input
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
@@ -76,24 +76,24 @@ function AccountRow({ account, onSave }) {
               inputMode="decimal"
               placeholder="limit"
               aria-label={`Credit limit for ${accountLabel(account)}`}
-              className="w-24 rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-blue-400 focus:outline-none"
+              className="w-24 rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none"
             />
           </div>
         ) : (
-          <span className="text-xs text-slate-300">—</span>
+          <span className="text-xs text-label-4">—</span>
         )}
       </td>
       <td className="px-4 py-2.5 text-right">
         {saved ? (
-          <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+          <span className="inline-flex items-center gap-1 text-xs text-good">
             <Check size={13} /> saved
           </span>
         ) : stored != null ? (
-          <span className="text-xs text-slate-400 tabular-nums">
+          <span className="text-xs text-label-3 tabular-nums">
             {owed ? `−${formatCurrencyAbs(stored)}` : formatCurrencyAbs(stored)}
           </span>
         ) : (
-          <span className="text-xs text-amber-600">not set</span>
+          <span className="text-xs text-warn">not set</span>
         )}
       </td>
     </tr>
@@ -107,24 +107,24 @@ export function BalancesEditor({ accounts, onSave, typeOverrideHint }) {
   const missing = sorted.filter((a) => a.currentBalance == null).length;
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-slate-50 px-6 py-4">
+    <div className="glass overflow-hidden">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b bg-fill px-6 py-4">
         <div className="flex items-center gap-2">
-          <Landmark size={16} className="text-slate-400" />
-          <h2 className="text-sm font-semibold text-slate-800">Balances</h2>
+          <Landmark size={16} className="text-label-3" />
+          <h2 className="text-sm font-semibold text-label">Balances</h2>
         </div>
-        <p className="max-w-prose text-xs text-slate-500">
+        <p className="max-w-prose text-xs text-label-2">
           What each account holds <b>today</b>. Every past cycle is re-based from it, so re-entering
           these after an import keeps the whole history honest.
           {missing > 0 && (
-            <span className="text-amber-700"> {missing} still to fill in.</span>
+            <span className="text-warn"> {missing} still to fill in.</span>
           )}
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
-            <tr className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+            <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
               <th className="px-4 py-2.5">Account</th>
               <th className="px-4 py-2.5">Type</th>
               <th className="px-4 py-2.5">Balance today</th>
@@ -140,7 +140,7 @@ export function BalancesEditor({ accounts, onSave, typeOverrideHint }) {
         </table>
       </div>
       {typeOverrideHint && (
-        <p className="border-t bg-amber-50/60 px-6 py-3 text-xs text-amber-800">{typeOverrideHint}</p>
+        <p className="border-t bg-warn/10 px-6 py-3 text-xs text-warn">{typeOverrideHint}</p>
       )}
     </div>
   );

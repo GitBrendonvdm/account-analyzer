@@ -20,7 +20,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
   return (
     <>
       <tr
-        className="cursor-pointer border-t bg-slate-50 font-medium text-slate-700 hover:bg-slate-100"
+        className="cursor-pointer border-t bg-fill font-medium text-label-2 hover:bg-fill"
         onClick={() => setExpanded(!expanded)}
       >
         <td className="p-3 pl-8">
@@ -28,7 +28,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
             <ChevronRight size={14} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />
             <RowIcon config={icon} size={14} />
             {sub.name}
-            <span className="text-[10px] font-normal text-slate-400">
+            <span className="text-[10px] font-normal text-label-3">
               {sortedCategories.length}
             </span>
           </span>
@@ -37,7 +37,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
           <td
             key={m}
             className={`p-3 text-right ${
-              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+              m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
             }`}
           >
             <Cell val={sub.totalsByMonth[m]} absolute />
@@ -47,7 +47,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
           weekly={sub.skipExpected ? undefined : sub.weeklyRemaining}
           weeks={cycleWeeks ?? []}
         />
-        <td className="p-3 text-right font-semibold text-blue-600">
+        <td className="p-3 text-right font-semibold text-info">
           {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
         </td>
         <td className="p-3 text-right">

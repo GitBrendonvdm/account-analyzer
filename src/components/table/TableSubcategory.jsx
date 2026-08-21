@@ -20,8 +20,8 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
   return (
     <>
       <tr
-        className={`cursor-pointer border-t text-slate-700 hover:bg-slate-50 ${
-          highlightUnmatchedTransfer ? 'bg-amber-50' : ''
+        className={`cursor-pointer border-t text-label-2 hover:bg-fill ${
+          highlightUnmatchedTransfer ? 'bg-warn/10' : ''
         }`}
         onClick={() => setExpanded(!expanded)}
       >
@@ -36,7 +36,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
           <td
             key={m}
             className={`p-3 text-right ${
-              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+              m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
             }`}
           >
             <Cell
@@ -51,7 +51,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
           weekly={sub.skipExpected ? undefined : sub.weeklyRemaining}
           weeks={cycleWeeks ?? []}
         />
-        <td className="p-3 text-right font-semibold text-blue-600">
+        <td className="p-3 text-right font-semibold text-info">
           {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
         </td>
         <td className="p-3 text-right">

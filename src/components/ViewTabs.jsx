@@ -10,7 +10,7 @@ const TABS = [
 
 export function ViewTabs({ activeTab, onTabChange }) {
   return (
-    <div className="flex gap-1 rounded-lg border bg-white p-1 shadow-sm">
+    <div className="flex gap-1 glass-tile p-1">
       {TABS.map(({ id, label, Icon }) => (
         <button
           key={id}
@@ -19,8 +19,8 @@ export function ViewTabs({ activeTab, onTabChange }) {
           aria-current={activeTab === id ? 'page' : undefined}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === id
-              ? 'bg-slate-800 text-white'
-              : 'text-slate-600 hover:bg-slate-50'
+              ? 'bg-fill-2 text-white'
+              : 'text-label-2 hover:bg-fill'
           }`}
         >
           <Icon size={16} />

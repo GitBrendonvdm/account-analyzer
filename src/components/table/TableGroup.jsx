@@ -19,7 +19,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
     <>
       <tr
         className={`cursor-pointer border-t font-bold ${
-          group.isException ? 'bg-amber-100' : group.isTransfer ? 'bg-slate-100 text-slate-500' : 'bg-slate-100'
+          group.isException ? 'bg-amber-100' : group.isTransfer ? 'bg-fill text-label-2' : 'bg-fill'
         }`}
         onClick={() => setCollapsed(!collapsed)}
       >
@@ -28,7 +28,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
           <RowIcon config={groupIcon} size={16} />
           {group.name}
           {group.isTransfer && (
-            <span className="text-xs font-normal text-slate-400">
+            <span className="text-xs font-normal text-label-3">
               always 0 — money moving between your own accounts
             </span>
           )}
@@ -37,7 +37,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
           <td
             key={m}
             className={`p-4 text-right ${
-              m === months[months.length - 1] ? 'border-l-2 border-slate-300' : ''
+              m === months[months.length - 1] ? 'border-l-2 border-hair' : ''
             }`}
             title={
               group.isTransfer
@@ -53,7 +53,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
           weeks={cycleWeeks ?? []}
           pad="p-4"
         />
-        <td className="p-4 text-right font-semibold text-blue-600">
+        <td className="p-4 text-right font-semibold text-info">
           {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
         </td>
         <td className="p-4 text-right">

@@ -24,7 +24,7 @@ const TYPE_BLURB = {
 function Delta({ value }) {
   if (Math.abs(value) < 1) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-slate-300">
+      <span className="inline-flex items-center gap-0.5 text-label-4">
         <Minus size={11} />
       </span>
     );
@@ -33,7 +33,7 @@ function Delta({ value }) {
   const Icon = better ? ArrowUpRight : ArrowDownRight;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 tabular-nums ${better ? 'text-green-600' : 'text-red-600'}`}
+      className={`inline-flex items-center gap-0.5 tabular-nums ${better ? 'text-good' : 'text-bad'}`}
     >
       <Icon size={11} className="shrink-0" />
       {formatCurrency(Math.abs(value))}
@@ -56,26 +56,26 @@ export function AccountPositionsTable({ positions, months, currentMonth }) {
     accounts.reduce((s, a) => s + (a.deltaByMonth[month] ?? 0), 0);
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="glass overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b p-4">
-        <h2 className="text-lg font-semibold text-slate-800">Position by pay cycle</h2>
-        <p className="text-xs text-slate-500">
+        <h2 className="text-lg font-semibold text-label">Position by pay cycle</h2>
+        <p className="text-xs text-label-2">
           Grouped by type, cards first. Higher is always better.
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="bg-fill text-xs tracking-wide text-label-2 uppercase">
             <tr>
               <th className="border-b p-3 font-medium">Account</th>
-              <th className="border-b p-3 text-right font-medium text-slate-400" title="Where the account stood before the first cycle shown.">
+              <th className="border-b p-3 text-right font-medium text-label-3" title="Where the account stood before the first cycle shown.">
                 Start
               </th>
               {months.map((m) => (
                 <th
                   key={m}
                   className={`border-b p-3 text-right font-medium ${
-                    m === currentMonth ? 'border-l-2 border-l-slate-300' : ''
+                    m === currentMonth ? 'border-l-2 border-l-hair-strong' : ''
                   }`}
                 >
                   {m === currentMonth ? 'Now' : m}
@@ -87,21 +87,21 @@ export function AccountPositionsTable({ positions, months, currentMonth }) {
           <tbody>
             {byType.map(({ type, accounts }) => (
               <Fragment key={type}>
-                <tr className="bg-slate-100/70">
-                  <td className="border-t p-2 pl-3 text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                <tr className="bg-fill/70">
+                  <td className="border-t p-2 pl-3 text-xs font-semibold tracking-wide text-label-2 uppercase">
                     {type}
-                    <span className="ml-2 text-[10px] font-normal normal-case text-slate-400">
+                    <span className="ml-2 text-[10px] font-normal normal-case text-label-3">
                       {TYPE_BLURB[type] ?? ''}
                     </span>
                   </td>
-                  <td className="border-t p-2 text-right text-xs font-semibold tabular-nums text-slate-400">
+                  <td className="border-t p-2 text-right text-xs font-semibold tabular-nums text-label-3">
                     {formatCurrency(groupOpening(accounts))}
                   </td>
                   {months.map((m) => (
                     <td
                       key={m}
-                      className={`border-t p-2 text-right text-xs font-semibold tabular-nums text-slate-700 ${
-                        m === currentMonth ? 'border-l-2 border-l-slate-300' : ''
+                      className={`border-t p-2 text-right text-xs font-semibold tabular-nums text-label-2 ${
+                        m === currentMonth ? 'border-l-2 border-l-hair-strong' : ''
                       }`}
                     >
                       {formatCurrency(groupTotal(accounts, m))}
@@ -112,22 +112,22 @@ export function AccountPositionsTable({ positions, months, currentMonth }) {
                   </td>
                 </tr>
                 {accounts.map((a) => (
-                  <tr key={a.account} className="border-t hover:bg-slate-50">
-                    <td className="p-3 pl-6 text-slate-700">
+                  <tr key={a.account} className="border-t hover:bg-fill">
+                    <td className="p-3 pl-6 text-label-2">
                       <span className="font-medium">{a.short || a.account}</span>
-                      {a.bank && <span className="ml-2 text-xs text-slate-400">{a.bank}</span>}
+                      {a.bank && <span className="ml-2 text-xs text-label-3">{a.bank}</span>}
                     </td>
-                    <td className="p-3 text-right tabular-nums text-slate-400">
+                    <td className="p-3 text-right tabular-nums text-label-3">
                       {formatCurrency(a.openingPosition)}
                     </td>
                     {months.map((m) => (
                       <td
                         key={m}
                         className={`p-3 text-right ${
-                          m === currentMonth ? 'border-l-2 border-l-slate-300' : ''
+                          m === currentMonth ? 'border-l-2 border-l-hair-strong' : ''
                         }`}
                       >
-                        <div className="tabular-nums text-slate-700">
+                        <div className="tabular-nums text-label-2">
                           {a.positionByMonth[m] == null ? '–' : formatCurrency(a.positionByMonth[m])}
                         </div>
                         <div className="text-[11px]">
@@ -145,7 +145,7 @@ export function AccountPositionsTable({ positions, months, currentMonth }) {
           </tbody>
         </table>
       </div>
-      <p className="border-t bg-slate-50 px-4 py-2 text-xs text-slate-500">
+      <p className="border-t bg-fill px-4 py-2 text-xs text-label-2">
         The export has no balance column, so each line starts from zero at the beginning of the
         file — the level is arbitrary, but every month-to-month change is exact.
       </p>

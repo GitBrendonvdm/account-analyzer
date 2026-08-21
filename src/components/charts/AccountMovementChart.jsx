@@ -18,7 +18,7 @@ const H = 72;
 function Sparkline({ points, positive }) {
   if (points.length < 2) {
     return (
-      <div className="flex h-[72px] items-center justify-center text-xs text-slate-400">
+      <div className="flex h-[72px] items-center justify-center text-xs text-label-3">
         Not enough activity to plot
       </div>
     );
@@ -44,7 +44,7 @@ function Sparkline({ points, positive }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-[72px] w-full" preserveAspectRatio="none" aria-hidden>
       {zeroY != null && (
-        <line x1="0" y1={zeroY} x2={W} y2={zeroY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
+        <line x1="0" y1={zeroY} x2={W} y2={zeroY} stroke="rgba(255,255,255,0.16)" strokeWidth="1" strokeDasharray="3 3" />
       )}
       <path d={area} fill={stroke} opacity="0.08" />
       <path d={line} fill="none" stroke={stroke} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
@@ -57,9 +57,9 @@ export function AccountMovementChart({ series }) {
 
   if (accounts.length === 0) {
     return (
-      <div className="rounded-xl border bg-white p-6">
-        <h2 className="text-lg font-semibold text-slate-800">Account movement</h2>
-        <div className="flex h-40 items-center justify-center text-sm text-slate-500">
+      <div className="glass p-6">
+        <h2 className="text-lg font-semibold text-label">Account movement</h2>
+        <div className="flex h-40 items-center justify-center text-sm text-label-2">
           No account activity in the selected range.
         </div>
       </div>
@@ -67,28 +67,28 @@ export function AccountMovementChart({ series }) {
   }
 
   return (
-    <div className="rounded-xl border bg-white p-6">
+    <div className="glass p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-800">Account movement</h2>
-        <p className="text-xs text-slate-500">
+        <h2 className="text-lg font-semibold text-label">Account movement</h2>
+        <p className="text-xs text-label-2">
           Cumulative change per account, each on its own scale. Transfers included.
         </p>
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-label-2">
         This is movement, not a balance — the export has no balance column, so every line starts
         from zero at the beginning of the range.
       </p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {accounts.map((a) => (
-          <div key={a.account} className="rounded-lg border border-slate-200 p-3">
+          <div key={a.account} className="rounded-lg border border-hair p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-sm font-medium text-slate-700" title={a.account}>
+              <span className="truncate text-sm font-medium text-label-2" title={a.account}>
                 {a.account}
               </span>
               <span
                 className={`shrink-0 text-sm font-semibold tabular-nums ${
-                  a.change > 0 ? 'text-green-600' : a.change < 0 ? 'text-red-600' : 'text-slate-400'
+                  a.change > 0 ? 'text-good' : a.change < 0 ? 'text-bad' : 'text-label-3'
                 }`}
               >
                 {formatCurrency(a.change)}
@@ -97,7 +97,7 @@ export function AccountMovementChart({ series }) {
             <div className="mt-2">
               <Sparkline points={a.points} positive={a.change >= 0} />
             </div>
-            <div className="mt-1 flex justify-between text-[11px] text-slate-400 tabular-nums">
+            <div className="mt-1 flex justify-between text-[11px] text-label-3 tabular-nums">
               <span>{formatCurrency(a.min)}</span>
               <span>{a.count} transactions</span>
               <span>{formatCurrency(a.max)}</span>

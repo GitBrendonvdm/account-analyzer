@@ -27,15 +27,15 @@ export function AnalyzerToolbar({
   }, [draftMonthRange, monthRange, onMonthRangeChange]);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-6 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-4 glass p-7">
       <div>
         <h1 className="flex items-center gap-2 text-lg font-bold">
-          <FileSpreadsheet className="text-blue-600" />
+          <FileSpreadsheet className="text-info" />
           Analyzer
         </h1>
-        {fileName && <p className="mt-1 text-xs text-slate-500">Last import: {fileName}</p>}
+        {fileName && <p className="mt-1 text-xs text-label-2">Last import: {fileName}</p>}
       </div>
-      <div className="flex items-center gap-2 text-xs text-slate-500">
+      <div className="flex items-center gap-2 text-xs text-label-2">
         <span>{draftMonthRange} cycles</span>
         <input
           type="range"
@@ -60,7 +60,7 @@ export function AnalyzerToolbar({
               aria-pressed={on}
               title={acc.seenNames?.length > 1 ? `Also exported as: ${acc.seenNames.join(', ')}` : acc.rawName}
               className={`rounded border px-3 py-1 text-xs ${
-                on ? 'border-blue-400 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white'
+                on ? 'border-info/30 bg-info/15 text-info' : 'border-hair bg-transparent'
               }`}
             >
               {on && <Check size={12} className="mr-1 inline" />}
@@ -69,7 +69,7 @@ export function AnalyzerToolbar({
           );
         })}
       </div>
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white">
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white">
         {importing ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
         {importing ? 'Importing' : 'Import'}
         <input

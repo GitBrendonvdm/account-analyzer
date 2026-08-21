@@ -20,7 +20,7 @@ function SortHeader({ label, sortKey, sort, onSort, className = '' }) {
       title={`Sort by ${label}`}
     >
       <span>{label}</span>
-      <span className={`text-[10px] ${active ? 'text-slate-700' : 'text-slate-300'}`}>
+      <span className={`text-[10px] ${active ? 'text-label-2' : 'text-label-4'}`}>
         {active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
       </span>
     </button>
@@ -51,39 +51,39 @@ export function TransactionTable({ processed }) {
   const cycleEnd = fmtDate(processed.currentCycleEnd);
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="glass overflow-hidden">
       <div className="max-h-[calc(100vh-14rem)] overflow-auto">
         <table className="w-full min-w-[800px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="sticky top-0 z-20 bg-slate-50">
+          <thead className="sticky-head sticky top-0 z-20">
             {/* Which columns are things that happened, and which are guesses. */}
-            <tr className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-              <th className="border-b bg-slate-50 px-4 pt-3 pb-1" />
+            <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
+              <th className="border-b px-4 pt-3 pb-1" />
               <th
-                className="border-b bg-slate-50 px-4 pt-3 pb-1 text-right"
+                className="border-b px-4 pt-3 pb-1 text-right"
                 colSpan={processed.months.length}
               >
                 Actual
               </th>
               {weeks.length > 0 && (
                 <th
-                  className="border-b border-l-2 border-l-blue-200 bg-blue-50/40 px-4 pt-3 pb-1 text-center text-blue-600"
+                  className="border-b border-l-2 border-l-info/30 bg-info/8 px-4 pt-3 pb-1 text-center text-info"
                   colSpan={weeks.length + 1}
                   title={`Forecast for the rest of this pay cycle, to ${cycleEnd}. Completed weeks are locked at what actually happened; the current week is prorated by how much of it is left.`}
                 >
                   Forecast to {cycleEnd}
                 </th>
               )}
-              <th className="border-b bg-slate-50 px-4 pt-3 pb-1" />
+              <th className="border-b px-4 pt-3 pb-1" />
             </tr>
             <tr>
-              <th className="border-b bg-slate-50 px-4 pb-3">
+              <th className="border-b px-4 pb-3">
                 <SortHeader label="Group" sortKey="group" sort={sort} onSort={handleSort} />
               </th>
               {processed.months.map((m) => (
                 <th
                   key={m}
-                  className={`border-b bg-slate-50 px-4 pb-3 text-right ${
-                    m === processed.currentMonth ? 'border-l-2 border-l-slate-300' : ''
+                  className={`border-b px-4 pb-3 text-right ${
+                    m === processed.currentMonth ? 'border-l-2 border-l-hair-strong' : ''
                   }`}
                   title={
                     m === processed.currentMonth
@@ -107,9 +107,9 @@ export function TransactionTable({ processed }) {
               {weeks.map((wk) => (
                 <th
                   key={wk.index}
-                  className={`border-b px-4 pb-3 text-right text-xs font-medium text-blue-600 ${
-                    wk.index === weeks[0].index ? 'border-l-2 border-l-blue-200' : ''
-                  } ${wk.isCurrent ? 'bg-blue-100/50' : 'bg-blue-50/40'}`}
+                  className={`border-b px-4 pb-3 text-right text-xs font-medium text-info ${
+                    wk.index === weeks[0].index ? 'border-l-2 border-l-info/30' : ''
+                  } ${wk.isCurrent ? 'bg-info/15' : 'bg-info/8'}`}
                   title={
                     wk.isCurrent
                       ? `This week (${weekSpan(processed, wk)}) — what's still expected before the week is out`
@@ -117,11 +117,11 @@ export function TransactionTable({ processed }) {
                   }
                 >
                   <div>{wk.isCurrent ? 'This week' : wk.label}</div>
-                  <div className="font-normal text-blue-400/80">{weekSpan(processed, wk)}</div>
+                  <div className="font-normal text-info/80">{weekSpan(processed, wk)}</div>
                 </th>
               ))}
               <th
-                className="border-b bg-blue-50/40 px-4 pb-3 text-right"
+                className="border-b bg-info/8 px-4 pb-3 text-right"
                 title={`Everything still expected between now and ${cycleEnd} — the sum of the week columns.`}
               >
                 <SortHeader
@@ -129,11 +129,11 @@ export function TransactionTable({ processed }) {
                   sortKey="remaining"
                   sort={sort}
                   onSort={handleSort}
-                  className="justify-end text-blue-600"
+                  className="justify-end text-info"
                 />
               </th>
               <th
-                className="border-b bg-slate-50 px-4 pb-3 text-right"
+                className="border-b px-4 pb-3 text-right"
                 title={`Recency-weighted average over the ${processed.months.length - 1} completed pay cycles in range, with outlier cycles capped so one abnormal month can't set the level.`}
               >
                 <SortHeader
@@ -167,7 +167,7 @@ export function TransactionTable({ processed }) {
           </tbody>
         </table>
       </div>
-      <p className="border-t bg-slate-50 px-4 py-2 text-xs text-slate-500">
+      <p className="border-t bg-fill/60 px-4 py-2 text-xs text-label-2">
         Columns left of the divider are what happened. Everything right of it is a forecast to{' '}
         {cycleEnd}: completed weeks are locked at their actuals, this week is prorated by how much
         of it is left, and later weeks carry their typical spend.
