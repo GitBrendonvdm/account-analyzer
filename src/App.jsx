@@ -3,6 +3,7 @@ import { AnalyzerToolbar } from './components/AnalyzerToolbar';
 import { ChartsView } from './components/ChartsView';
 import { AccountsView } from './components/AccountsView';
 import { CycleSummary } from './components/CycleSummary';
+import { ImportSummary } from './components/ImportSummary';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
   buildAccountMovementSeries,
@@ -19,15 +20,20 @@ import { useTransactionData } from './hooks/useTransactionData';
 export default function App() {
   const [activeTab, setActiveTab] = useState('table');
   const {
+    ready,
     data,
+    accounts,
+    selectedIds,
     selectedAccounts,
     monthRange,
     setMonthRange,
     fileName,
-    allAccounts,
     availableMonthCount,
     toggleAccount,
     handleFileUpload,
+    lastImport,
+    dismissLastImport,
+    importing,
   } = useAnalyzerState();
 
   const processed = useTransactionData(data, selectedAccounts, monthRange);
@@ -63,6 +69,14 @@ export default function App() {
     }
   }, [data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions]);
 
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
+        Loading your data…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="w-full space-y-6">
@@ -71,11 +85,13 @@ export default function App() {
           monthRange={monthRange}
           availableMonthCount={availableMonthCount}
           onMonthRangeChange={setMonthRange}
-          allAccounts={allAccounts}
-          selectedAccounts={selectedAccounts}
+          accounts={accounts}
+          selectedIds={selectedIds}
           onToggleAccount={toggleAccount}
           onFileUpload={handleFileUpload}
+          importing={importing}
         />
+        <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
         {processed ? (
           <>
             <CycleSummary summary={summary} />

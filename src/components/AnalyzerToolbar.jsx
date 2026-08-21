@@ -1,21 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Upload, FileSpreadsheet, Check } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Upload, FileSpreadsheet, Check, Loader2 } from 'lucide-react';
+import { accountLabel } from '../db/accountIdentity';
 
 export function AnalyzerToolbar({
   fileName,
   monthRange,
   onMonthRangeChange,
   availableMonthCount = 12,
-  allAccounts,
-  selectedAccounts,
+  accounts,
+  selectedIds,
   onToggleAccount,
   onFileUpload,
+  importing,
 }) {
   const [draftMonthRange, setDraftMonthRange] = useState(monthRange);
-
-  useEffect(() => {
+  // Adjust-during-render rather than an effect: syncing a prop into local state in useEffect
+  // triggers a second render pass, and the lint rule that flags it is right to.
+  const [syncedFrom, setSyncedFrom] = useState(monthRange);
+  if (syncedFrom !== monthRange) {
+    setSyncedFrom(monthRange);
     setDraftMonthRange(monthRange);
-  }, [monthRange]);
+  }
 
   const commitMonthRange = useCallback(() => {
     if (draftMonthRange !== monthRange) onMonthRangeChange(draftMonthRange);
@@ -28,10 +33,10 @@ export function AnalyzerToolbar({
           <FileSpreadsheet className="text-blue-600" />
           Analyzer
         </h1>
-        {fileName && <p className="mt-1 text-xs text-slate-500">Saved: {fileName}</p>}
+        {fileName && <p className="mt-1 text-xs text-slate-500">Last import: {fileName}</p>}
       </div>
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <span>{draftMonthRange} months</span>
+        <span>{draftMonthRange} cycles</span>
         <input
           type="range"
           min="3"
@@ -41,29 +46,39 @@ export function AnalyzerToolbar({
           onPointerUp={commitMonthRange}
           onKeyUp={commitMonthRange}
           className="w-32 accent-blue-600"
+          aria-label="How many pay cycles to show"
         />
       </div>
       <div className="flex flex-wrap gap-2">
-        {allAccounts.map((acc) => (
-          <button
-            key={acc}
-            type="button"
-            onClick={() => onToggleAccount(acc)}
-            className={`rounded border px-3 py-1 text-xs ${
-              selectedAccounts.includes(acc)
-                ? 'border-blue-400 bg-blue-100 text-blue-700'
-                : 'border-slate-200 bg-white'
-            }`}
-          >
-            {selectedAccounts.includes(acc) && <Check size={12} className="mr-1 inline" />}
-            {acc}
-          </button>
-        ))}
+        {accounts.map((acc) => {
+          const on = selectedIds.includes(acc.id);
+          return (
+            <button
+              key={acc.id}
+              type="button"
+              onClick={() => onToggleAccount(acc.id)}
+              aria-pressed={on}
+              title={acc.seenNames?.length > 1 ? `Also exported as: ${acc.seenNames.join(', ')}` : acc.rawName}
+              className={`rounded border px-3 py-1 text-xs ${
+                on ? 'border-blue-400 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white'
+              }`}
+            >
+              {on && <Check size={12} className="mr-1 inline" />}
+              {accountLabel(acc)}
+            </button>
+          );
+        })}
       </div>
       <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white">
-        <Upload size={18} />
-        Upload
-        <input type="file" accept=".csv,.txt" className="hidden" onChange={onFileUpload} />
+        {importing ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+        {importing ? 'Importing' : 'Import'}
+        <input
+          type="file"
+          accept=".csv,.txt"
+          className="hidden"
+          onChange={onFileUpload}
+          disabled={importing}
+        />
       </label>
     </div>
   );
