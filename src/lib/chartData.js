@@ -2,6 +2,7 @@ import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { projectedMonthNet } from './expected';
 import { detectTransferPairs } from './transfers';
+import { parseAccount } from './accounts';
 import { formatMonthLabel } from '../utils/format';
 import {
   endOfDay,
@@ -21,14 +22,36 @@ export function chartGranularity(monthCount) {
   return 'month';
 }
 
-function netTransactions(data, months) {
+/**
+ * The rows the net-total line is drawn from.
+ *
+ * These have to match the population the table totals, or the chart quietly disagrees with every
+ * other figure in the app. Two filters were missing and both mattered:
+ *
+ *  - The ACCOUNT SELECTION was accepted as an argument and never applied, so the chips did nothing
+ *    to this chart while scoping everything around it.
+ *  - LOAN ACCOUNTS were included. `processTransactionData` drops them on purpose — the interest,
+ *    fees and insurance charged inside a loan are already contained in the instalment leaving the
+ *    bank, so counting both bills the same money twice. The line was carrying that double count
+ *    while the "average monthly net" printed above it came from the properly-scoped pipeline.
+ *
+ * Classification still runs on the unfiltered data: a transfer pair spans two accounts, so
+ * detecting pairs on a filtered set would orphan a leg and it would resurface as phantom income.
+ */
+function netTransactions(data, months, selectedAccounts) {
+  const selected = new Set(selectedAccounts ?? []);
   const scopedData = enrichWithEffectivePayMonths(data, months);
   const { transferIds } = detectTransferPairs(data, months);
   const exceptionState = { ...buildExceptionClusters(scopedData, months, transferIds), transferIds };
+  const loanAccounts = new Set(
+    [...new Set(data.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan'),
+  );
 
   return scopedData
     .filter((t) => {
       if (!months.includes(getPayMonth(t))) return false;
+      if (selectedAccounts && !selected.has(t.Account)) return false;
+      if (loanAccounts.has(t.Account)) return false;
       return resolveMainGroup(t, exceptionState) !== 'Transfers';
     })
     .map((t) => ({
@@ -201,7 +224,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
     nextPayDate,
   } = processed;
   const granularity = chartGranularity(months.length);
-  const transactions = netTransactions(data, calcMonths);
+  const transactions = netTransactions(data, calcMonths, selectedAccounts);
   const today = new Date();
   const todayEnd = endOfDay(today);
 

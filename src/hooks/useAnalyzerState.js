@@ -14,6 +14,21 @@ import { importTransactions, migrateFromLocalStorage } from '../db/importTransac
 import { parseTransactionDate } from '../utils/date';
 
 /**
+ * Loans start switched off.
+ *
+ * A loan account records no spending of its own — only the instalment arriving and the interest,
+ * fees and insurance the lender charges against it, all of which are already contained in the
+ * instalment leaving your bank. The pipeline drops them from the flows for exactly that reason, so
+ * leaving them switched on adds rows to the account list and noise to per-account views without
+ * adding a figure anyone reads. They stay one click away for when the balance sheet is the subject.
+ */
+function defaultSelection(accounts) {
+  const spending = accounts.filter((a) => a.type !== 'Loan');
+  // Unless loans are all there is — an empty selection would show nothing at all.
+  return (spending.length ? spending : accounts).map((a) => a.id);
+}
+
+/**
  * Everything the app holds, backed by IndexedDB rather than a JSON blob.
  *
  * Accounts are selected by their stable id, not by display name, so switching an account on stays
@@ -50,7 +65,13 @@ export function useAnalyzerState() {
       if (cancelled) return;
       const known = new Set(accountRows.map((a) => a.id));
       const restored = (saved.selectedAccountIds ?? []).filter((id) => known.has(id));
-      setSelectedIds(restored.length ? restored : accountRows.map((a) => a.id));
+      // A stored selection of EVERY account is what the old default wrote, not a choice anyone
+      // made — so it re-derives, and loans switch off. A selection that differs from "all" was
+      // chosen deliberately and is left exactly as it is.
+      const everythingSelected = restored.length === accountRows.length;
+      setSelectedIds(
+        restored.length && !everythingSelected ? restored : defaultSelection(accountRows),
+      );
       if (saved.monthRange) setMonthRangeState(saved.monthRange);
       if (migrated) setLastImport(migrated);
       setReady(true);
@@ -92,10 +113,12 @@ export function useAnalyzerState() {
         try {
           const summary = await importTransactions(parseCsv(event.target.result), file.name);
           const { accountRows } = await refresh();
-          // Newly-seen accounts start switched on; anything already chosen stays chosen.
+          // Newly-seen accounts start switched on — unless they're loans, which follow the same
+          // rule as on a first run. Anything already chosen stays chosen either way.
           setSelectedIds((prev) => {
             const known = new Set(prev);
-            const next = [...prev, ...accountRows.map((a) => a.id).filter((id) => !known.has(id))];
+            const arriving = defaultSelection(accountRows).filter((id) => !known.has(id));
+            const next = [...prev, ...arriving];
             setSetting('selectedAccountIds', next);
             return next;
           });
