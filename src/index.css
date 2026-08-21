@@ -43,6 +43,10 @@
   --radius-chip: 999px;
 
   --font-sans: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Beyond 2xl the default scale runs out, and an ultrawide is where a fixed column strands. */
+  --breakpoint-3xl: 1800px;
+  --breakpoint-4xl: 2200px;
 }
 
 :root {

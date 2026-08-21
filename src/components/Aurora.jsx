@@ -13,26 +13,32 @@ export function Aurora() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
       <div
-        className="absolute h-[760px] w-[760px] rounded-full"
+        className="absolute rounded-full"
         style={{
-          left: '-180px',
-          top: '-260px',
+          width: 'clamp(700px, 52vw, 1500px)',
+          height: 'clamp(700px, 52vw, 1500px)',
+          left: '-12vw',
+          top: '-22vw',
           background: 'radial-gradient(circle, rgba(94,92,230,0.30), rgba(94,92,230,0) 68%)',
         }}
       />
       <div
-        className="absolute h-[700px] w-[700px] rounded-full"
+        className="absolute rounded-full"
         style={{
-          right: '-180px',
-          top: '-120px',
+          width: 'clamp(640px, 48vw, 1400px)',
+          height: 'clamp(640px, 48vw, 1400px)',
+          right: '-12vw',
+          top: '-14vw',
           background: 'radial-gradient(circle, rgba(255,69,58,0.18), rgba(255,69,58,0) 66%)',
         }}
       />
       <div
-        className="absolute h-[640px] w-[640px] rounded-full"
+        className="absolute rounded-full"
         style={{
-          left: '34%',
-          bottom: '-340px',
+          width: 'clamp(600px, 44vw, 1300px)',
+          height: 'clamp(600px, 44vw, 1300px)',
+          left: '32%',
+          bottom: '-24vw',
           background: 'radial-gradient(circle, rgba(48,209,88,0.12), rgba(48,209,88,0) 68%)',
         }}
       />

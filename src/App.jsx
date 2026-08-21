@@ -159,7 +159,7 @@ export default function App() {
   return (
     <div className="relative min-h-screen">
       <Aurora />
-      <div className="relative mx-auto w-full max-w-[1360px] px-5 pb-16 sm:px-8">
+      <div className="relative mx-auto w-full max-w-[1440px] px-5 pb-16 sm:px-8 3xl:max-w-[1760px] 4xl:max-w-[2040px]">
         <TopBar
           activeView={activeTab}
           onViewChange={setActiveTab}

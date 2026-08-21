@@ -10,11 +10,11 @@ const fmt = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
 /** The bar colours for "where it goes" — semantic first, then a stable rotation. */
 const BAR_TONES = ['#5e5ce6', '#0a84ff', '#63e6e2', '#ff9f0a', '#ff375f', '#30d158'];
 
-function WhereItGoes({ rows, onOpenLedger }) {
+function WhereItGoes({ rows, onOpenLedger, className = '' }) {
   if (!rows.length) return null;
   const max = Math.max(...rows.map((r) => r.amount), 1);
   return (
-    <Card className="materialize p-7 sm:p-8">
+    <Card className={`materialize p-7 sm:p-8 ${className}`}>
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="t-head">Where it goes</h2>
         <button
@@ -79,9 +79,11 @@ export function TodayView({ summary, safe, curve, netWorth, costOfDebt, position
     .forEach((m) => spendRows.push({ name: m.category, amount: m.perCycle }));
 
   return (
-    <div className="flex flex-col gap-5">
+    /* On an ultrawide a column of full-width bands strands the content in empty space, so past
+       1800px the page becomes a 12-track grid and the blocks pair up instead of stacking. */
+    <div className="grid grid-cols-1 gap-5 3xl:grid-cols-12">
       {/* hero */}
-      <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr]">
+      <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-7 3xl:grid-cols-[1.15fr_0.85fr]">
         <div>
           <div className="t-label">Safe to spend before payday</div>
           <div className={`t-hero num mt-2.5 ${negative ? 'text-bad' : 'text-good'}`}>
@@ -124,12 +126,12 @@ export function TodayView({ summary, safe, curve, netWorth, costOfDebt, position
       </Card>
 
       {curve && (
-        <Card className="materialize p-7 sm:p-8">
+        <Card className="materialize p-7 sm:p-8 3xl:col-span-5 3xl:flex 3xl:flex-col 3xl:justify-center">
           <SpendCurve curve={curve} />
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 3xl:col-span-5 3xl:grid-cols-1">
         <Tile className="rise p-6">
           <Figure
             label="Came in"
@@ -177,7 +179,7 @@ export function TodayView({ summary, safe, curve, netWorth, costOfDebt, position
         </Tile>
       </div>
 
-      <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} />
+      <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} className="3xl:col-span-7" />
     </div>
   );
 }
