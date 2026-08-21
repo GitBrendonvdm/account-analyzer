@@ -3,7 +3,8 @@ import { ChevronRight } from 'lucide-react';
 import { formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
-import { getSpendingGroupIconConfig, RowIcon } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { getSpendingGroupIconConfig } from './rowIcons';
 import { TableSubcategory } from './TableSubcategory';
 import { WeekCells } from './WeekCells';
 
@@ -56,7 +57,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
       {expanded &&
         sortedCategories.map((c) => (
           <TableSubcategory
-            key={c.name}
+            key={c.key ?? c.name}
             sub={c}
             months={months}
             parentGroup={parentGroup}

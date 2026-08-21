@@ -29,3 +29,10 @@ test-data/
 *.njsproj
 *.sln
 *.sw?
+
+# Ingest inbox — bank exports awaiting merge, never committed
+inbox/
+test-data/master.csv
+[INFO] Recording command outcome: printf
+
+[OK] Command outcome recorded

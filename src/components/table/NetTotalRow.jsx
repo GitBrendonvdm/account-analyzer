@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format';
-import { NET_TOTAL_ICON, RowIcon } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { NET_TOTAL_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
 
 /**

@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format';
-import { RowIcon, VARIANT_ICON } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { VARIANT_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
 
 export function VariantTransactionRow({ variant, months, cycleWeeks }) {

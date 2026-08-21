@@ -1,24 +1,7 @@
 import { formatCurrency } from '../../utils/format';
-import { RowIcon, TRANSFER_MATCH_ICON } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { TRANSFER_MATCH_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
-
-export function groupMatches(matches, months) {
-  const groups = new Map();
-  matches.forEach((match) => {
-    if (!months.includes(match.month)) return;
-    const key = `${match.credit.Description}⇄${match.debit.Description}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        creditLabel: match.credit.Description,
-        debitLabel: match.debit.Description,
-        isReversal: Boolean(match.isReversal),
-        amountsByMonth: Object.fromEntries(months.map((m) => [m, null])),
-      });
-    }
-    groups.get(key).amountsByMonth[match.month] = match.amount;
-  });
-  return [...groups.values()];
-}
 
 export function TransferMatchRow({ group, months, cycleWeeks }) {
   return (

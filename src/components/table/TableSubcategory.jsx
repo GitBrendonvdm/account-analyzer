@@ -5,7 +5,8 @@ import { useGroupedTransactions } from '../../hooks/useGroupedTransactions';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
 import { GroupedTransactionRow } from './GroupedTransactionRow';
-import { getSubcategoryIconConfig, RowIcon } from './rowIcons';
+import { RowIcon } from './RowIcon';
+import { getSubcategoryIconConfig } from './rowIcons';
 import { WeekCells } from './WeekCells';
 
 export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {

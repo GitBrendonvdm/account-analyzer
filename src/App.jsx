@@ -3,9 +3,11 @@ import { AnalyzerToolbar } from './components/AnalyzerToolbar';
 import { ChartsView } from './components/ChartsView';
 import { AccountsView } from './components/AccountsView';
 import { CycleSummary } from './components/CycleSummary';
-import { ImportSummary } from './components/ImportSummary';
 import { Headlines } from './components/Headlines';
+import { HabitsView } from './components/HabitsView';
+import { ImportSummary } from './components/ImportSummary';
 import { NetWorthStrip } from './components/NetWorthStrip';
+import { PlanView } from './components/PlanView';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
   buildAccountMovementSeries,
@@ -14,13 +16,19 @@ import {
 } from './lib/accountSeries';
 import { applyBalances, cardHeadroom, summariseNetWorth } from './lib/netWorth';
 import { buildCostOfDebt } from './lib/costOfDebt';
+import { buildHabits } from './lib/habits';
 import { buildHeadlines } from './lib/headlines';
+import { deriveSafeToSpend } from './lib/safeToSpend';
+import { buildBudgetProgress } from './lib/budgets';
+import { buildGapClosers, buildTrajectory } from './lib/trajectory';
+import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
 import { TransactionTable } from './components/TransactionTable';
 import { ViewTabs } from './components/ViewTabs';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
+import { usePlanState } from './hooks/usePlanState';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('table');
@@ -45,6 +53,7 @@ export default function App() {
   const processed = useTransactionData(data, selectedAccounts, monthRange);
   const chartData = useChartData(data, selectedAccounts, processed);
   const summary = useMemo(() => deriveCycleSummary(processed), [processed]);
+
   const accountSeries = useMemo(
     () =>
       processed
@@ -78,13 +87,48 @@ export default function App() {
     [balanced, processed],
   );
   const headroom = useMemo(() => cardHeadroom(balanced), [balanced]);
+
   const costOfDebt = useMemo(
     () => (processed ? buildCostOfDebt(data, selectedAccounts, processed.months) : null),
     [data, selectedAccounts, processed],
   );
+  const habits = useMemo(
+    () => (processed ? buildHabits(data, selectedAccounts, processed) : null),
+    [data, selectedAccounts, processed],
+  );
+
   const headlines = useMemo(
-    () => buildHeadlines({ summary, processed, positions: balanced, netWorth, costOfDebt, headroom }),
-    [summary, processed, balanced, netWorth, costOfDebt, headroom],
+    () => buildHeadlines({ summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits }),
+    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits],
+  );
+
+  // ---- plan: targets, goals, scenario ------------------------------------------------------
+  const { targets, setTarget, goals, addGoal, removeGoal, monthlySaving, setMonthlySaving } =
+    usePlanState();
+
+  const safe = useMemo(() => deriveSafeToSpend(processed, summary), [processed, summary]);
+  const budgets = useMemo(
+    () => (processed ? buildBudgetProgress(processed, targets) : null),
+    [processed, targets],
+  );
+  const trajectory = useMemo(
+    () =>
+      processed && balanced.some((b) => b.known)
+        ? buildTrajectory(balanced, {
+            cycles: 12,
+            monthlySaving,
+            fromDate: processed.currentCycleEnd,
+          })
+        : null,
+    [balanced, monthlySaving, processed],
+  );
+  const gapClosers = useMemo(
+    () => (processed && processed.netAvg < 0 ? buildGapClosers(processed, -processed.netAvg) : null),
+    [processed],
+  );
+  const goalSummary = useMemo(
+    () => summariseGoals(goals, Math.max(0, processed?.netAvg ?? 0)),
+    [goals, processed],
   );
 
   const showBalances = useCallback(() => setActiveTab('accounts'), []);
@@ -95,7 +139,7 @@ export default function App() {
     if (import.meta.env.DEV) {
       window.__mv = {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
-        balanced, netWorth, costOfDebt, headlines,
+        balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers,
       };
     }
   });
@@ -131,6 +175,22 @@ export default function App() {
             <ViewTabs activeTab={activeTab} onTabChange={setActiveTab} />
             {activeTab === 'table' && <TransactionTable processed={processed} />}
             {activeTab === 'charts' && <ChartsView chartData={chartData} />}
+            {activeTab === 'habits' && <HabitsView habits={habits} />}
+            {activeTab === 'plan' && (
+              <PlanView
+                safe={safe}
+                summary={summary}
+                budgets={budgets}
+                onSetTarget={setTarget}
+                trajectory={trajectory}
+                monthlySaving={monthlySaving}
+                onMonthlySavingChange={setMonthlySaving}
+                gapClosers={gapClosers}
+                goals={goalSummary}
+                onAddGoal={addGoal}
+                onRemoveGoal={removeGoal}
+              />
+            )}
             {activeTab === 'accounts' && (
               <AccountsView
                 series={accountSeries}

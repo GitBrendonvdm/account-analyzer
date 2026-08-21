@@ -1,3 +1,9 @@
+/**
+ * Icon lookups for every kind of table row — data, not components.
+ *
+ * Kept out of the component file so Fast Refresh keeps working: a module that exports both a
+ * component and plain values gets remounted rather than hot-swapped on every edit.
+ */
 import {
   AlertCircle,
   ArrowLeftRight,
@@ -70,9 +76,3 @@ export const EXCEPTION_DESCRIPTION_ICON = { Icon: AlertCircle, className: 'text-
 export const VARIANT_ICON = { Icon: GitBranch, className: 'text-slate-400' };
 export const TRANSFER_MATCH_ICON = { Icon: Link2, className: 'text-violet-400' };
 export const NET_TOTAL_ICON = { Icon: Scale, className: 'text-slate-300' };
-
-export function RowIcon({ config, size = 14 }) {
-  if (!config) return null;
-  const { Icon, className } = config;
-  return <Icon size={size} className={`shrink-0 ${className}`} aria-hidden />;
-}
