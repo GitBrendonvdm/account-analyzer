@@ -1,4 +1,5 @@
 import { parseTransactionDate } from '../utils/date';
+import { parseAccount } from './accounts';
 
 /**
  * Cumulative spend across the current cycle, against a typical one.
@@ -48,7 +49,13 @@ export function buildCycleCurve(data, selectedAccounts, processed) {
 
   const length = Math.max(1, Math.round((currentCycleEnd - currentCycleStart) / DAY_MS) + 1);
   const selected = new Set(selectedAccounts);
-  const scoped = data.filter((t) => selected.has(t.Account));
+  // Loans are excluded here whatever the chips say. A loan account records no spending of its own —
+  // only the instalment arriving and the charges the lender raises against it, all of which are
+  // already inside the instalment leaving the bank. Letting a chip put them back would double the
+  // curve against a table that never counts them.
+  const scoped = data.filter(
+    (t) => selected.has(t.Account) && parseAccount(t.Account).type !== 'Loan',
+  );
 
   const actualDaily = spendByDay(
     scoped.filter((t) => t['Pay Month'] === currentMonth),

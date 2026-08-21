@@ -6,6 +6,7 @@ import { ChartsView } from './components/ChartsView';
 import { AccountsView } from './components/AccountsView';
 import { Headlines } from './components/Headlines';
 import { buildCycleCurve } from './lib/cycleCurveSeries';
+import { buildBalanceBands } from './lib/balanceSeries';
 import { HabitsView } from './components/HabitsView';
 import { ImportSummary } from './components/ImportSummary';
 import { PlanView } from './components/PlanView';
@@ -101,6 +102,11 @@ export default function App() {
     [data, selectedAccounts, processed],
   );
 
+  const balances = useMemo(
+    () => (processed ? buildBalanceBands(data, selectedAccounts, accounts, processed, { cycles: 3 }) : null),
+    [data, selectedAccounts, accounts, processed],
+  );
+
   const headlines = useMemo(
     () => buildHeadlines({ summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits }),
     [summary, processed, balanced, netWorth, costOfDebt, headroom, habits],
@@ -142,7 +148,7 @@ export default function App() {
     if (import.meta.env.DEV) {
       window.__mv = {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
-        balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers,
+        balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers, balances, curve,
       };
     }
   });
@@ -183,7 +189,7 @@ export default function App() {
                   summary={summary}
                   safe={safe}
                   curve={curve}
-                  chartData={chartData}
+                  balances={balances}
                   netWorth={netWorth}
                   costOfDebt={costOfDebt}
                   positions={balanced.map((p) => ({ ...p, currentMonthKey: processed.currentMonth }))}
