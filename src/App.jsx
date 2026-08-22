@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Aurora } from './components/Aurora';
 import { TopBar } from './components/TopBar';
 import { TodayView } from './components/TodayView';
@@ -43,6 +43,19 @@ import {
 } from './lib/debtPlan';
 import { useSettings } from './hooks/useSettings';
 import { useToday } from './hooks/useToday';
+import { processTransactionData } from './lib/processTransactionData';
+import { buildRecurringLines } from './lib/recurring';
+import { buildIncomeProfile } from './lib/incomeProfile';
+import { buildUpcoming } from './lib/upcoming';
+import { buildDirection, buildVitals } from './lib/vitals';
+import { buildCashToPayday } from './lib/cashToPayday';
+import { buildSubscriptions } from './lib/subscriptions';
+import { buildPriceCreep } from './lib/priceCreep';
+import { buildDrift } from './lib/drift';
+import { buildBasket } from './lib/basket';
+import { buildFeesAudit } from './lib/fees';
+import { buildSavingsFinder } from './lib/savingsFinder';
+import { solveExtraForDate, solveExtraForGoal } from './lib/solver';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -59,6 +72,7 @@ export default function App() {
     data,
     accounts,
     createAccount,
+    deleteAccount,
     selectedIds,
     selectedAccounts,
     monthRange,
@@ -110,9 +124,11 @@ export default function App() {
 
   // ---- balances turn positions into money -------------------------------------------------
   const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  // `data` lets a typed or uploaded balance anchor on its as-of date rather than the latest cycle,
+  // and brings external (transaction-less) accounts into the picture.
   const balanced = useMemo(
-    () => (processed ? applyBalances(accountPositions, accountsById, processed.months) : []),
-    [accountPositions, accountsById, processed],
+    () => (processed ? applyBalances(accountPositions, accountsById, processed.months, { data }) : []),
+    [accountPositions, accountsById, processed, data],
   );
   const netWorth = useMemo(
     () => (processed ? summariseNetWorth(balanced, processed.months) : null),
@@ -120,9 +136,12 @@ export default function App() {
   );
   const headroom = useMemo(() => cardHeadroom(balanced), [balanced]);
 
+  // Over EVERY account: loans are switched off by default, and a cost-of-debt figure that
+  // silently drops the bond's R21k a cycle is the single most misleading number the app can show.
+  const allNamesForCost = useMemo(() => accounts.flatMap((a) => a.seenNames ?? [a.rawName]), [accounts]);
   const costOfDebt = useMemo(
-    () => (processed ? buildCostOfDebt(data, selectedAccounts, processed.months) : null),
-    [data, selectedAccounts, processed],
+    () => (processed ? buildCostOfDebt(data, allNamesForCost, processed.months) : null),
+    [data, allNamesForCost, processed],
   );
   const habits = useMemo(
     () => (processed ? buildHabits(data, selectedAccounts, processed) : null),
@@ -197,6 +216,106 @@ export default function App() {
   );
   const debtEngine = useMemo(() => ({ comparePlans, marginalValue, lumpWhatIf, rateSensitivity, cascadeTimeline }), []);
 
+  // ---- recurring lines, income, what is coming up ------------------------------------------
+  // Everything in this block ignores the account chips too: a bill is a bill whether or not its
+  // account is switched on, and the vitals are about the household, not the current filter.
+  const dataThrough = processed?.dataThrough ?? null;
+  const allNames = useMemo(() => accounts.flatMap((a) => a.seenNames ?? [a.rawName]), [accounts]);
+  const recurring = useMemo(
+    () =>
+      data && calendar && transfers
+        ? buildRecurringLines(data, { accounts, calendar, transfers, asOf: today, dataThrough })
+        : null,
+    [data, accounts, calendar, transfers, today, dataThrough],
+  );
+  const lines = recurring?.lines ?? null;
+  const incomeProfile = useMemo(
+    () =>
+      data && calendar && transfers
+        ? buildIncomeProfile(data, { accounts, calendar, transfers, asOf: today, dataThrough })
+        : null,
+    [data, accounts, calendar, transfers, today, dataThrough],
+  );
+  const upcoming = useMemo(
+    () =>
+      lines && calendar
+        ? buildUpcoming(lines, { calendar, asOf: today, dataThrough, incomeProfile, explained: recurring.explained, data, transfers })
+        : null,
+    [lines, calendar, today, dataThrough, incomeProfile, recurring, data, transfers],
+  );
+
+  // A longer window for the vitals: twelve complete cycles, when the file has them.
+  const processedLong = useMemo(
+    () => (data ? processTransactionData(data, allNames, Math.min(13, Math.max(3, availableMonthCount)), today) : null),
+    [data, allNames, availableMonthCount, today],
+  );
+  const costOfDebtLong = useMemo(
+    () => (data && processedLong ? buildCostOfDebt(data, allNames, processedLong.months) : null),
+    [data, allNames, processedLong],
+  );
+  const vitals = useMemo(
+    () =>
+      processedLong && data && calendar && transfers
+        ? buildVitals({ processedLong, data, accounts, balanced, costOfDebtLong, transfers, calendar, asOf: today })
+        : null,
+    [processedLong, data, accounts, balanced, costOfDebtLong, transfers, calendar, today],
+  );
+  const direction = useMemo(
+    () =>
+      data && calendar && transfers
+        ? buildDirection({ data, accounts, transfers, calendar, lines, incomeProfile })
+        : null,
+    [data, accounts, transfers, calendar, lines, incomeProfile],
+  );
+  const cashBuffer = Number(settings.get('cashBuffer', 0)) || 0;
+  const cashPath = useMemo(
+    () =>
+      data && calendar && transfers && lines && upcoming
+        ? buildCashToPayday({
+            data, accounts, calendar, transfers, lines, explained: recurring.explained, upcoming, incomeProfile,
+            asOf: today, dataThrough, buffer: cashBuffer,
+          })
+        : null,
+    [data, accounts, calendar, transfers, lines, recurring, upcoming, incomeProfile, today, dataThrough, cashBuffer],
+  );
+
+  // ---- the savings finders ------------------------------------------------------------------
+  const storedOverrides = settings.get('lineOverrides', null);
+  const lineOverrides = useMemo(() => storedOverrides ?? {}, [storedOverrides]);
+  const subscriptions = useMemo(
+    () => (lines && calendar ? buildSubscriptions(lines, { calendar, dataThrough, asOf: today, lineOverrides }) : null),
+    [lines, calendar, dataThrough, today, lineOverrides],
+  );
+  const priceCreep = useMemo(() => (lines ? buildPriceCreep(lines) : null), [lines]);
+  const drift = useMemo(
+    () => (data && calendar && transfers ? buildDrift(data, { transfers, calendar, accounts, selectedAccounts }) : null),
+    [data, calendar, transfers, accounts, selectedAccounts],
+  );
+  const basket = useMemo(
+    () => (data && calendar && transfers ? buildBasket(data, { transfers, calendar, accounts, selectedAccounts }) : null),
+    [data, calendar, transfers, accounts, selectedAccounts],
+  );
+  const fees = useMemo(
+    () => (data && calendar && transfers ? buildFeesAudit(data, accounts, { transfers, calendar, lines: lines ?? [] }) : null),
+    [data, accounts, transfers, calendar, lines],
+  );
+  const finder = useMemo(
+    () =>
+      subscriptions && fees
+        ? buildSavingsFinder({ subscriptions, priceCreep, drift, fees, basket, debtBudget, processed })
+        : null,
+    [subscriptions, priceCreep, drift, fees, basket, debtBudget, processed],
+  );
+  const setLineOverride = useCallback(
+    (lineId, value) => {
+      const next = { ...(settings.get('lineOverrides', null) ?? {}) };
+      if (value == null) delete next[lineId];
+      else next[lineId] = value;
+      settings.set('lineOverrides', next);
+    },
+    [settings],
+  );
+
   const safe = useMemo(() => deriveSafeToSpend(processed, summary), [processed, summary]);
   const budgets = useMemo(
     () => (processed ? buildBudgetProgress(processed, targets) : null),
@@ -221,6 +340,12 @@ export default function App() {
     () => summariseGoals(goals, Math.max(0, processed?.netAvg ?? 0)),
     [goals, processed],
   );
+  // "What would it take": the Plan view calls the solver on demand with these.
+  const solverInputs = useMemo(
+    () => ({ debts, debtBudget, gapClosers, processed, planOptions }),
+    [debts, debtBudget, gapClosers, processed, planOptions],
+  );
+  const solve = useMemo(() => ({ solveExtraForDate, solveExtraForGoal }), []);
 
 
   // Recharts' ResponsiveContainer measures 0x0 under a headless browser, so charts can't be
@@ -231,6 +356,8 @@ export default function App() {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
         balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers, balances, curve,
         calendar, transfers, terms, debts, debtBudget, plans, marginal, sensitivity, rateSteps: rateStepList,
+        recurring, lines, incomeProfile, upcoming, processedLong, costOfDebtLong, vitals, direction,
+        cashPath, subscriptions, priceCreep, drift, basket, fees, finder,
       };
     }
   });
@@ -328,12 +455,28 @@ export default function App() {
                   positions={balanced.map((p) => ({ ...p, currentMonthKey: processed.currentMonth }))}
                   habits={habits}
                   onOpenLedger={() => setActiveTab('table')}
+                  vitals={vitals}
+                  upcoming={upcoming}
+                  cashPath={cashPath}
+                  incomeProfile={incomeProfile}
+                  onOpenAccounts={() => setActiveTab('accounts')}
                 />
               )}
               {activeTab !== 'today' && <Headlines headlines={headlines} />}
               {activeTab === 'table' && <LedgerView processed={processed} positions={balanced} />}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
-              {activeTab === 'habits' && <HabitsView habits={habits} />}
+              {activeTab === 'habits' && (
+                <HabitsView
+                  habits={habits}
+                  finder={finder}
+                  subscriptions={subscriptions}
+                  priceCreep={priceCreep}
+                  drift={drift}
+                  basket={basket}
+                  lineOverrides={lineOverrides}
+                  onSetLineOverride={setLineOverride}
+                />
+              )}
             {activeTab === 'plan' && (
               <PlanView
                 safe={safe}
@@ -347,6 +490,12 @@ export default function App() {
                 goals={goalSummary}
                 onAddGoal={addGoal}
                 onRemoveGoal={removeGoal}
+                direction={direction}
+                debts={debts}
+                debtBudget={debtBudget}
+                solverInputs={solverInputs}
+                solve={solve}
+                onOpenDebt={() => setActiveTab('debt')}
               />
             )}
               {activeTab === 'debt' && (
@@ -379,6 +528,8 @@ export default function App() {
                   accounts={accounts}
                   onSaveAccount={updateAccount}
                   costOfDebt={costOfDebt}
+                  fees={fees}
+                  onDeleteAccount={deleteAccount}
                 />
               )}
             </>
