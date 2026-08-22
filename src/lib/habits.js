@@ -1,6 +1,5 @@
+import { spendRows } from './flows';
 import { groupByMerchant } from './merchants';
-import { isInternalMovementCategory } from './transfers';
-import { parseAccount } from './accounts';
 import { mondayIndexOfDay } from './weeklyEnvelope';
 import { parseTransactionDate } from '../utils/date';
 
@@ -16,29 +15,14 @@ import { parseTransactionDate } from '../utils/date';
  *
  * Loan-account rows and transfers are excluded throughout, for the same reason the main table
  * excludes them: they aren't spending, they're the same money moving or the same cost counted
- * twice.
+ * twice. The spend filter itself lives in `flows.js` so that "spend" means the same rows here as
+ * everywhere else; given the full-file transfer set it also drops a repayment whose other leg
+ * fell outside the visible window, which the window-scoped `processed.transferIds` cannot see.
  */
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** A merchant billing in this share of cycles is a standing commitment, not a habit. */
 const RECURRING_RATIO = 0.8;
-
-function spendRows(data, selectedAccounts, months, transferIds) {
-  const selected = new Set(selectedAccounts);
-  const visible = new Set(months);
-  const loan = new Set(
-    [...new Set(data.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan'),
-  );
-  return data.filter(
-    (t) =>
-      t.AmountNum < 0 &&
-      selected.has(t.Account) &&
-      visible.has(t['Pay Month']) &&
-      !loan.has(t.Account) &&
-      !transferIds?.has(t.id) &&
-      !isInternalMovementCategory(t.Category),
-  );
-}
 
 function cycleTotals(items, months) {
   const byMonth = new Map();
@@ -48,10 +32,19 @@ function cycleTotals(items, months) {
   return months.map((m) => byMonth.get(m) ?? 0);
 }
 
-export function buildHabits(data, selectedAccounts, processed) {
+/**
+ * @param data              every row
+ * @param selectedAccounts  raw account names to keep
+ * @param processed         processTransactionData(...) — supplies the window and, failing a full
+ *                          transfer set, its own window-scoped transferIds
+ * @param options           transfers: buildFullTransfers(data) (wiring); optional until then
+ */
+export function buildHabits(data, selectedAccounts, processed, { transfers = null } = {}) {
   if (!data?.length || !processed?.months?.length) return null;
   const { months, transferIds } = processed;
-  const rows = spendRows(data, selectedAccounts, months, transferIds);
+  const rows = transfers
+    ? spendRows(data, { transfers, selectedAccounts, months })
+    : spendRows(data, { selectedAccounts, months }).filter((t) => !transferIds?.has(t.id));
   if (rows.length === 0) return null;
 
   const cycles = months.length;
