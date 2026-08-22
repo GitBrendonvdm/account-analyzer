@@ -14,7 +14,10 @@ import { migrate } from './db/migrate.mjs';
  */
 
 const PORT = Number(process.env.PORT ?? 8080);
-const HOST = process.env.HOST ?? '0.0.0.0';
+// '::' is dual-stack on Linux: it answers 127.0.0.1 AND ::1. That matters because the
+// container's own health probe asks for `localhost`, which alpine resolves to ::1 first — an
+// IPv4-only listener refuses it and the deploy rolls back with the app perfectly healthy.
+const HOST = process.env.HOST ?? '::';
 
 const store = await openStore();
 const applied = await migrate(store);
