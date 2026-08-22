@@ -158,10 +158,6 @@ export default function App() {
     [data, selectedAccounts, accounts, processed],
   );
 
-  const headlines = useMemo(
-    () => buildHeadlines({ summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits }),
-    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits],
-  );
 
   // ---- plan: targets, goals, scenario ------------------------------------------------------
   const { targets, setTarget, goals, addGoal, removeGoal, monthlySaving, setMonthlySaving } =
@@ -346,6 +342,16 @@ export default function App() {
     [debts, debtBudget, gapClosers, processed, planOptions],
   );
   const solve = useMemo(() => ({ solveExtraForDate, solveExtraForGoal }), []);
+
+  // Headlines read every analytic, so they come last.
+  const headlines = useMemo(
+    () =>
+      buildHeadlines({
+        summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits,
+        vitals, direction, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, finder, drift,
+      }),
+    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, direction, plans, debtBudget, rateStepList, upcoming, subscriptions, finder, drift],
+  );
 
 
   // Recharts' ResponsiveContainer measures 0x0 under a headless browser, so charts can't be
