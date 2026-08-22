@@ -29,6 +29,20 @@ import { LedgerView } from './components/LedgerView';
 import { Login } from './components/Login';
 import { MigrateBanner } from './components/MigrateBanner';
 import { StatementUpload } from './components/StatementUpload';
+import { DebtView } from './components/DebtView';
+import { buildCycleCalendar } from './lib/cycleCurve';
+import { buildFullTransfers } from './lib/flows';
+import { buildLiabilityTerms, rateSteps as buildRateSteps, toDebt } from './lib/inferRates';
+import {
+  buildDebtBudget,
+  cascadeTimeline,
+  comparePlans,
+  lumpWhatIf,
+  marginalValue,
+  rateSensitivity,
+} from './lib/debtPlan';
+import { useSettings } from './hooks/useSettings';
+import { useToday } from './hooks/useToday';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -39,6 +53,7 @@ export default function App() {
   // The last account-summary upload, shown as one line until dismissed — the import banner's
   // shape is about rows, and this one is about balances.
   const [statementDone, setStatementDone] = useState(null);
+  const today = useToday();
   const {
     ready,
     data,
@@ -132,6 +147,55 @@ export default function App() {
   // ---- plan: targets, goals, scenario ------------------------------------------------------
   const { targets, setTarget, goals, addGoal, removeGoal, monthlySaving, setMonthlySaving } =
     usePlanState();
+  const settings = useSettings();
+
+  // ---- debt: terms off the ledgers, one engine, the plans ----------------------------------
+  // These ignore the account chips on purpose: a loan you have switched off is still a loan.
+  // Keyed on `data`/`accounts` only, so toggling a chip never recomputes them.
+  const allMonths = useMemo(
+    () => (data ? [...new Set(data.map((t) => t['Pay Month']))].sort() : []),
+    [data],
+  );
+  const calendar = useMemo(
+    () => (data ? buildCycleCalendar(data, allMonths, today) : null),
+    [data, allMonths, today],
+  );
+  const transfers = useMemo(() => (data ? buildFullTransfers(data, { accounts }) : null), [data, accounts]);
+  const primeRate = settings.get('primeRate', null);
+  const terms = useMemo(
+    () => (data && transfers ? buildLiabilityTerms(data, accounts, { asOf: today, primeRate, transfers }) : []),
+    [data, accounts, today, primeRate, transfers],
+  );
+  const debts = useMemo(() => terms.map(toDebt).filter(Boolean), [terms]);
+  const rateStepList = useMemo(() => terms.flatMap((t) => buildRateSteps(t)), [terms]);
+  const debtBudget = useMemo(
+    () => (processed ? buildDebtBudget(processed, { monthlySaving, cuts: 0, debts, balanced }) : null),
+    [processed, monthlySaving, debts, balanced],
+  );
+  const planOptions = useMemo(
+    () =>
+      processed
+        ? { currentMonth: processed.currentMonth, nextPayDate: processed.nextPayDate ?? null, inflows: debtBudget?.inflows ?? {} }
+        : null,
+    [processed, debtBudget],
+  );
+  const plans = useMemo(
+    () =>
+      debts.length && planOptions
+        ? comparePlans(debts, { ...planOptions, extraPerMonth: debtBudget?.extraSchedule ?? 0, strategy: settings.get('debtStrategy', 'avalanche') })
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settings.get reads a plain value
+    [debts, planOptions, debtBudget, settings.settings],
+  );
+  const marginal = useMemo(
+    () => (debts.length && planOptions ? marginalValue(debts, { ...planOptions, extraPerMonth: debtBudget?.extraSchedule ?? 0 }) : null),
+    [debts, planOptions, debtBudget],
+  );
+  const sensitivity = useMemo(
+    () => (debts.length && planOptions ? rateSensitivity(debts, { ...planOptions, extraPerMonth: debtBudget?.extraSchedule ?? 0 }) : null),
+    [debts, planOptions, debtBudget],
+  );
+  const debtEngine = useMemo(() => ({ comparePlans, marginalValue, lumpWhatIf, rateSensitivity, cascadeTimeline }), []);
 
   const safe = useMemo(() => deriveSafeToSpend(processed, summary), [processed, summary]);
   const budgets = useMemo(
@@ -166,6 +230,7 @@ export default function App() {
       window.__mv = {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
         balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers, balances, curve,
+        calendar, transfers, terms, debts, debtBudget, plans, marginal, sensitivity, rateSteps: rateStepList,
       };
     }
   });
@@ -284,6 +349,25 @@ export default function App() {
                 onRemoveGoal={removeGoal}
               />
             )}
+              {activeTab === 'debt' && (
+                <DebtView
+                  terms={terms}
+                  debts={debts}
+                  debtBudget={debtBudget}
+                  plans={plans}
+                  marginal={marginal}
+                  sensitivity={sensitivity}
+                  rateSteps={rateStepList}
+                  accounts={accounts}
+                  settings={settings}
+                  onPatchAccount={updateAccount}
+                  onOpenPlan={() => setActiveTab('plan')}
+                  onOpenAccounts={() => setActiveTab('accounts')}
+                  asOf={today}
+                  engine={debtEngine}
+                  planOptions={planOptions}
+                />
+              )}
               {activeTab === 'accounts' && (
                 <AccountsView
                   series={accountSeries}

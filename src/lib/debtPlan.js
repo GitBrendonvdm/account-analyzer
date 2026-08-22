@@ -7,6 +7,7 @@ import {
   MARGINAL_AMOUNT_DEFAULT,
   MARGINAL_HORIZON_MONTHS,
   RATE_SENSITIVITY_SHIFTS_BP,
+  DEFAULT_RATE_BY_KIND,
 } from '../constants';
 import { addMonthsToKey } from './effectivePayMonth';
 import { annuity } from './inferRates';
@@ -718,12 +719,18 @@ export function buildDebtBudget(processed, { monthlySaving = 0, cuts = 0, debts 
   const absorber = absorberFromBalances
     ? cards.find((d) => d.id === (absorberFromBalances.accountId ?? accountIdOf(absorberFromBalances.account)))
     : [...cards].sort((a, b) => b.balance - a.balance)[0] ?? null;
-  const absorberRate = absorber?.rateNominal ?? null;
+  // With no card balance typed there is no absorber to name, but the gap still costs money: it
+  // goes onto a card somewhere, and a card rate is the one default worth assuming for the figure.
+  const absorberRate = absorber?.rateNominal ?? DEFAULT_RATE_BY_KIND.card;
   const rM = monthlyRate(absorberRate ?? 0);
   const inflows = absorber && deficitPerCycle > 0 ? { [absorber.id]: deficitPerCycle } : {};
-  const deficitCost12 = absorber ? 78 * deficitPerCycle * rM : 0;
+  const deficitCost12 = deficitPerCycle > 0 ? 78 * deficitPerCycle * rM : 0;
   if (absorber && deficitPerCycle > 0) {
     assumptions.push(`Deficit of ${fmt(deficitPerCycle)} a cycle lands on the ${absorber.label} at ${pct(absorberRate)}`);
+  } else if (deficitPerCycle > 0) {
+    assumptions.push(
+      `No card balance is typed, so the cost of the gap assumes a card at ${pct(absorberRate)} — type a card balance and rate to replace it`,
+    );
   }
 
   let limitMonth = null;

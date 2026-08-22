@@ -8,6 +8,7 @@ const VIEWS = [
   { id: 'charts', label: 'Trends' },
   { id: 'habits', label: 'Habits' },
   { id: 'plan', label: 'Plan' },
+  { id: 'debt', label: 'Debt' },
   { id: 'accounts', label: 'Accounts' },
 ];
 

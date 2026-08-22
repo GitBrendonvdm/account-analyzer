@@ -38,7 +38,8 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
   const adjusted = debtBudget.adjusted ?? 0;
   const surplus = debtBudget.surplus ?? adjusted;
   const planned = Math.max(0, adjusted - surplus);
-  const absorber = debtBudget.absorberLabel ?? 'your card';
+  // With no card balance typed nobody can say WHICH card absorbs the gap, only that one does.
+  const absorber = debtBudget.absorberLabel ? `the ${debtBudget.absorberLabel}` : 'a credit card';
   const breakEven = debtBudget.breakEvenExtra ?? deficit;
   const limitMonth = fmtMonthYear(debtBudget.limitDate);
 
@@ -57,14 +58,14 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
                 You are {formatCurrencyAbs(deficit)} a cycle short.
               </p>
               <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
-                That lands on the {absorber} and costs about {formatCurrencyAbs(debtBudget.deficitCost12)}{' '}
+                That lands on {absorber} and costs about {formatCurrencyAbs(debtBudget.deficitCost12)}{' '}
                 in interest over the next year. The plans below assume no extra payments until the
                 gap closes.
               </p>
               <p className="mt-2 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
                 The first {formatCurrencyAbs(breakEven)} of anything extra you find stops the bleed;
                 only what is above it reaches a debt.
-                {limitMonth && ` At this pace the ${absorber} reaches its limit in ${limitMonth}.`}
+                {limitMonth && ` At this pace ${absorber} reaches its limit in ${limitMonth}.`}
               </p>
               <Assumptions items={debtBudget.assumptions} />
             </div>
