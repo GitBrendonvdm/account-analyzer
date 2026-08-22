@@ -11,6 +11,7 @@ import { MarginalTable } from './debt/MarginalTable';
 import { LumpWhatIf } from './debt/LumpWhatIf';
 import { CardTiles } from './debt/CardTiles';
 import { SensitivityStrip } from './debt/SensitivityStrip';
+import { WhatIfPanel } from './debt/WhatIfPanel';
 import { MARGINAL_AMOUNT_DEFAULT, MARGINAL_HORIZON_MONTHS } from '../constants';
 
 // A card's inset. 28px either side of a 360px phone left 304px for eight columns of figures; 20px
@@ -71,6 +72,7 @@ export function DebtView({
   asOf,
   engine = null,
   planOptions = null,
+  incomePerCycle = null,
 }) {
   const termList = terms ?? EMPTY;
   const debtList = debts ?? EMPTY;
@@ -188,6 +190,17 @@ export function DebtView({
   return (
     <div className="flex flex-col gap-5">
       <DeficitBanner debtBudget={debtBudget} onOpenPlan={onOpenPlan} />
+
+      {debtList.length > 0 && (
+        <WhatIfPanel
+          debts={debtList}
+          base={runOptions}
+          deficit={deficit}
+          incomePerCycle={incomePerCycle}
+          instalmentsPerCycle={debtList.reduce((sum, d) => sum + (d.instalment ?? 0), 0)}
+          onOpenPlan={onOpenPlan}
+        />
+      )}
 
       <LiabilityTable
         terms={termList}

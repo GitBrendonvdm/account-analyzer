@@ -49,6 +49,7 @@ import { buildBasket } from './lib/basket';
 import { buildFeesAudit } from './lib/fees';
 import { buildSavingsFinder } from './lib/savingsFinder';
 import { solveExtraForDate, solveExtraForGoal } from './lib/solver';
+import { bestQuickWin } from './lib/scenario';
 // Everything that is not the opening screen loads on first use. Today is a hand-drawn page; the
 // other views carry Recharts, the debt engine's UI and the PDF reader, which together doubled the
 // first paint for a screen that needed none of them.
@@ -217,6 +218,20 @@ export default function App() {
     [debts, planOptions, debtBudget],
   );
   const debtEngine = useMemo(() => ({ comparePlans, marginalValue, lumpWhatIf, rateSensitivity, cascadeTimeline }), []);
+  // The quickest payoff within three cycles, for the headline strip.
+  const quickWin = useMemo(
+    () =>
+      debts.length && planOptions
+        ? bestQuickWin(debts, { ...planOptions, strategy: settings.get('debtStrategy', 'avalanche'), extraPerMonth: debtBudget?.extraSchedule ?? 0 }, {
+            months: 3,
+            deficit: debtBudget?.deficitPerCycle ?? 0,
+            incomePerCycle: processed?.incomeAvg ?? null,
+            instalmentsPerCycle: debts.reduce((sum, d) => sum + (d.instalment ?? 0), 0),
+          })
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settings.get reads a plain value
+    [debts, planOptions, debtBudget, processed, settings.settings],
+  );
 
   // ---- recurring lines, income, what is coming up ------------------------------------------
   // Everything in this block ignores the account chips too: a bill is a bill whether or not its
@@ -354,9 +369,9 @@ export default function App() {
     () =>
       buildHeadlines({
         summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits,
-        vitals, direction, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, finder, drift,
+        vitals, direction, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, finder, drift, quickWin,
       }),
-    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, direction, plans, debtBudget, rateStepList, upcoming, subscriptions, finder, drift],
+    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, direction, plans, debtBudget, rateStepList, upcoming, subscriptions, finder, drift, quickWin],
   );
 
 
@@ -369,7 +384,7 @@ export default function App() {
         balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers, balances, curve,
         calendar, transfers, terms, debts, debtBudget, plans, marginal, sensitivity, rateSteps: rateStepList,
         recurring, lines, incomeProfile, upcoming, processedLong, costOfDebtLong, vitals, direction,
-        cashPath, subscriptions, priceCreep, drift, basket, fees, finder,
+        cashPath, subscriptions, priceCreep, drift, basket, fees, finder, quickWin,
       };
     }
   });
@@ -534,6 +549,7 @@ export default function App() {
                   asOf={today}
                   engine={debtEngine}
                   planOptions={planOptions}
+                  incomePerCycle={processed?.incomeAvg ?? null}
                 />
               )}
               {activeTab === 'accounts' && (

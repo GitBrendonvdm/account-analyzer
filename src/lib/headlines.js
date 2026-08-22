@@ -105,6 +105,7 @@ export function buildHeadlines({
   subscriptions = null,
   finder = null,
   drift = null,
+  quickWin = null,
 } = {}) {
   if (!summary || !processed) return [];
   const out = [];
@@ -314,6 +315,24 @@ export function buildHeadlines({
       weight: finder.found * 12,
       text: `${R(finder.found)} a cycle of cancellable spend found${cover}.`,
       detail: `${R(finite(finder.foundPerYear, finder.found * 12))} a year, counting only cancellable items at high or medium confidence${behavioural > 0 ? `; ${R(behavioural)} more a cycle if the trips and drift change` : ''}.`,
+    });
+  }
+
+  // ---- 10b. The quickest payoff ---------------------------------------------------------------
+  // A decision, not a statistic: the debt that could be gone within three cycles, what that costs
+  // and what it frees. The Debt tab's "What if" panel is the long form of this one line.
+  if (quickWin && quickWin.freed?.perCycle > 0 && quickWin.sentence) {
+    const ev = quickWin.everything ?? {};
+    const sooner = finite(ev.monthsSooner);
+    out.push({
+      id: 'quick-win',
+      tone: 'good',
+      weight: finite(quickWin.freed.within12),
+      text: quickWin.sentence,
+      detail:
+        sooner > 0 && ev.scenarioDate
+          ? `Rolled on, everything clears ${sooner} cycle${sooner === 1 ? '' : 's'} sooner (${ev.scenarioDate.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}) with ${R(finite(ev.interestSaved))} less interest overall.`
+          : `${R(finite(quickWin.freed.within12))} freed within a year.`,
     });
   }
 
