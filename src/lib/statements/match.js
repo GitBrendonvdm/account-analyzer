@@ -21,7 +21,10 @@ import { shapeAccount, typeFromName } from './fnb';
  * it is before it can be added (see externalRecord).
  *
  * The patch is deliberately small: a balance, the date it was true, and a limit when the statement
- * let one be derived. It never touches the name or the type.
+ * let one be derived. It never touches the name or the type. The date is the statement's unless
+ * the caller overrides it — an FNB page carries none, and "today" is wrong for a PDF saved last
+ * week — and a patch that would leave the record exactly as it is can be told apart
+ * (`patchIsNoop`) so that a second upload of the same page writes nothing.
  */
 
 const LIABILITY = new Set(['Credit Card', 'Loan']);
@@ -96,6 +99,25 @@ function patchFor(entry, account, asOf) {
   return patch;
 }
 
+const sameCents = (a, b) =>
+  (a == null && b == null) ||
+  (typeof a === 'number' && typeof b === 'number' && Math.round(a * 100) === Math.round(b * 100));
+
+/**
+ * Would this patch leave the record as it is? Balance to the cent, the same as-of date, and the
+ * same value for any limit the patch carries. Who set the balance is not part of it: uploading
+ * the page that set it again is not a change.
+ */
+export function patchIsNoop(patch, account) {
+  if (!patch || !account) return false;
+  if (!sameCents(patch.currentBalance, account.currentBalance)) return false;
+  if ((patch.balanceAsOf ?? null) !== (account.balanceAsOf ?? null)) return false;
+  for (const key of ['creditLimit', 'overdraftLimit']) {
+    if (key in patch && !sameCents(patch[key], account[key])) return false;
+  }
+  return true;
+}
+
 function recordFor(entry, bank, asOf) {
   const bankName = bank || entry.bank || 'Unknown';
   const mask = entry.last4;
@@ -134,14 +156,15 @@ export function externalRecord(entry, { bank, asOf, type } = {}) {
 
 /**
  * @param {object}          parsed            the result of parseStatement
- * @param {object[]|object} accountsOrOptions the app's account records, or `{ knownAccounts }`
+ * @param {object[]|object} accountsOrOptions the app's account records, or
+ *                                            `{ knownAccounts, asOf }` — `asOf` replaces the
+ *                                            statement's date in every patch and record
  */
 export function matchStatement(parsed, accountsOrOptions = []) {
-  const accounts = Array.isArray(accountsOrOptions)
-    ? accountsOrOptions
-    : (accountsOrOptions?.knownAccounts ?? []);
+  const options = Array.isArray(accountsOrOptions) ? {} : (accountsOrOptions ?? {});
+  const accounts = Array.isArray(accountsOrOptions) ? accountsOrOptions : (options.knownAccounts ?? []);
   const resolved = adoptKnownTypes(parsed, accounts);
-  const asOf = resolved?.asOf ?? null;
+  const asOf = options.asOf ?? resolved?.asOf ?? null;
   const bank = resolved?.bank ?? '';
   const used = new Set();
   const matched = [];

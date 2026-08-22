@@ -23,7 +23,7 @@ import { shapeAccount, typeFromName } from './fnb';
  * the matching one.
  */
 
-const MARKER = /nedbank|all balances|account description/i;
+const MARKER = /nedbank|all balances|account description|account\s+(summary|mmmary)/i;
 // Page furniture OCR returns alongside the rows: the title (with "summary" often mangled), the
 // date line, the column header, and the bare date that opens the page.
 const STRUCTURE =
@@ -87,6 +87,7 @@ function readRow(raw) {
       typeFrom: column ? 'column' : 'name',
       printedBalance: current.value,
       available: available.value,
+      line: raw,
     }),
   };
 }

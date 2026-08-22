@@ -74,7 +74,7 @@ export function typeFromName(name) {
  * the original rather than from a sign this rule already changed. `signFromType` says the rule
  * flipped it, so the preview can say so.
  */
-export function shapeAccount({ bank, name, number, numbers, type, kind, typeFrom, printedBalance, available }) {
+export function shapeAccount({ bank, name, number, numbers, type, kind, typeFrom, printedBalance, available, line }) {
   const liability = LIABILITY.has(type);
   const signed = liability ? -Math.abs(printedBalance) : printedBalance;
   const balance = signed === 0 ? 0 : signed;
@@ -95,6 +95,9 @@ export function shapeAccount({ bank, name, number, numbers, type, kind, typeFrom
     overdraftLimit: type === 'Bank' ? room : null,
     signFromType: liability && printedBalance > 0,
     currency: 'ZAR',
+    // The text this came from, so a row can be reported back when it turns out to belong to a
+    // page of the other bank.
+    line: line ?? null,
   };
 }
 
@@ -147,7 +150,7 @@ export function parseFnb(lines, { asOf } = {}) {
     }
     const { type, kind } = typeFromName(name);
     accounts.push(
-      shapeAccount({ bank: 'FNB', name, number, type, kind, typeFrom: 'label', printedBalance, available }),
+      shapeAccount({ bank: 'FNB', name, number, type, kind, typeFrom: 'label', printedBalance, available, line }),
     );
   }
 

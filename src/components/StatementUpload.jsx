@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, FileText, Loader2, ScanText, X } from 'lucide-react';
 import { accountLabel } from '../db/accountIdentity';
 import { formatCurrency } from '../utils/format';
-import { externalRecord, matchStatement, parseStatement } from '../lib/statements';
+import { externalRecord, matchStatement, parseStatement, patchIsNoop } from '../lib/statements';
 import { todayIso } from '../lib/statements/amounts';
 import { Card } from './ui/Surface';
 
@@ -20,6 +20,11 @@ import { Card } from './ui/Surface';
  * not perfect, and a balance that is wrong by a digit should be caught by a glance, not a bank
  * reconciliation later. A large account whose type the page did not give is held back until the
  * user says what it is, because the type decides the sign, and the sign decides net worth.
+ *
+ * The date is the user's to set. A Nedbank page prints the day it was saved; an FNB page does not,
+ * and the day of the upload is wrong for a PDF saved last week — so the sheet asks for the date the
+ * PDF was saved, and that date goes on every balance written. Confirming the same page twice
+ * writes nothing the second time: a patch that changes nothing is counted, not sent.
  */
 
 const READ_ERROR =
@@ -36,6 +41,11 @@ function formatDay(iso) {
 
 const sameCents = (a, b) => a != null && b != null && Math.round(a * 100) === Math.round(b * 100);
 
+/** A date on or before today, as the statement's date must be; anything else becomes today. */
+function clampDay(iso, today) {
+  return typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso <= today ? iso : today;
+}
+
 function progressLabel(p) {
   if (p?.stage === 'ocr') {
     if (p.status === 'recognizing text' && typeof p.progress === 'number') {
@@ -44,6 +54,19 @@ function progressLabel(p) {
     return 'Preparing OCR…';
   }
   return 'Reading…';
+}
+
+/** Where the balance the record holds today came from — so a re-upload reads as one. */
+function provenance(account) {
+  if (account.currentBalance == null) return 'no balance yet';
+  const when = account.balanceAsOf ? formatDay(account.balanceAsOf) : '';
+  if (account.source === 'statement') {
+    return `was: from your ${account.bank || 'bank'} summary${when ? `, ${when}` : ''}`;
+  }
+  if (account.source === 'manual' || account.source === 'user') {
+    return `was: typed${when ? ` ${when}` : ''}`;
+  }
+  return `was: set${when ? ` ${when}` : ' earlier'}`;
 }
 
 function Sheet({ title, subtitle, onClose, children }) {
@@ -88,6 +111,7 @@ function Sheet({ title, subtitle, onClose, children }) {
 
 function MatchedRow({ match, asOf }) {
   const { account, parsed, patch, note } = match;
+  const unchanged = patchIsNoop(patch, account);
   const old = account.currentBalance;
   const next = patch.currentBalance;
   const changed = !sameCents(old, next);
@@ -109,12 +133,15 @@ function MatchedRow({ match, asOf }) {
           {limit}
           {note && <span className="text-warn"> · {note}</span>}
         </div>
+        <div className="t-caption truncate">
+          {unchanged ? <span className="text-good">already up to date</span> : provenance(account)}
+        </div>
       </div>
       <div className="num shrink-0 text-right text-sm">
         {changed && old != null && (
           <span className="mr-2 text-label-3 line-through">{formatCurrency(old)}</span>
         )}
-        <span className={tone}>{formatCurrency(next)}</span>
+        <span className={unchanged ? 'text-label-2' : tone}>{formatCurrency(next)}</span>
       </div>
     </li>
   );
@@ -197,6 +224,14 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
   const [adds, setAdds] = useState({});
   // needsAttention entries, keyed by account number: { type, add }.
   const [choices, setChoices] = useState({});
+  const today = todayIso();
+  const [asOf, setAsOf] = useState(today);
+
+  // Re-matched whenever the date changes, so every patch and record carries the chosen day.
+  const match = useMemo(
+    () => (result ? matchStatement(result.parsed, { knownAccounts: accounts, asOf }) : null),
+    [result, accounts, asOf],
+  );
 
   const reset = useCallback(() => {
     setPhase('idle');
@@ -219,18 +254,21 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
       try {
         const { default: extractLines } = await import('../lib/statements/extract');
         const extracted = await extractLines(file, { onProgress: setProgress });
-        const parsed = parseStatement(extracted.lines, { asOf: todayIso(), knownAccounts: accounts });
+        const now = todayIso();
+        const parsed = parseStatement(extracted.lines, { asOf: now, knownAccounts: accounts });
         if (!parsed.bank || parsed.accounts.length === 0) {
           setError({ message: READ_ERROR });
           setPhase('error');
           return;
         }
-        const match = matchStatement(parsed, { knownAccounts: accounts });
-        setAdds(Object.fromEntries(match.unmatched.map((u) => [u.record.id, true])));
+        const initialAsOf = clampDay(parsed.asOf, now);
+        const first = matchStatement(parsed, { knownAccounts: accounts, asOf: initialAsOf });
+        setAsOf(initialAsOf);
+        setAdds(Object.fromEntries(first.unmatched.map((u) => [u.record.id, true])));
         setChoices(
-          Object.fromEntries(match.needsAttention.map((n) => [n.parsed.number, { type: '', add: false }])),
+          Object.fromEntries(first.needsAttention.map((n) => [n.parsed.number, { type: '', add: false }])),
         );
-        setResult({ parsed, match, method: extracted.method, fileName: file.name });
+        setResult({ parsed, method: extracted.method, fileName: file.name });
         setPhase('preview');
       } catch (err) {
         setError({ message: READ_ERROR, detail: err?.message });
@@ -241,13 +279,18 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
   );
 
   const confirm = useCallback(async () => {
-    if (!result) return;
+    if (!result || !match) return;
     setPhase('confirming');
-    const { parsed, match, method, fileName } = result;
+    const { parsed, method, fileName } = result;
     const updatedNames = [];
     const createdNames = [];
+    let unchanged = 0;
     try {
       for (const m of match.matched) {
+        if (patchIsNoop(m.patch, m.account)) {
+          unchanged += 1;
+          continue;
+        }
         await onPatchAccount(m.account.id, m.patch);
         updatedNames.push(accountLabel(m.account));
       }
@@ -259,18 +302,17 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
       for (const n of match.needsAttention) {
         const choice = choices[n.parsed.number];
         if (!choice?.type || !choice.add) continue;
-        await onCreateAccount(
-          externalRecord(n.parsed, { bank: parsed.bank, asOf: parsed.asOf, type: choice.type }),
-        );
+        await onCreateAccount(externalRecord(n.parsed, { bank: parsed.bank, asOf, type: choice.type }));
         createdNames.push(n.parsed.name);
       }
       onDone?.({
         kind: 'statement',
         fileName,
         bank: parsed.bank,
-        asOf: parsed.asOf,
+        asOf,
         method,
         updated: updatedNames.length,
+        unchanged,
         created: createdNames.length,
         skipped: parsed.skipped.length,
         updatedNames,
@@ -281,13 +323,15 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
       setError({ message: `Couldn't save: ${err?.message ?? 'unknown error'}` });
       setPhase('preview');
     }
-  }, [result, adds, choices, onPatchAccount, onCreateAccount, onDone, reset]);
+  }, [result, match, asOf, adds, choices, onPatchAccount, onCreateAccount, onDone, reset]);
 
   const busy = phase === 'reading';
-  const toUpdate = result ? result.match.matched.length : 0;
-  const toAdd = result
-    ? result.match.unmatched.filter((u) => adds[u.record.id]).length +
-      result.match.needsAttention.filter(
+  const matchedRows = match?.matched ?? [];
+  const unchangedCount = matchedRows.filter((m) => patchIsNoop(m.patch, m.account)).length;
+  const toUpdate = matchedRows.length - unchangedCount;
+  const toAdd = match
+    ? match.unmatched.filter((u) => adds[u.record.id]).length +
+      match.needsAttention.filter(
         (n) => choices[n.parsed.number]?.type && choices[n.parsed.number]?.add,
       ).length
     : 0;
@@ -327,10 +371,10 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
         </Sheet>
       )}
 
-      {(phase === 'preview' || phase === 'confirming') && result && (
+      {(phase === 'preview' || phase === 'confirming') && result && match && (
         <Sheet
           title="Account summary"
-          subtitle={`${result.parsed.bank} · as of ${formatDay(result.parsed.asOf)} · ${
+          subtitle={`${result.parsed.bank} · ${
             result.method === 'ocr' ? 'read from an image' : 'read from the PDF text'
           }`}
           onClose={reset}
@@ -342,22 +386,40 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
             </p>
           )}
 
-          {toUpdate > 0 && (
+          <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <label htmlFor="statement-as-of" className="t-label">
+              As of
+            </label>
+            <input
+              id="statement-as-of"
+              type="date"
+              value={asOf}
+              max={today}
+              onChange={(e) => e.target.value && setAsOf(clampDay(e.target.value, today))}
+              className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none"
+            />
+            <span className="t-caption">Use the date you saved the PDF.</span>
+          </div>
+
+          {matchedRows.length > 0 && (
             <section className="mt-5">
-              <h3 className="t-label">Update {toUpdate} account{toUpdate === 1 ? '' : 's'}</h3>
+              <h3 className="t-label">
+                Update {toUpdate} account{toUpdate === 1 ? '' : 's'}
+                {unchangedCount > 0 && ` · ${unchangedCount} already up to date`}
+              </h3>
               <ul className="mt-1">
-                {result.match.matched.map((m) => (
-                  <MatchedRow key={m.account.id} match={m} asOf={result.parsed.asOf} />
+                {matchedRows.map((m) => (
+                  <MatchedRow key={m.account.id} match={m} asOf={asOf} />
                 ))}
               </ul>
             </section>
           )}
 
-          {result.match.unmatched.length > 0 && (
+          {match.unmatched.length > 0 && (
             <section className="mt-5">
               <h3 className="t-label">Not in your transaction export</h3>
               <ul className="mt-1">
-                {result.match.unmatched.map((u) => (
+                {match.unmatched.map((u) => (
                   <UnmatchedRow
                     key={u.record.id}
                     entry={u}
@@ -371,16 +433,16 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
             </section>
           )}
 
-          {result.match.needsAttention.length > 0 && (
+          {match.needsAttention.length > 0 && (
             <section className="mt-5">
               <h3 className="t-label">Needs a type before it can be added</h3>
               <ul className="mt-1">
-                {result.match.needsAttention.map((n) => (
+                {match.needsAttention.map((n) => (
                   <AttentionRow
                     key={n.parsed.number}
                     entry={n}
                     bank={result.parsed.bank}
-                    asOf={result.parsed.asOf}
+                    asOf={asOf}
                     choice={choices[n.parsed.number] ?? { type: '', add: false }}
                     onChange={(choice) =>
                       setChoices((prev) => ({ ...prev, [n.parsed.number]: choice }))
@@ -432,7 +494,7 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
               {toUpdate > 0 && `Update ${toUpdate}`}
               {toUpdate > 0 && toAdd > 0 && ' · '}
               {toAdd > 0 && `Add ${toAdd}`}
-              {toUpdate + toAdd === 0 && 'Nothing to apply'}
+              {toUpdate + toAdd === 0 && (unchangedCount > 0 ? 'All up to date' : 'Nothing to apply')}
             </button>
           </div>
         </Sheet>

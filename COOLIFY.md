@@ -14,6 +14,17 @@ Coolify watches `main` and deploys itself. There is no CI step in this repo — 
 - First visit after a fresh database asks for a passphrase. To reset a lost one, add
   `RESET_PASSPHRASE=1` to the environment, redeploy once, then remove it.
 
+## Two things that bit the first server deploy
+
+1. **The in-container health probe talks to `localhost`**, which alpine resolves to `::1` first. A
+   server bound to `0.0.0.0` refuses it, Coolify marks the new container unhealthy and rolls back —
+   with the app perfectly fine. The server binds `::` (dual-stack) for that reason, and the Coolify
+   health check host is set to `127.0.0.1` as well.
+2. **Changing "Ports Exposes" through the API does not regenerate the Traefik labels.** They are
+   stored in `custom_labels` and kept the old `loadbalancer.server.port=80`, so the proxy returned
+   502 while the container was healthy on 8080. If the port ever changes again, check the labels
+   (Settings → Advanced → Container Labels in the UI) and fix the two `server.port` lines.
+
 ## How the trigger is wired
 
 In the Coolify application, under **Settings**:
