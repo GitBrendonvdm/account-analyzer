@@ -481,6 +481,7 @@ export default function App() {
                   basket={basket}
                   lineOverrides={lineOverrides}
                   onSetLineOverride={setLineOverride}
+                  asOf={today}
                 />
               )}
             {activeTab === 'plan' && (
@@ -502,6 +503,10 @@ export default function App() {
                 solverInputs={solverInputs}
                 solve={solve}
                 onOpenDebt={() => setActiveTab('debt')}
+                subscriptions={subscriptions}
+                lineOverrides={lineOverrides}
+                onSetLineOverride={setLineOverride}
+                asOf={today}
               />
             )}
               {activeTab === 'debt' && (

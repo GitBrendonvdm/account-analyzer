@@ -3,13 +3,64 @@ import { Card, Figure, Tile } from './ui/Surface';
 import { CycleDial } from './today/CycleDial';
 import { SpendCurve } from './today/SpendCurve';
 import { BalanceBands } from './today/BalanceBands';
+import { VitalsRow } from './today/VitalsRow';
+import { UpcomingCard } from './today/UpcomingCard';
+import { CashPath } from './today/CashPath';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
-const fmt = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
+const toDate = (v) => {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const fmt = (v) => {
+  const d = toDate(v);
+  return d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—';
+};
+const ordinal = (n) => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+};
+const median = (values) => {
+  const sorted = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
 
 /** The bar colours for "where it goes" — semantic first, then a stable rotation. */
 const BAR_TONES = ['#5e5ce6', '#0a84ff', '#63e6e2', '#ff9f0a', '#ff375f', '#30d158'];
+
+/**
+ * The line under the dial: what the salary is, when it usually lands, and how often it has been
+ * late. Read from the income profile's salary aggregate; the day range comes from the salary
+ * sources' own day-of-month so two earners paid on different days still get one honest range.
+ */
+function salaryCaption(profile) {
+  const salary = profile?.salary;
+  if (!salary || !(salary.expectedAmount > 0)) return null;
+  const sources = (profile.sources ?? []).filter((s) => salary.sourceIds?.includes(s.id));
+  const dom = median(sources.map((s) => s.dom));
+  const lands =
+    dom != null
+      ? `usually lands the ${ordinal(Math.max(1, Math.round(dom) - 1))}–${ordinal(Math.min(31, Math.round(dom) + 1))}`
+      : Number.isFinite(salary.typicalCycleDay)
+        ? `usually lands on day ${Math.round(salary.typicalCycleDay)} of the cycle`
+        : null;
+  const late = (salary.missingCycles?.length ?? 0) + (salary.lateCycles?.length ?? 0);
+  const cycles = salary.cycles ?? profile.cycles?.length ?? null;
+  const parts = [
+    sources.length > 1
+      ? `${sources.length === 2 ? 'Two' : sources.length} salaries, ${formatCurrencyAbs(salary.expectedAmount)} a cycle`
+      : `Salary ${formatCurrencyAbs(salary.expectedAmount)}`,
+  ];
+  if (lands) parts[0] += sources.length > 1 ? ` · ${lands.replace('usually lands', 'usually land')}` : ` ${lands}`;
+  if (salary.lastReceived) parts.push(`last received ${fmt(salary.lastReceived)}`);
+  if (cycles) parts.push(`late in ${late} of ${cycles} cycles`);
+  return parts.join(' · ');
+}
 
 function WhereItGoes({ rows, onOpenLedger, className = '' }) {
   if (!rows.length) return null;
@@ -60,14 +111,35 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
  * Everything else is supporting evidence, and the full ledger is one deliberate click away rather
  * than being the front page. That inversion is the point of the rework — the table answers "what
  * exactly", which is a question you go looking for, not one you need answered on arrival.
+ *
+ * Below the hero, in order: the six vitals (the year's health, not the cycle's), then the bills
+ * calendar beside the cash path (what lands when, and what that does to the balance), then the
+ * two cycle overlays, the three figures and where the money goes. Every new block renders nothing
+ * — never a crash — when its data is not there yet, so the page degrades to the old one.
  */
-export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt, positions, habits, onOpenLedger }) {
+export function TodayView({
+  summary,
+  safe,
+  curve,
+  balances,
+  netWorth,
+  costOfDebt,
+  positions,
+  habits,
+  vitals,
+  upcoming,
+  cashPath,
+  incomeProfile,
+  onOpenLedger,
+  onOpenAccounts,
+}) {
   if (!summary) return null;
 
   const negative = (safe?.safe ?? 0) <= 0;
-  const cards = positions.filter((p) => p.type === 'Credit Card');
+  const cards = (positions ?? []).filter((p) => p.type === 'Credit Card');
   const cardDebt = cards.reduce((s, p) => s + Math.min(0, p.positionByMonth?.[p.currentMonthKey] ?? 0), 0);
   const cardChange = cards.reduce((s, p) => s + (p.windowChange ?? 0), 0);
+  const caption = salaryCaption(incomeProfile);
 
   const spendRows = [];
   if (costOfDebt?.perCycle > 0) {
@@ -79,12 +151,12 @@ export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt
     .slice(0, 5)
     .forEach((m) => spendRows.push({ name: m.category, amount: m.perCycle }));
 
+  const showCalendar = Boolean(upcoming || cashPath);
+
   return (
     /* On an ultrawide a column of full-width bands strands the content in empty space, so past
        1800px the page becomes a 12-track grid and the blocks pair up instead of stacking. */
-    /* flex-grow + a stretching chart row is what stops the page ending early and leaving bare
-       ground below it — nothing was capping the height, there simply was not enough content. */
-    <div className="grid flex-grow grid-cols-1 gap-5 3xl:grid-cols-12 3xl:grid-rows-[auto_minmax(0,1fr)_auto_auto]">
+    <div className="grid flex-grow grid-cols-1 gap-5 3xl:grid-cols-12">
       {/* hero */}
       <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-12 3xl:grid-cols-[minmax(0,1fr)_auto]">
         <div>
@@ -125,8 +197,25 @@ export function TodayView({ summary, safe, curve, balances, netWorth, costOfDebt
           <div className="t-caption">
             {fmt(summary.start)} – {fmt(summary.end)}
           </div>
+          {caption && <div className="t-caption max-w-[34ch] text-center">{caption}</div>}
         </div>
       </Card>
+
+      {vitals !== undefined && (
+        <VitalsRow vitals={vitals} onOpenAccounts={onOpenAccounts} className="3xl:col-span-12" />
+      )}
+
+      {showCalendar && (
+        <div className="grid gap-5 lg:grid-cols-2 3xl:col-span-12">
+          <UpcomingCard upcoming={upcoming} dataThrough={summary.dataThrough} />
+          <CashPath
+            cashPath={cashPath}
+            incomeProfile={incomeProfile}
+            onOpenAccounts={onOpenAccounts}
+            className={upcoming ? '3xl:col-span-2' : 'lg:col-span-2'}
+          />
+        </div>
+      )}
 
       {curve && (
         <Card className="materialize flex flex-col p-7 sm:p-8 3xl:col-span-6">

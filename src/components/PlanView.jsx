@@ -3,7 +3,9 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -13,6 +15,28 @@ import {
 import { Flag, Scissors, Target, Wallet } from 'lucide-react';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 import { suggestTarget } from '../lib/budgets';
+import { Field } from './ui/Field';
+import { DirectionTable } from './plan/DirectionTable';
+import { SolverPanel } from './plan/SolverPanel';
+import { StandingCharges } from './plan/StandingCharges';
+import {
+  BAD,
+  ChartFrame,
+  ChartLegend,
+  ChartTooltip,
+  GOOD,
+  LABEL,
+  ZoomHint,
+  axisStyle,
+  compactNumber,
+  cursorStyle,
+  gridStyle,
+  selectionStyle,
+  useReducedMotion,
+  useSeriesToggle,
+  useZoomDomain,
+  yAxisStyle,
+} from './charts/interactive';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
 const MONTH_YEAR = { month: 'short', year: '2-digit' };
@@ -36,7 +60,7 @@ function Panel({ title, subtitle, children, right }) {
 /* ------------------------------------------------------------------ safe to spend */
 
 function SafeToSpend({ safe, summary }) {
-  if (!safe) return null;
+  if (!safe || !summary) return null;
   const negative = safe.safe <= 0;
   return (
     <div className="glass p-7">
@@ -106,7 +130,7 @@ function SafeToSpend({ safe, summary }) {
         </dl>
       </div>
 
-      {safe.bills.length > 0 && (
+      {safe.bills?.length > 0 && (
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4 text-xs">
           <span className="font-medium text-label-2">Set aside for:</span>
           {safe.bills.slice(0, 8).map((b) => (
@@ -133,9 +157,9 @@ function TargetRow({ row, onSet }) {
   const [draft, setDraft] = useState(row.target == null ? '' : String(row.target));
   const pct = row.target ? Math.min(150, (row.projected / row.target) * 100) : 0;
 
-  const commit = () => {
-    const v = parseFloat(draft.replace(/[^\d.]/g, ''));
-    onSet(row.category, Number.isFinite(v) && v > 0 ? v : null);
+  const commit = (value) => {
+    const v = parseFloat(String(value).replace(/[^\d.]/g, ''));
+    onSet?.(row.category, Number.isFinite(v) && v > 0 ? v : null);
   };
 
   return (
@@ -156,19 +180,14 @@ function TargetRow({ row, onSet }) {
         {formatCurrencyAbs(row.projected)}
       </td>
       <td className="px-4 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-label-3">R</span>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            inputMode="decimal"
-            placeholder={String(suggestTarget(row.typical))}
-            aria-label={`Target for ${row.category}`}
-            className="w-24 rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none"
-          />
-        </div>
+        <Field
+          prefix="R"
+          value={draft}
+          onChange={setDraft}
+          onCommit={commit}
+          placeholder={String(suggestTarget(row.typical))}
+          ariaLabel={`Target for ${row.category}`}
+        />
       </td>
       <td className="px-4 py-2.5">
         {row.target ? (
@@ -197,10 +216,19 @@ function TargetRow({ row, onSet }) {
 
 /* ------------------------------------------------------------------ trajectory */
 
+const EMPTY = [];
+const TRAJECTORY_SERIES = ['assets', 'debt', 'net'];
+
+/**
+ * Net worth, assets and debt projected forward, with the interaction kit: drag to zoom, hover for
+ * the three figures and their change since the first visible cycle, click the legend to hide a
+ * series. Tones are the Aurora good/bad fills — the pastel light-theme hexes this chart shipped
+ * with were the one place the app still looked like a different product.
+ */
 function TrajectoryChart({ trajectory }) {
   const data = useMemo(
     () =>
-      (trajectory?.points ?? []).map((p) => ({
+      (trajectory?.points ?? EMPTY).map((p) => ({
         cycle: p.cycle,
         label: p.date ? p.date.toLocaleDateString('en-ZA', MONTH_YEAR) : `+${p.cycle}`,
         net: Math.round(p.net),
@@ -209,109 +237,194 @@ function TrajectoryChart({ trajectory }) {
       })),
     [trajectory],
   );
+  const zoom = useZoomDomain(data, 'label');
+  const toggles = useSeriesToggle(TRAJECTORY_SERIES);
+  const reduced = useReducedMotion();
   if (!data.length) return null;
 
+  const { visibleData } = zoom;
+  const first = visibleData[0];
+  const last = visibleData[visibleData.length - 1];
+  const summary = `Net worth projected over ${data.length} cycles, from ${formatCurrency(data[0].net)} to ${formatCurrency(
+    data[data.length - 1].net,
+  )}.${zoom.zoomed ? ` Zoomed to ${first.label} – ${last.label}.` : ''}`;
+
   return (
-    <div className="h-72 w-full px-2 py-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }} tickLine={false} />
-          <YAxis
-            tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => `${Math.round(v / 1000)}k`}
-          />
-          <Tooltip
-            formatter={(v, name) => [formatCurrency(v), name]}
-            contentStyle={{ fontSize: 12, borderRadius: 12, background: '#16161c', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7' }}
-          />
-          <ReferenceLine y={0} stroke="rgba(255,255,255,0.22)" />
-          <Area type="monotone" dataKey="assets" name="Held" stroke="#10b981" fill="#d1fae5" strokeWidth={1.5} />
-          <Area type="monotone" dataKey="debt" name="Owed" stroke="#ef4444" fill="#fee2e2" strokeWidth={1.5} />
-          <Line type="monotone" dataKey="net" name="Net worth" stroke="#f5f5f7" strokeWidth={2.5} dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
+    <div className="px-2 py-4">
+      <ChartFrame label={summary} zoom={zoom} unit="cycles" className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={visibleData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }} {...zoom.chartProps}>
+            <CartesianGrid {...gridStyle} />
+            <XAxis dataKey="label" {...axisStyle} interval="preserveStartEnd" />
+            <YAxis {...yAxisStyle} tickFormatter={compactNumber} />
+            <Tooltip
+              cursor={cursorStyle}
+              isAnimationActive={false}
+              active={zoom.dragging ? false : undefined}
+              content={<ChartTooltip deltaFrom={first} />}
+            />
+            <Legend content={<ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} />} />
+            <ReferenceLine y={0} stroke="rgba(255,255,255,0.22)" />
+            <Area
+              type="monotone"
+              dataKey="assets"
+              name="Held"
+              stroke={GOOD}
+              fill="rgba(48,209,88,0.18)"
+              strokeWidth={1.5}
+              hide={toggles.isHidden('assets')}
+              isAnimationActive={!reduced}
+            />
+            <Area
+              type="monotone"
+              dataKey="debt"
+              name="Owed"
+              stroke={BAD}
+              fill="rgba(255,69,58,0.18)"
+              strokeWidth={1.5}
+              hide={toggles.isHidden('debt')}
+              isAnimationActive={!reduced}
+            />
+            <Line
+              type="monotone"
+              dataKey="net"
+              name="Net worth"
+              stroke={LABEL}
+              strokeWidth={2.5}
+              dot={false}
+              activeDot={{ r: 5, stroke: '#08080a', strokeWidth: 2 }}
+              hide={toggles.isHidden('net')}
+              isAnimationActive={!reduced}
+            />
+            {zoom.selection && (
+              <ReferenceArea x1={zoom.selection.x1} x2={zoom.selection.x2} {...selectionStyle} />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </ChartFrame>
+      <ZoomHint
+        zoomed={zoom.zoomed}
+        onReset={zoom.reset}
+        label={zoom.zoomed ? `${first.label} – ${last.label}` : null}
+        className="mt-2 px-4"
+      />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ the view */
 
+/**
+ * Plan — this cycle's room, the direction, what it would take, and the levers.
+ *
+ * Order is the order of the questions: how much is safe now, which way things are going, what a
+ * chosen date would cost, then the targets, the cuts, the projection, the standing charges the
+ * plan has to carry, and the goals. The direction table and the solver are new; everything else
+ * is the previous view, with the trajectory chart re-toned and given the interaction kit and the
+ * inputs moved onto `Field`.
+ *
+ * The solver is never imported here: App hands in `solve` (the library) together with the
+ * `solverInputs` bundle, so the panel stays renderable — and testable — with neither.
+ */
 export function PlanView({
   safe,
   summary,
   budgets,
   onSetTarget,
   trajectory,
-  monthlySaving,
+  monthlySaving = 0,
   onMonthlySavingChange,
   gapClosers,
   goals,
   onAddGoal,
   onRemoveGoal,
+  direction,
+  debts,
+  debtBudget,
+  solverInputs,
+  solve,
+  onOpenDebt,
+  subscriptions,
+  lineOverrides,
+  onSetLineOverride,
+  asOf,
 }) {
   const [showAll, setShowAll] = useState(false);
   const [goalDraft, setGoalDraft] = useState({ name: '', target: '', saved: '' });
 
   const rows = budgets ? (showAll ? budgets.rows : budgets.rows.slice(0, 12)) : [];
+  const goalList = goals?.goals ?? [];
 
   return (
     <div className="flex flex-col gap-5">
       <SafeToSpend safe={safe} summary={summary} />
 
-      <Panel
-        title="Targets"
-        subtitle="Judged against where the cycle is heading — spend so far plus what's still forecast — rather than against spend so far, which is meaningless on day three."
-        right={
-          budgets?.withTargets.length > 0 && (
-            <div className="text-right">
-              <div
-                className={`text-lg font-semibold tabular-nums ${
-                  budgets.status === 'over' ? 'text-bad' : 'text-good'
-                }`}
-              >
-                {formatCurrencyAbs(budgets.totalProjected)} / {formatCurrencyAbs(budgets.totalTarget)}
+      <DirectionTable direction={direction} />
+
+      {(solve || solverInputs || debts) && (
+        <SolverPanel
+          debts={debts}
+          debtBudget={debtBudget}
+          solverInputs={solverInputs}
+          solve={solve}
+          monthlySaving={monthlySaving}
+          onOpenDebt={onOpenDebt}
+        />
+      )}
+
+      {budgets && (
+        <Panel
+          title="Targets"
+          subtitle="Judged against where the cycle is heading — spend so far plus what's still forecast — rather than against spend so far, which is meaningless on day three."
+          right={
+            budgets.withTargets?.length > 0 && (
+              <div className="text-right">
+                <div
+                  className={`text-lg font-semibold tabular-nums ${
+                    budgets.status === 'over' ? 'text-bad' : 'text-good'
+                  }`}
+                >
+                  {formatCurrencyAbs(budgets.totalProjected)} / {formatCurrencyAbs(budgets.totalTarget)}
+                </div>
+                <div className="t-label">
+                  {budgets.overBy > 0
+                    ? `heading ${formatCurrencyAbs(budgets.overBy)} over`
+                    : `${formatCurrencyAbs(-budgets.overBy)} of room`}
+                </div>
               </div>
-              <div className="t-label">
-                {budgets.overBy > 0
-                  ? `heading ${formatCurrencyAbs(budgets.overBy)} over`
-                  : `${formatCurrencyAbs(-budgets.overBy)} of room`}
-              </div>
-            </div>
-          )
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead>
-              <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
-                <th className="border-b px-6 py-2.5">Category</th>
-                <th className="border-b px-4 py-2.5 text-right">Typical</th>
-                <th className="border-b px-4 py-2.5 text-right">So far</th>
-                <th className="border-b px-4 py-2.5 text-right">Heading for</th>
-                <th className="border-b px-4 py-2.5">Target</th>
-                <th className="border-b px-4 py-2.5">Against target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <TargetRow key={r.category} row={r} onSet={onSetTarget} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {budgets && budgets.rows.length > 12 && (
-          <button
-            type="button"
-            onClick={() => setShowAll((s) => !s)}
-            className="w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:bg-fill"
-          >
-            {showAll ? 'Show fewer' : `Show all ${budgets.rows.length} categories`}
-          </button>
-        )}
-      </Panel>
+            )
+          }
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead>
+                <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
+                  <th className="border-b px-6 py-2.5">Category</th>
+                  <th className="border-b px-4 py-2.5 text-right">Typical</th>
+                  <th className="border-b px-4 py-2.5 text-right">So far</th>
+                  <th className="border-b px-4 py-2.5 text-right">Heading for</th>
+                  <th className="border-b px-4 py-2.5">Target</th>
+                  <th className="border-b px-4 py-2.5">Against target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <TargetRow key={r.category} row={r} onSet={onSetTarget} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {budgets.rows.length > 12 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((s) => !s)}
+              className="w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:bg-fill"
+            >
+              {showAll ? 'Show fewer' : `Show all ${budgets.rows.length} categories`}
+            </button>
+          )}
+        </Panel>
+      )}
 
       {gapClosers && (
         <Panel
@@ -387,8 +500,8 @@ export function PlanView({
                 max="20000"
                 step="500"
                 value={monthlySaving}
-                onChange={(e) => onMonthlySavingChange(parseInt(e.target.value, 10))}
-                className="w-32 accent-blue-600"
+                onChange={(e) => onMonthlySavingChange?.(parseInt(e.target.value, 10))}
+                className="w-32 accent-info"
                 aria-label="Extra saving per cycle"
               />
               <span className="w-20 text-right font-medium tabular-nums">
@@ -410,7 +523,7 @@ export function PlanView({
                 {formatCurrencyAbs(trajectory.change)})
               </span>
             </div>
-            {trajectory.events.map((e) => (
+            {(trajectory.events ?? []).map((e) => (
               <div key={`${e.type}-${e.account}`} className={e.type === 'limit' ? 'text-bad' : 'text-good'}>
                 {e.account} {e.type === 'limit' ? 'hits its limit' : 'is cleared'} in {e.cycle} cycle
                 {e.cycle === 1 ? '' : 's'}
@@ -421,102 +534,107 @@ export function PlanView({
         </Panel>
       )}
 
-      <Panel
-        title="Goals"
-        subtitle="Arrival dates come from what you actually keep each cycle. When that's negative the honest answer is that the goal doesn't arrive, and the app says how much would have to be found first."
-      >
-        <div className="p-6">
-          {goals.goals.length > 0 && (
-            <ul className="mb-5 space-y-3">
-              {goals.goals.map((g) => (
-                <li key={g.id} className="flex flex-wrap items-center gap-3">
-                  <Flag size={14} className="shrink-0 text-label-3" />
-                  <span className="w-40 shrink-0 truncate text-sm font-medium text-label">
-                    {g.name}
-                  </span>
-                  <span className="h-2 min-w-24 flex-1 overflow-hidden rounded-full bg-fill">
-                    <span
-                      className="block h-full rounded-full bg-good"
-                      style={{ width: `${g.progress * 100}%` }}
-                    />
-                  </span>
-                  <span className="shrink-0 text-xs text-label-2 tabular-nums">
-                    {formatCurrencyAbs(g.saved)} / {formatCurrencyAbs(g.target)}
-                  </span>
-                  <span
-                    className={`shrink-0 text-xs ${g.reachable ? 'text-label-2' : 'text-warn'}`}
-                  >
-                    {g.reachable
-                      ? g.cycles === 0
-                        ? 'reached'
-                        : `${g.cycles} cycles · ${g.eta.toLocaleDateString('en-ZA', MONTH_YEAR)}`
-                      : 'not while the cycle closes negative'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveGoal(g.id)}
-                    className="ml-auto shrink-0 rounded px-2 py-1 text-xs text-label-3 hover:bg-fill hover:text-label-2"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+      <StandingCharges
+        subscriptions={subscriptions}
+        lineOverrides={lineOverrides}
+        onSetLineOverride={onSetLineOverride}
+        asOf={asOf}
+      />
 
-          <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const target = parseFloat(goalDraft.target.replace(/[^\d.]/g, ''));
-              if (!goalDraft.name.trim() || !(target > 0)) return;
-              onAddGoal({
-                name: goalDraft.name.trim(),
-                target,
-                saved: parseFloat(goalDraft.saved.replace(/[^\d.]/g, '')) || 0,
-              });
-              setGoalDraft({ name: '', target: '', saved: '' });
-            }}
-          >
-            <label className="t-label">
-              <span className="mb-1 block">Goal</span>
-              <input
-                value={goalDraft.name}
-                onChange={(e) => setGoalDraft((d) => ({ ...d, name: e.target.value }))}
-                placeholder="Emergency fund"
-                className="w-48 rounded border px-2.5 py-1.5 text-sm text-label focus:border-info/30 focus:outline-none"
-              />
-            </label>
-            <label className="t-label">
-              <span className="mb-1 block">Target</span>
-              <input
-                value={goalDraft.target}
-                onChange={(e) => setGoalDraft((d) => ({ ...d, target: e.target.value }))}
-                placeholder="50000"
-                inputMode="decimal"
-                className="w-28 rounded border px-2.5 py-1.5 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none"
-              />
-            </label>
-            <label className="t-label">
-              <span className="mb-1 block">Already saved</span>
-              <input
-                value={goalDraft.saved}
-                onChange={(e) => setGoalDraft((d) => ({ ...d, saved: e.target.value }))}
-                placeholder="0"
-                inputMode="decimal"
-                className="w-28 rounded border px-2.5 py-1.5 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none"
-              />
-            </label>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded-xl bg-fill-2 px-3.5 py-2 text-sm text-white hover:bg-fill-2"
+      {goals && (
+        <Panel
+          title="Goals"
+          subtitle="Arrival dates come from what you actually keep each cycle. When that's negative the honest answer is that the goal doesn't arrive, and the app says how much would have to be found first."
+        >
+          <div className="p-6">
+            {goalList.length > 0 && (
+              <ul className="mb-5 space-y-3">
+                {goalList.map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-center gap-3">
+                    <Flag size={14} className="shrink-0 text-label-3" />
+                    <span className="w-40 shrink-0 truncate text-sm font-medium text-label">
+                      {g.name}
+                    </span>
+                    <span className="h-2 min-w-24 flex-1 overflow-hidden rounded-full bg-fill">
+                      <span
+                        className="block h-full rounded-full bg-good"
+                        style={{ width: `${g.progress * 100}%` }}
+                      />
+                    </span>
+                    <span className="shrink-0 text-xs text-label-2 tabular-nums">
+                      {formatCurrencyAbs(g.saved)} / {formatCurrencyAbs(g.target)}
+                    </span>
+                    <span
+                      className={`shrink-0 text-xs ${g.reachable ? 'text-label-2' : 'text-warn'}`}
+                    >
+                      {g.reachable
+                        ? g.cycles === 0
+                          ? 'reached'
+                          : `${g.cycles} cycles · ${g.eta.toLocaleDateString('en-ZA', MONTH_YEAR)}`
+                        : 'not while the cycle closes negative'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveGoal?.(g.id)}
+                      className="ml-auto shrink-0 rounded px-2 py-1 text-xs text-label-3 hover:bg-fill hover:text-label-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <form
+              className="flex flex-wrap items-end gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const target = parseFloat(goalDraft.target.replace(/[^\d.]/g, ''));
+                if (!goalDraft.name.trim() || !(target > 0)) return;
+                onAddGoal?.({
+                  name: goalDraft.name.trim(),
+                  target,
+                  saved: parseFloat(goalDraft.saved.replace(/[^\d.]/g, '')) || 0,
+                });
+                setGoalDraft({ name: '', target: '', saved: '' });
+              }}
             >
-              <Target size={14} />
-              Add goal
-            </button>
-          </form>
-        </div>
-      </Panel>
+              <Field
+                label="Goal"
+                inputMode="text"
+                value={goalDraft.name}
+                onChange={(v) => setGoalDraft((d) => ({ ...d, name: v }))}
+                placeholder="Emergency fund"
+                width="w-48"
+                className="[&_input]:text-left"
+              />
+              <Field
+                label="Target"
+                prefix="R"
+                value={goalDraft.target}
+                onChange={(v) => setGoalDraft((d) => ({ ...d, target: v }))}
+                placeholder="50000"
+                width="w-28"
+              />
+              <Field
+                label="Already saved"
+                prefix="R"
+                value={goalDraft.saved}
+                onChange={(v) => setGoalDraft((d) => ({ ...d, saved: v }))}
+                placeholder="0"
+                width="w-28"
+              />
+              <button
+                type="submit"
+                className="press flex items-center gap-1.5 rounded-xl bg-fill-2 px-3.5 py-2 text-sm text-label hover:brightness-125"
+              >
+                <Target size={14} />
+                Add goal
+              </button>
+            </form>
+          </div>
+        </Panel>
+      )}
     </div>
   );
 }

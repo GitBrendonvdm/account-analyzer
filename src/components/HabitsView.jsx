@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Repeat } from 'lucide-react';
 import { formatCurrencyAbs } from '../utils/format';
 import { Card, CardHead } from './ui/Surface';
+import { FindHero } from './habits/FindHero';
+import { SubscriptionsCard } from './habits/SubscriptionsCard';
+import { PriceCreepCard } from './habits/PriceCreepCard';
+import { DriftCard } from './habits/DriftCard';
+import { WinsCard } from './habits/WinsCard';
+import { BasketCard } from './habits/BasketCard';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
 const fmtDate = (d) => (d ? d.toLocaleDateString('en-ZA', DAY_MONTH) : '—');
@@ -70,154 +75,93 @@ function MerchantList({ merchants, months }) {
   );
 }
 
-function Movers({ items, direction }) {
-  const rising = direction === 'up';
-  const rows = items.filter((m) => (rising ? m.delta > 0 : m.delta < 0)).slice(0, 6);
-  const max = Math.max(...rows.map((m) => Math.abs(m.delta)), 1);
-
-  return (
-    <div className="p-6">
-      <div
-        className={`mb-4 flex items-center gap-2 text-[13px] font-semibold ${rising ? 'text-bad' : 'text-good'}`}
-      >
-        {rising ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-        {rising ? 'Rising' : 'Falling'}
-      </div>
-      <ul className="flex flex-col gap-4">
-        {rows.length === 0 && (
-          <li className="t-caption">Nothing {rising ? 'rising' : 'falling'}.</li>
-        )}
-        {rows.map((m) => (
-          <li key={m.category} className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between gap-3 text-[14px]">
-              <span className="truncate text-label-2">{m.category}</span>
-              <span className={`num shrink-0 font-semibold ${rising ? 'text-bad' : 'text-good'}`}>
-                {rising ? '+' : '−'}
-                {formatCurrencyAbs(m.delta)}
-              </span>
-            </div>
-            <span className="block h-1 overflow-hidden rounded-full bg-fill">
-              <span
-                className={`block h-full rounded-full ${rising ? 'bg-bad' : 'bg-good'}`}
-                style={{ width: `${Math.max(3, (Math.abs(m.delta) / max) * 100)}%` }}
-              />
-            </span>
-            <span className="t-caption">
-              {formatCurrencyAbs(m.early)} → {formatCurrencyAbs(m.late)} a cycle
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 /**
- * Spending habits: who gets the money, what bills you every cycle, what is shifting, and when in
- * the week it happens. All of it was in the data long before it had anywhere to appear.
+ * Spending habits: what could be cancelled, what bills you every cycle, what crept up, what
+ * changed, what is new and what you stopped, whether it is trips or tickets — then who gets the
+ * money and when in the week it goes.
+ *
+ * The order is the order of usefulness. The finder comes first because it is the one block with
+ * a figure that can be acted on this week; the merchant ranking and the weekday chart are context
+ * and sit last. The "standing commitments" and "what's changing" blocks of the previous version are
+ * replaced by the standing-charges audit and the drift card, which answer the same questions from
+ * the recurring engine and a robust statistic rather than from presence counts and half-window
+ * means (see SubscriptionsCard and DriftCard for why that mattered).
+ *
+ * Every analytics block is optional: the view renders whichever of its inputs have arrived and
+ * leaves the others out, so a missing library never blanks the page.
  */
-export function HabitsView({ habits }) {
+export function HabitsView({
+  habits,
+  finder,
+  subscriptions,
+  priceCreep,
+  drift,
+  basket,
+  lineOverrides,
+  onSetLineOverride,
+  asOf,
+}) {
   const [sortBy, setSortBy] = useState('spend');
-  if (!habits) return null;
+  const anyAnalytics = Boolean(finder || subscriptions || priceCreep || drift || basket);
+  if (!habits && !anyAnalytics) return null;
 
-  const { subscriptions, movers, weekday, busiest, quietest, months } = habits;
-  const merchants = (sortBy === 'spend' ? habits.topMerchants : habits.byFrequency).slice(0, 15);
+  const months = habits?.months ?? [];
+  const merchants = habits
+    ? (sortBy === 'spend' ? habits.topMerchants : habits.byFrequency).slice(0, 15)
+    : [];
+  const weekday = habits?.weekday ?? [];
   const weekMax = Math.max(...weekday.map((w) => w.perCycle), 1);
 
   return (
     <div className="flex flex-col gap-5">
-      <Card className="materialize overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
-          <CardHead
-            title="Where the money goes"
-            subtitle="By merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so one shop reads as one line."
-          />
-          <div className="glass-chip flex shrink-0 gap-1 p-1">
-            {[
-              { id: 'spend', label: 'By amount' },
-              { id: 'count', label: 'By frequency' },
-            ].map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setSortBy(opt.id)}
-                aria-pressed={sortBy === opt.id}
-                className={`press rounded-full px-3.5 py-1.5 text-[12.5px] ${
-                  sortBy === opt.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <MerchantList merchants={merchants} months={months} />
-      </Card>
+      <FindHero finder={finder} />
+      <SubscriptionsCard
+        subscriptions={subscriptions}
+        lineOverrides={lineOverrides}
+        onSetLineOverride={onSetLineOverride}
+        asOf={asOf}
+      />
+      <PriceCreepCard priceCreep={priceCreep} />
+      <DriftCard drift={drift} />
+      <WinsCard subscriptions={subscriptions} />
+      <BasketCard basket={basket} />
 
-      <Card className="materialize overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
-          <CardHead
-            title="Standing commitments"
-            subtitle="Merchants that billed in nearly every cycle. Instalments and policies stay separate, because a total folding a bond in with a streaming service invites you to imagine cancelling a bond."
-          />
-          <div className="shrink-0 text-right">
-            <div className="t-title num">{formatCurrencyAbs(subscriptions.total)}</div>
-            <div className="t-caption">
-              a cycle · {formatCurrencyAbs(subscriptions.total * 12)} a year
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-x-9 gap-y-4 border-b px-6 py-5">
-          {subscriptions.byGroup.map((g) => (
-            <div key={g.group}>
-              <div className="text-[10px] font-medium tracking-[0.08em] text-label-3 uppercase">
-                {g.group}
-              </div>
-              <div className="num mt-1 text-[15px] font-semibold">
-                {formatCurrencyAbs(g.perCycle)}
-              </div>
-            </div>
-          ))}
-          <div className="border-l pl-9">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium tracking-[0.08em] text-good uppercase">
-              <Repeat size={11} /> Optional services
-            </div>
-            <div className="num mt-1 text-[15px] font-semibold text-good">
-              {formatCurrencyAbs(subscriptions.cancellableTotal)}
-              <span className="ml-2 text-[12px] font-normal text-label-3">
-                {subscriptions.cancellable.length} merchants
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <MerchantList merchants={subscriptions.items.slice(0, 12)} months={months} />
-      </Card>
-
-      <div className="grid gap-5 lg:grid-cols-2">
+      {habits && (
         <Card className="materialize overflow-hidden">
-          <div className="border-b px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
             <CardHead
-              title="What's changing"
-              subtitle={`The last ${Math.ceil(months.length / 2)} cycles against the ${Math.floor(months.length / 2)} before them.`}
+              title="Where the money goes"
+              subtitle="By merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so one shop reads as one line."
             />
-          </div>
-          <div className="grid gap-px bg-hair sm:grid-cols-2">
-            <div style={{ background: 'rgba(255,255,255,0.012)' }}>
-              <Movers items={movers} direction="up" />
+            <div className="glass-chip flex shrink-0 gap-1 p-1">
+              {[
+                { id: 'spend', label: 'By amount' },
+                { id: 'count', label: 'By frequency' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSortBy(opt.id)}
+                  aria-pressed={sortBy === opt.id}
+                  className={`press rounded-full px-3.5 py-1.5 text-[12.5px] ${
+                    sortBy === opt.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.012)' }}>
-              <Movers items={movers} direction="down" />
-            </div>
           </div>
+          <MerchantList merchants={merchants} months={months} />
         </Card>
+      )}
 
+      {habits && weekday.length > 0 && (
         <Card className="materialize overflow-hidden">
           <div className="border-b px-6 py-5">
             <CardHead
               title="When you spend"
-              subtitle={`${busiest.day} is the heaviest day of the week, ${quietest.day} the lightest.`}
+              subtitle={`${habits.busiest.day} is the heaviest day of the week, ${habits.quietest.day} the lightest.`}
             />
           </div>
           <div className="p-6">
@@ -232,7 +176,7 @@ export function HabitsView({ habits }) {
                     style={{
                       height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%`,
                       background:
-                        w.day === busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
+                        w.day === habits.busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
                       transition: 'height 700ms var(--ease-out)',
                     }}
                     title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
@@ -246,7 +190,7 @@ export function HabitsView({ habits }) {
             </p>
           </div>
         </Card>
-      </div>
+      )}
     </div>
   );
 }
