@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StepChart } from '../habits/StepChart';
 import { STANDING_CHARGES_SHOWN } from '../habits/SubscriptionsCard';
 import { formatCurrencyAbs } from '../../utils/format';
+import { STICKY_CELL, TableScroller } from './TableScroller';
 
 /**
  * Every active recurring line, as the full table.
@@ -65,7 +66,8 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
 
   return (
     <section className={`glass overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
+      {/* Card padding steps down to 16px on a phone: the card is already full-bleed there. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-4 md:px-6 md:py-5">
         <div>
           <h2 className="t-head">Standing charges</h2>
           <p className="t-label mt-1.5 max-w-prose">
@@ -78,13 +80,13 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
         </div>
       </div>
       {list.length === 0 ? (
-        <p className="t-caption px-6 py-4">No recurring lines yet — the engine needs a few complete cycles.</p>
+        <p className="t-caption px-4 py-4 md:px-6">No recurring lines yet — the engine needs a few complete cycles.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroller>
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead>
-              <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
-                <th className="border-b px-6 py-2.5">Line</th>
+              <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase max-md:text-xs">
+                <th className={`border-b px-4 py-2.5 md:px-6 ${STICKY_CELL}`}>Line</th>
                 <th className="border-b px-3 py-2.5">Kind</th>
                 <th className="border-b px-3 py-2.5">Cadence</th>
                 <th className="border-b px-3 py-2.5">Day</th>
@@ -100,12 +102,13 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
             <tbody>
               {shown.map((line) => (
                 <tr key={line.id} className="border-b last:border-0">
-                  <td className="px-6 py-2">
-                    <div className="max-w-[16rem] truncate text-sm text-label">{line.label}</div>
-                    <div className="t-caption truncate">{line.category ?? ''}</div>
+                  {/* The label column is narrower on a phone so the first figure is visible beside it. */}
+                  <td className={`px-4 py-2 md:px-6 ${STICKY_CELL}`}>
+                    <div className="max-w-[9rem] truncate text-sm text-label md:max-w-[16rem]">{line.label}</div>
+                    <div className="t-caption max-w-[9rem] truncate md:max-w-none">{line.category ?? ''}</div>
                   </td>
                   <td className="px-3 py-2">
-                    <span className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-label-2">{line.kind}</span>
+                    <span className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-label-2 max-md:text-[11px]">{line.kind}</span>
                   </td>
                   <td className="px-3 py-2 text-xs text-label-2">{line.cadence}</td>
                   <td className="px-3 py-2 text-xs text-label-2">{ordinal(line.dom)}</td>
@@ -137,7 +140,7 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
                         value={overrideOf(line)}
                         onChange={(e) => onSetLineOverride(line.id, e.target.value || null)}
                         aria-label={`Override for ${line.label}`}
-                        className="rounded border bg-transparent px-1.5 py-1 text-xs text-label focus:border-info/30 focus:outline-none"
+                        className="rounded border bg-transparent px-1.5 py-1 text-xs text-label focus:border-info/30 focus:outline-none max-md:h-11"
                       >
                         {OVERRIDES.map((o) => (
                           <option key={o.value} value={o.value}>
@@ -151,23 +154,23 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroller>
       )}
       {collapsible && (
         <>
           {!showAll && (
-            <p className="t-caption px-6 py-2.5 text-center">{`${shown.length} of ${list.length} shown · totals cover all`}</p>
+            <p className="t-caption px-4 py-2.5 text-center md:px-6">{`${shown.length} of ${list.length} shown · totals cover all`}</p>
           )}
           <button
             type="button"
             onClick={() => setShowAll((s) => !s)}
-            className="press w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label"
+            className="press w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label max-md:min-h-11"
           >
             {showAll ? 'Show fewer' : `Show all ${list.length} standing charges`}
           </button>
         </>
       )}
-      {subscriptions?.assumptions?.length > 0 && <p className="t-caption border-t px-6 py-4">{subscriptions.assumptions.join(' ')}</p>}
+      {subscriptions?.assumptions?.length > 0 && <p className="t-caption border-t px-4 py-4 md:px-6">{subscriptions.assumptions.join(' ')}</p>}
     </section>
   );
 }

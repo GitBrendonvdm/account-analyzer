@@ -28,6 +28,7 @@ import {
   useZoomDomain,
   yAxisStyle,
 } from '../charts/interactive';
+import { LEGEND_TAP, useNarrowViewport } from './narrow';
 
 /**
  * Every debt's balance over the plan, stacked, with a pin where each one vanishes.
@@ -85,6 +86,9 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
   const zoom = useZoomDomain(data, 'payMonth');
   const toggles = useSeriesToggle(ids);
   const reduced = useReducedMotion();
+  // On a phone the legend moves out of the frame (below) and the pins drop their labels: four of
+  // them collide across a 300px plot, and the list under the chart names them anyway.
+  const narrow = useNarrowViewport();
 
   if (!data.length) return null;
 
@@ -134,7 +138,7 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
               content={
                 <ChartTooltip
                   filterEntry={(e) => e.value > 0}
@@ -142,7 +146,7 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
                 />
               }
             />
-            <Legend content={<ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} />} />
+            {!narrow && <Legend content={<ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} />} />}
             {ids
               .slice()
               .reverse()
@@ -174,7 +178,7 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
                   x={p.x}
                   stroke={LABEL_3}
                   strokeDasharray="4 3"
-                  label={{ value: p.label, position: 'insideTopRight', fill: LABEL_3, fontSize: 11 }}
+                  label={narrow ? undefined : { value: p.label, position: 'insideTopRight', fill: LABEL_3, fontSize: 11 }}
                 />
               ))}
             {zoom.selection && <ReferenceArea x1={zoom.selection.x1} x2={zoom.selection.x2} {...selectionStyle} />}
@@ -182,11 +186,20 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
         </ResponsiveContainer>
       </ChartFrame>
 
+      {narrow && (
+        <ChartLegend
+          payload={ids.map((id) => ({ dataKey: id, value: labelsById[id] ?? id, color: TONES[ids.indexOf(id) % TONES.length], type: 'line' }))}
+          toggle={toggles.toggle}
+          isHidden={toggles.isHidden}
+          className={LEGEND_TAP}
+        />
+      )}
+
       <ZoomHint
         zoomed={zoom.zoomed}
         onReset={zoom.reset}
         label={zoom.zoomed ? `${first.label} – ${last.label}` : null}
-        className="mt-3"
+        className={`mt-3 ${LEGEND_TAP}`}
       />
 
       {pins.length > 0 && (

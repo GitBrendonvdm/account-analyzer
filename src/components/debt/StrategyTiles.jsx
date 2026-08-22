@@ -94,7 +94,7 @@ export function StrategyTiles({ strategies, table = [], best, selected, onSelect
                 <span className={`text-[14.5px] font-semibold ${active ? 'text-info' : 'text-label'}`}>{s.label}</span>
                 <span className="flex flex-wrap gap-1">
                   {badges(s.id).map((b) => (
-                    <span key={b} className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-good">
+                    <span key={b} className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-good max-md:text-xs">
                       {b}
                     </span>
                   ))}

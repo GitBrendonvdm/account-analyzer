@@ -63,15 +63,16 @@ export function SensitivityStrip({ rows = [], debts = [], terms = [], bp = 0, on
             : 'None of your debts is on a variable rate, so a move changes nothing here.'
         }
         right={
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="glass-chip flex flex-wrap gap-1 p-1" role="group" aria-label="Rate shift">
+          // On a phone the controls take the full card width under the title, each segment a thumb tall.
+          <div className="flex flex-wrap items-center gap-3 max-md:w-full">
+            <div className="glass-chip flex flex-wrap gap-1 p-1 max-md:w-full" role="group" aria-label="Rate shift">
               {shifts.map((b) => (
                 <button
                   key={b}
                   type="button"
                   onClick={() => onBp?.(b)}
                   aria-pressed={bp === b}
-                  className={`press rounded-full px-3 py-1.5 text-[12.5px] ${bp === b ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'}`}
+                  className={`press rounded-full px-3 py-1.5 text-[12.5px] max-md:min-h-11 max-md:flex-1 ${bp === b ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'}`}
                 >
                   {bpLabel(b)}
                 </button>
@@ -81,7 +82,7 @@ export function SensitivityStrip({ rows = [], debts = [], terms = [], bp = 0, on
               type="button"
               onClick={() => onRecast?.(!recast)}
               aria-pressed={recast}
-              className={`press glass-chip px-3.5 py-1.5 text-[12.5px] ${recast ? 'text-label' : 'text-label-2'}`}
+              className={`press glass-chip px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 max-md:w-full ${recast ? 'text-label' : 'text-label-2'}`}
             >
               {recast ? 'Instalment recast, term holds' : 'Instalment held, term moves'}
             </button>

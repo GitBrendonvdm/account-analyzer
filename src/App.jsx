@@ -397,7 +397,7 @@ export default function App() {
   return (
     <div className="relative min-h-screen">
       <Aurora />
-      <div className="relative mx-auto w-full max-w-[1440px] px-5 pb-16 sm:px-8 3xl:max-w-[1760px] 4xl:max-w-[2040px]">
+      <div className="relative mx-auto w-full max-w-[1440px] px-4 pb-16 max-md:pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:px-8 3xl:max-w-[1760px] 4xl:max-w-[2040px]">
         <TopBar
           activeView={activeTab}
           onViewChange={setActiveTab}
@@ -434,7 +434,7 @@ export default function App() {
                 {statementDone.created > 0 && `, ${statementDone.created} account${statementDone.created === 1 ? '' : 's'} added`}
                 {statementDone.method === 'ocr' && ' (read by OCR — worth a glance under Accounts)'}
               </span>
-              <button type="button" onClick={() => setStatementDone(null)} className="press text-label-3 hover:text-label">
+              <button type="button" onClick={() => setStatementDone(null)} className="press text-label-3 hover:text-label max-md:min-h-11 max-md:px-3">
                 Dismiss
               </button>
             </div>
@@ -448,9 +448,9 @@ export default function App() {
             />
           )}
           {importError && (
-            <div className="glass-tile flex items-center justify-between gap-4 px-5 py-3 text-[13px] text-bad">
+            <div className="glass-tile flex flex-wrap items-center justify-between gap-4 px-5 py-3 text-[13px] text-bad">
               <span>Import failed: {importError}</span>
-              <button type="button" onClick={dismissImportError} className="press text-label-2 hover:text-label">
+              <button type="button" onClick={dismissImportError} className="press text-label-2 hover:text-label max-md:min-h-11 max-md:px-3">
                 Dismiss
               </button>
             </div>

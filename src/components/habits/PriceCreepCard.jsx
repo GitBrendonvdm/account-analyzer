@@ -19,9 +19,15 @@ import { formatCurrencyAbs } from '../../utils/format';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const pctLabel = (pct) => `${pct >= 0 ? '+' : '−'}${Math.round(Math.abs(pct) * 100)}%`;
 
+/**
+ * From `sm` up: name, old → new, percentage, step chart, extra a year, in five columns. Below `sm`
+ * the amount is pinned beside the name, the old → new and percentage share the next line, and the
+ * chart spans the row; the pair's wrapper is `display: contents` on the desktop grid so the column
+ * order there is exactly what it was.
+ */
 function CreepRow({ item, tone }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t px-6 py-3 sm:grid-cols-[minmax(0,13rem)_auto_auto_minmax(0,1fr)_auto]">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t px-4 py-3 sm:grid-cols-[minmax(0,13rem)_auto_auto_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-6">
       <div className="min-w-0">
         <div className="truncate text-[15px] font-medium">{item.label}</div>
         <div className="t-caption truncate">
@@ -30,14 +36,16 @@ function CreepRow({ item, tone }) {
           {item.steps?.length > 0 && ` · ${plural(item.steps.length, 'step')} over ${plural(item.cyclesObserved ?? item.steps.length, 'cycle')}`}
         </div>
       </div>
-      <span className="num text-[13px] text-label-2">
-        {formatCurrencyAbs(item.first?.amount)} → {formatCurrencyAbs(item.last?.amount)}
-      </span>
-      <span className={`num text-[13px] font-semibold ${tone}`}>{pctLabel(item.totalPct ?? 0)}</span>
-      <div className="hidden sm:block">
+      <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:contents">
+        <span className="num text-[13px] text-label-2">
+          {formatCurrencyAbs(item.first?.amount)} → {formatCurrencyAbs(item.last?.amount)}
+        </span>
+        <span className={`num text-[13px] font-semibold ${tone}`}>{pctLabel(item.totalPct ?? 0)}</span>
+      </div>
+      <div className="col-span-2 sm:col-span-1">
         <StepChart first={item.first} last={item.last} steps={item.steps} />
       </div>
-      <div className="col-span-2 text-right sm:col-span-1">
+      <div className="col-start-2 row-start-1 text-right sm:col-auto sm:row-auto">
         <div className={`num text-[15px] font-semibold ${tone}`}>
           {item.extraPerYear >= 0 ? '+' : '−'}
           {formatCurrencyAbs(item.extraPerYear)}
@@ -59,7 +67,7 @@ export function PriceCreepCard({ priceCreep, className = '' }) {
 
   return (
     <Card className={`materialize overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
         <CardHead
           title="Price increases"
           subtitle="Standing charges whose price stepped up, from their first settled price to the latest. A step needs the new amount to repeat; one odd charge is not a price."
@@ -69,10 +77,10 @@ export function PriceCreepCard({ priceCreep, className = '' }) {
           <div className="t-caption">a year more than at the start</div>
         </div>
       </div>
-      <p className="t-sub border-b px-6 py-4">{sentence}</p>
+      <p className="t-sub border-b px-4 py-4 sm:px-6">{sentence}</p>
 
       {rising.length === 0 ? (
-        <p className="t-caption px-6 py-5">No standing charge has stepped up since the data began.</p>
+        <p className="t-caption px-4 py-5 sm:px-6">No standing charge has stepped up since the data began.</p>
       ) : (
         <ol className="flex flex-col">
           {rising.map((item) => (
@@ -83,7 +91,7 @@ export function PriceCreepCard({ priceCreep, className = '' }) {
 
       {falling.length > 0 && (
         <>
-          <div className="border-t bg-fill px-6 py-2.5 text-[11px] font-semibold tracking-wide text-label-3 uppercase">
+          <div className="border-t bg-fill px-4 py-2.5 text-[12px] font-semibold tracking-wide text-label-3 uppercase sm:px-6 sm:text-[11px]">
             Got cheaper
           </div>
           <ol className="flex flex-col">
@@ -94,7 +102,7 @@ export function PriceCreepCard({ priceCreep, className = '' }) {
         </>
       )}
 
-      <div className="border-t px-6 py-4">
+      <div className="border-t px-4 py-4 sm:px-6">
         {variable.length > 0 && (
           <p className="text-[13px] text-label-2" title={variable.map((v) => v.label).join(', ')}>
             {priceCreep.variableSentence ?? `${plural(variable.length, 'line')} vary too much to compare`}

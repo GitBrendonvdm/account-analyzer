@@ -28,6 +28,7 @@ import {
   selectionStyle,
   useReducedMotion,
   useSeriesToggle,
+  useTooltipPosition,
   useZoomDomain,
   yAxisStyle,
 } from './interactive';
@@ -67,6 +68,7 @@ export function PeriodNetChart({ chartData }) {
   const zoom = useZoomDomain(points, 'label');
   const toggles = useSeriesToggle(SERIES);
   const reduced = useReducedMotion();
+  const tooltipPosition = useTooltipPosition();
 
   if (!points.length) {
     return (
@@ -100,7 +102,16 @@ export function PeriodNetChart({ chartData }) {
         </p>
       </div>
 
-      <ChartFrame label={summary} zoom={zoom} unit="months" className="h-80 w-full">
+      {/* The bars take no pointer events, so a finger that lands on one is anchored to the SVG and not
+          to the bar: Recharts remounts every bar rectangle on each tooltip change, and a touch sequence
+          whose start target leaves the document loses its moves — the drag would stall. The readout and
+          the highlight are axis-driven from the chart surface and do not need the bars to be hittable. */}
+      <ChartFrame
+        label={summary}
+        zoom={zoom}
+        unit="months"
+        className="h-80 w-full [&_.recharts-bar-rectangle]:pointer-events-none"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={visibleData}
@@ -113,7 +124,8 @@ export function PeriodNetChart({ chartData }) {
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
+              position={tooltipPosition}
               content={
                 <ChartTooltip filterEntry={onlyCurrentRemaining} colorOf={barColour} footer={projectedFooter} />
               }

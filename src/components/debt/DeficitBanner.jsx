@@ -46,7 +46,7 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
   if (deficit > 0) {
     return (
       <Card
-        className="materialize p-6 sm:p-7"
+        className="materialize p-5 sm:p-7"
         style={{ borderColor: 'rgba(255,69,58,0.38)', borderTopColor: 'rgba(255,69,58,0.5)' }}
         aria-live="polite"
       >
@@ -74,7 +74,7 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
             <button
               type="button"
               onClick={onOpenPlan}
-              className="press glass-chip flex shrink-0 items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-info hover:brightness-125"
+              className="press glass-chip flex shrink-0 items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11"
             >
               Close it
               <ArrowRight size={13} />
@@ -89,7 +89,7 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
   if (adjusted > 0) {
     return (
       <Card
-        className="materialize p-6 sm:p-7"
+        className="materialize p-5 sm:p-7"
         style={{ borderColor: 'rgba(48,209,88,0.3)', borderTopColor: 'rgba(48,209,88,0.42)' }}
       >
         <div className="flex gap-4">
@@ -111,7 +111,7 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
   }
 
   return (
-    <Card className="materialize p-6 sm:p-7">
+    <Card className="materialize p-5 sm:p-7">
       <p className="t-sub">Your cycles close level.</p>
       <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
         Nothing is available for extra payments until spending changes; the plans below start from

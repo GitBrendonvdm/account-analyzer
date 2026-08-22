@@ -8,6 +8,7 @@ import { GroupedTransactionRow } from './GroupedTransactionRow';
 import { RowIcon } from './RowIcon';
 import { getSubcategoryIconConfig } from './rowIcons';
 import { WeekCells } from './WeekCells';
+import { PIN_PLAIN, PIN_WARN } from './stickyColumn';
 
 export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
@@ -25,7 +26,8 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
         }`}
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="p-3 pl-12 font-medium">
+        {/* Indents halve on a phone: the tree still reads, and the name keeps its room. */}
+        <td className={`p-3 pl-12 font-medium max-md:pl-6 ${highlightUnmatchedTransfer ? PIN_WARN : PIN_PLAIN}`}>
           <span className="flex items-center gap-2">
             <ChevronRight size={14} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />
             <RowIcon config={subIcon} />

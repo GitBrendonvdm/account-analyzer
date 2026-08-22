@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
+import { STICKY_CELL, TableScroller } from './TableScroller';
 
 /**
  * Which way the household is going: the last three cycles against the last twelve, against the
@@ -79,7 +80,8 @@ export function DirectionTable({ direction, className = '' }) {
 
   return (
     <section className={`glass overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
+      {/* Card padding steps down to 16px on a phone: the card is already full-bleed there. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-4 md:px-6 md:py-5">
         <div>
           <h2 className="t-head">Direction</h2>
           <p className="t-label mt-1.5 max-w-prose">
@@ -88,13 +90,13 @@ export function DirectionTable({ direction, className = '' }) {
         </div>
       </div>
       {headline && (
-        <p className={`t-sub border-b px-6 py-4 ${summary.widening ? 'text-bad' : word === 'narrowing' ? 'text-good' : ''}`}>{headline}</p>
+        <p className={`t-sub border-b px-4 py-4 md:px-6 ${summary.widening ? 'text-bad' : word === 'narrowing' ? 'text-good' : ''}`}>{headline}</p>
       )}
-      <div className="overflow-x-auto">
+      <TableScroller>
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
-            <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
-              <th className="border-b px-6 py-2.5">Metric</th>
+            <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase max-md:text-xs">
+              <th className={`border-b px-4 py-2.5 md:px-6 ${STICKY_CELL}`}>Metric</th>
               <th className="border-b px-4 py-2.5 text-right">12-cycle</th>
               <th className="border-b px-4 py-2.5 text-right">3-cycle</th>
               <th className="border-b px-4 py-2.5">Change</th>
@@ -105,16 +107,17 @@ export function DirectionTable({ direction, className = '' }) {
           <tbody>
             {metrics.map((m) => (
               <tr key={m.id} className="border-b last:border-0">
-                <td className="px-6 py-2.5">
+                <td className={`px-4 py-2.5 md:px-6 ${STICKY_CELL}`}>
                   <span className="text-sm text-label">{m.label ?? m.id}</span>
                   {m.note && <div className="t-caption max-w-[32ch]">{m.note}</div>}
                 </td>
-                <td className="num px-4 py-2.5 text-right text-label-2">{money(m.long)}</td>
-                <td className="num px-4 py-2.5 text-right font-medium">{money(m.short)}</td>
-                <td className="px-4 py-2.5">
+                {/* A figure that wraps reads as two numbers; at the 720px floor the columns are tight. */}
+                <td className="num px-4 py-2.5 text-right whitespace-nowrap text-label-2">{money(m.long)}</td>
+                <td className="num px-4 py-2.5 text-right font-medium whitespace-nowrap">{money(m.short)}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
                   <Change metric={m} />
                 </td>
-                <td className="num px-4 py-2.5 text-right text-label-2">{money(m.prior)}</td>
+                <td className="num px-4 py-2.5 text-right whitespace-nowrap text-label-2">{money(m.prior)}</td>
                 <td className="px-4 py-2.5">
                   <Spark values={m.series} />
                 </td>
@@ -122,15 +125,15 @@ export function DirectionTable({ direction, className = '' }) {
             ))}
             {metrics.length === 0 && (
               <tr>
-                <td colSpan={6} className="t-caption px-6 py-4">
+                <td colSpan={6} className="t-caption px-4 py-4 md:px-6">
                   Direction needs at least three complete cycles.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </div>
-      {direction.assumptions?.length > 0 && <p className="t-caption border-t px-6 py-4">{direction.assumptions.join(' ')}</p>}
+      </TableScroller>
+      {direction.assumptions?.length > 0 && <p className="t-caption border-t px-4 py-4 md:px-6">{direction.assumptions.join(' ')}</p>}
     </section>
   );
 }

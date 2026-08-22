@@ -19,6 +19,7 @@ import { Field } from './ui/Field';
 import { DirectionTable } from './plan/DirectionTable';
 import { SolverPanel } from './plan/SolverPanel';
 import { StandingCharges } from './plan/StandingCharges';
+import { STICKY_CELL, TableScroller } from './plan/TableScroller';
 import {
   BAD,
   ChartFrame,
@@ -44,8 +45,9 @@ const MONTH_YEAR = { month: 'short', year: '2-digit' };
 function Panel({ title, subtitle, children, right }) {
   return (
     <section className="glass overflow-hidden">
-      {/* Static class: Tailwind can't see a class name assembled at runtime. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
+      {/* Static class: Tailwind can't see a class name assembled at runtime. Card padding steps
+          down to 16px on a phone, where the card is already full-bleed. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-4 md:px-6 md:py-5">
         <div>
           <h2 className="t-head">{title}</h2>
           {subtitle && <p className="t-label mt-1.5 max-w-prose">{subtitle}</p>}
@@ -63,14 +65,16 @@ function SafeToSpend({ safe, summary }) {
   if (!safe || !summary) return null;
   const negative = safe.safe <= 0;
   return (
-    <div className="glass p-7">
+    <div className="glass p-5 md:p-7">
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
-          <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase max-md:text-xs">
             <Wallet size={13} /> Safe to spend
           </div>
+          {/* The figure scales with the screen and never wraps — a rand amount broken over two
+              lines reads as two numbers. 36px/40px is exactly text-4xl, so desktop is unchanged. */}
           <div
-            className={`mt-1 text-4xl font-semibold tabular-nums ${negative ? 'text-bad' : 'text-good'}`}
+            className={`mt-1 text-[clamp(28px,9vw,36px)]/10 font-semibold whitespace-nowrap tabular-nums ${negative ? 'text-bad' : 'text-good'}`}
           >
             {formatCurrency(safe.safe)}
           </div>
@@ -88,39 +92,40 @@ function SafeToSpend({ safe, summary }) {
             )}
           </p>
         </div>
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+        {/* Two columns on a phone, where the grid takes the whole card width below the figure. */}
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm max-md:w-full max-md:gap-x-4 sm:grid-cols-3">
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">In so far</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">In so far</dt>
             <dd className="mt-0.5 font-medium text-label tabular-nums">
               {formatCurrencyAbs(summary.income.received)}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">Out so far</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Out so far</dt>
             <dd className="mt-0.5 font-medium text-label tabular-nums">
               {formatCurrencyAbs(summary.expense.spent)}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">Still expected in</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Still expected in</dt>
             <dd className="mt-0.5 font-medium text-good tabular-nums">
               {formatCurrencyAbs(safe.incomeStillExpected)}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">Bills still due</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Bills still due</dt>
             <dd className="mt-0.5 font-medium text-bad tabular-nums">
               −{formatCurrencyAbs(safe.committed)}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">Forecast to spend</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Forecast to spend</dt>
             <dd className="mt-0.5 font-medium text-label-2 tabular-nums">
               {formatCurrencyAbs(safe.discretionaryForecast)}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase">If you follow it</dt>
+            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">If you follow it</dt>
             <dd
               className={`mt-0.5 font-medium tabular-nums ${safe.forecastGap < 0 ? 'text-bad' : 'text-good'}`}
             >
@@ -164,10 +169,10 @@ function TargetRow({ row, onSet }) {
 
   return (
     <tr className="border-b last:border-0">
-      <td className="px-6 py-2.5">
+      <td className={`px-4 py-2.5 md:px-6 ${STICKY_CELL}`}>
         <span className="text-sm text-label">{row.category}</span>
         {row.isBill && (
-          <span className="ml-2 rounded bg-fill px-1.5 py-0.5 text-[10px] text-label-2">
+          <span className="ml-2 rounded bg-fill px-1.5 py-0.5 text-[10px] text-label-2 max-md:text-[11px]">
             bill
           </span>
         )}
@@ -180,6 +185,7 @@ function TargetRow({ row, onSet }) {
         {formatCurrencyAbs(row.projected)}
       </td>
       <td className="px-4 py-2.5">
+        {/* `width` is Field's input-class slot; the phone height rides along with the width. */}
         <Field
           prefix="R"
           value={draft}
@@ -187,6 +193,7 @@ function TargetRow({ row, onSet }) {
           onCommit={commit}
           placeholder={String(suggestTarget(row.typical))}
           ariaLabel={`Target for ${row.category}`}
+          width="w-24 max-md:h-11"
         />
       </td>
       <td className="px-4 py-2.5">
@@ -260,7 +267,7 @@ function TrajectoryChart({ trajectory }) {
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
               content={<ChartTooltip deltaFrom={first} />}
             />
             <Legend content={<ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} />} />
@@ -395,11 +402,11 @@ export function PlanView({
             )
           }
         >
-          <div className="overflow-x-auto">
+          <TableScroller>
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
-                <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
-                  <th className="border-b px-6 py-2.5">Category</th>
+                <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase max-md:text-xs">
+                  <th className={`border-b px-4 py-2.5 md:px-6 ${STICKY_CELL}`}>Category</th>
                   <th className="border-b px-4 py-2.5 text-right">Typical</th>
                   <th className="border-b px-4 py-2.5 text-right">So far</th>
                   <th className="border-b px-4 py-2.5 text-right">Heading for</th>
@@ -413,12 +420,12 @@ export function PlanView({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroller>
           {budgets.rows.length > 12 && (
             <button
               type="button"
               onClick={() => setShowAll((s) => !s)}
-              className="w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:bg-fill"
+              className="w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:bg-fill max-md:min-h-11"
             >
               {showAll ? 'Show fewer' : `Show all ${budgets.rows.length} categories`}
             </button>
@@ -439,23 +446,29 @@ export function PlanView({
             </div>
           }
         >
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {gapClosers.plan.length === 0 ? (
               <p className="text-sm text-label-2">Nothing discretionary large enough to matter.</p>
             ) : (
               <>
-                <ul className="space-y-2.5">
+                <ul className="space-y-2.5 max-md:space-y-3.5">
                   {gapClosers.plan.map((c) => (
-                    <li key={c.name} className="flex items-center gap-3">
+                    // One line on a desktop. On a phone the two fixed-width ends alone are wider
+                    // than the screen, so it becomes a small grid: the name in full on the first
+                    // line, the bar with its reading beside it on the second.
+                    <li
+                      key={c.name}
+                      className="flex items-center gap-3 max-md:grid max-md:grid-cols-[auto_1fr_auto] max-md:gap-x-3 max-md:gap-y-1.5"
+                    >
                       <Scissors size={13} className="shrink-0 text-label-3" />
-                      <span className="w-48 shrink-0 truncate text-sm text-label">{c.name}</span>
-                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-fill">
+                      <span className="min-w-0 truncate text-sm text-label max-md:col-span-2 md:w-48 md:shrink-0">{c.name}</span>
+                      <span className="h-2 overflow-hidden rounded-full bg-fill max-md:col-start-2 md:flex-1">
                         <span
                           className="block h-full rounded-full bg-info"
                           style={{ width: `${Math.min(100, c.cutPercent * 100)}%` }}
                         />
                       </span>
-                      <span className="w-44 shrink-0 text-right text-xs text-label-2 tabular-nums">
+                      <span className="shrink-0 text-right text-xs text-label-2 tabular-nums md:w-44">
                         cut {formatCurrencyAbs(c.cut)} of {formatCurrencyAbs(c.typical)} (
                         {Math.round(c.cutPercent * 100)}%)
                       </span>
@@ -492,7 +505,9 @@ export function PlanView({
           title="If nothing changes"
           subtitle={`Every account continued at the pace it has actually been moving over the visible window. A projection of the recent past, not a prediction.${trajectory.absorber ? ` The shortfall lands on the ${trajectory.absorber}.` : ''}`}
           right={
-            <label className="flex items-center gap-2 text-xs text-label-2">
+            // On a phone the slider takes the card's full width on its own line, 44px tall, with
+            // the label and the value above it: a 128px track is not something a thumb can set.
+            <label className="flex flex-wrap items-center gap-2 text-xs text-label-2 max-md:w-full">
               Save per cycle
               <input
                 type="range"
@@ -501,17 +516,17 @@ export function PlanView({
                 step="500"
                 value={monthlySaving}
                 onChange={(e) => onMonthlySavingChange?.(parseInt(e.target.value, 10))}
-                className="w-32 accent-info"
+                className="w-32 accent-info max-md:order-3 max-md:h-11 max-md:w-full"
                 aria-label="Extra saving per cycle"
               />
-              <span className="w-20 text-right font-medium tabular-nums">
+              <span className="w-20 text-right font-medium tabular-nums max-md:ml-auto">
                 {formatCurrencyAbs(monthlySaving)}
               </span>
             </label>
           }
         >
           <TrajectoryChart trajectory={trajectory} />
-          <div className="flex flex-wrap gap-x-8 gap-y-2 border-t bg-fill px-6 py-4 text-xs">
+          <div className="flex flex-wrap gap-x-8 gap-y-2 border-t bg-fill px-4 py-4 text-xs md:px-6">
             <div>
               <span className="text-label-2">Net worth in {trajectory.horizon} cycles: </span>
               <b className={`tabular-nums ${trajectory.endNet < 0 ? 'text-bad' : 'text-good'}`}>
@@ -546,26 +561,28 @@ export function PlanView({
           title="Goals"
           subtitle="Arrival dates come from what you actually keep each cycle. When that's negative the honest answer is that the goal doesn't arrive, and the app says how much would have to be found first."
         >
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {goalList.length > 0 && (
-              <ul className="mb-5 space-y-3">
+              <ul className="mb-5 space-y-3 max-md:space-y-4">
                 {goalList.map((g) => (
-                  <li key={g.id} className="flex flex-wrap items-center gap-3">
+                  // On a phone: name and Remove on the first line, the bar on its own, then the
+                  // figures and the arrival — the `order`s do the re-flow, nothing is duplicated.
+                  <li key={g.id} className="flex flex-wrap items-center gap-3 max-md:gap-y-1.5">
                     <Flag size={14} className="shrink-0 text-label-3" />
-                    <span className="w-40 shrink-0 truncate text-sm font-medium text-label">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-label md:w-40 md:flex-none">
                       {g.name}
                     </span>
-                    <span className="h-2 min-w-24 flex-1 overflow-hidden rounded-full bg-fill">
+                    <span className="h-2 min-w-24 overflow-hidden rounded-full bg-fill max-md:order-2 max-md:basis-full md:flex-1">
                       <span
                         className="block h-full rounded-full bg-good"
                         style={{ width: `${g.progress * 100}%` }}
                       />
                     </span>
-                    <span className="shrink-0 text-xs text-label-2 tabular-nums">
+                    <span className="shrink-0 text-xs text-label-2 tabular-nums max-md:order-3">
                       {formatCurrencyAbs(g.saved)} / {formatCurrencyAbs(g.target)}
                     </span>
                     <span
-                      className={`shrink-0 text-xs ${g.reachable ? 'text-label-2' : 'text-warn'}`}
+                      className={`shrink-0 text-xs max-md:order-3 ${g.reachable ? 'text-label-2' : 'text-warn'}`}
                     >
                       {g.reachable
                         ? g.cycles === 0
@@ -576,7 +593,7 @@ export function PlanView({
                     <button
                       type="button"
                       onClick={() => onRemoveGoal?.(g.id)}
-                      className="ml-auto shrink-0 rounded px-2 py-1 text-xs text-label-3 hover:bg-fill hover:text-label-2"
+                      className="ml-auto shrink-0 rounded px-2 py-1 text-xs text-label-3 hover:bg-fill hover:text-label-2 max-md:order-1 max-md:min-h-11 max-md:px-3"
                     >
                       Remove
                     </button>
@@ -585,8 +602,9 @@ export function PlanView({
               </ul>
             )}
 
+            {/* The three fields and the button stack full-width on a phone, 44px tall each. */}
             <form
-              className="flex flex-wrap items-end gap-3"
+              className="flex flex-wrap items-end gap-3 max-md:flex-col max-md:items-stretch"
               onSubmit={(e) => {
                 e.preventDefault();
                 const target = parseFloat(goalDraft.target.replace(/[^\d.]/g, ''));
@@ -605,7 +623,7 @@ export function PlanView({
                 value={goalDraft.name}
                 onChange={(v) => setGoalDraft((d) => ({ ...d, name: v }))}
                 placeholder="Emergency fund"
-                width="w-48"
+                width="w-48 max-md:h-11 max-md:w-full"
                 className="[&_input]:text-left"
               />
               <Field
@@ -614,7 +632,7 @@ export function PlanView({
                 value={goalDraft.target}
                 onChange={(v) => setGoalDraft((d) => ({ ...d, target: v }))}
                 placeholder="50000"
-                width="w-28"
+                width="w-28 max-md:h-11 max-md:w-full"
               />
               <Field
                 label="Already saved"
@@ -622,11 +640,11 @@ export function PlanView({
                 value={goalDraft.saved}
                 onChange={(v) => setGoalDraft((d) => ({ ...d, saved: v }))}
                 placeholder="0"
-                width="w-28"
+                width="w-28 max-md:h-11 max-md:w-full"
               />
               <button
                 type="submit"
-                className="press flex items-center gap-1.5 rounded-xl bg-fill-2 px-3.5 py-2 text-sm text-label hover:brightness-125"
+                className="press flex items-center gap-1.5 rounded-xl bg-fill-2 px-3.5 py-2 text-sm text-label hover:brightness-125 max-md:min-h-11 max-md:justify-center"
               >
                 <Target size={14} />
                 Add goal

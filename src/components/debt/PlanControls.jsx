@@ -13,9 +13,18 @@ import { formatCurrencyAbs } from '../../utils/format';
  * exactly how much does. Anything above what the cycles already give has to be found by cuts, and
  * the link to Plan is where those cuts are listed. Every control here persists through settings so
  * the choice survives a reload and the next browser.
+ *
+ * On a phone every control is a thumb tall (44px) and full width: the six-way strategy control
+ * wraps under the title, the slider's hit box is as tall as the control, and the lump and prime
+ * fields share one row with 16px inputs so iOS does not zoom the page when one is focused. All of
+ * it is `max-md:`; from `md` up nothing moves.
  */
 
-const SEGMENT = 'press rounded-full px-3.5 py-1.5 text-[12.5px]';
+const SEGMENT = 'press rounded-full px-3.5 py-1.5 text-[12.5px] whitespace-nowrap max-md:min-h-11 max-md:flex-1';
+/** An inline link inside a sentence: pad the hit area out to 44px without moving the line. */
+const INLINE_TAP = 'max-md:-my-3 max-md:min-h-11 max-md:min-w-11 max-md:justify-center max-md:py-3';
+/** Make the kit's small numeric inputs phone-sized: full width, 44px, 16px type. */
+const FIELD_TAP = 'max-md:[&_input]:min-h-11 max-md:[&_input]:w-full max-md:[&_input]:text-base max-md:[&_label]:flex';
 
 export function PlanControls({
   strategies,
@@ -60,7 +69,7 @@ export function PlanControls({
         title="Plan"
         subtitle="Where the extra goes first, and how much of it there is. Every figure below moves with these."
         right={
-          <div className="glass-chip flex flex-wrap gap-1 p-1" role="group" aria-label="Payoff strategy">
+          <div className="glass-chip flex flex-wrap gap-1 p-1 max-md:w-full" role="group" aria-label="Payoff strategy">
             {strategies.map((s) => (
               <button
                 key={s.id}
@@ -92,7 +101,7 @@ export function PlanControls({
               value={extra}
               disabled={minimum}
               onChange={(e) => onExtra(Number(e.target.value))}
-              className="w-full accent-info disabled:opacity-40"
+              className="w-full accent-info disabled:opacity-40 max-md:h-11"
               aria-label="Extra payment per cycle"
             />
           </label>
@@ -112,7 +121,7 @@ export function PlanControls({
                 <button
                   type="button"
                   onClick={onOpenPlan}
-                  className="press inline-flex items-center gap-1 text-info hover:brightness-125"
+                  className={`press inline-flex items-center gap-1 text-info hover:brightness-125 ${INLINE_TAP}`}
                 >
                   <ArrowRight size={12} />
                   Plan
@@ -122,13 +131,13 @@ export function PlanControls({
           )}
         </div>
 
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-start md:gap-x-6">
           <button
             type="button"
             onClick={() => onCascade(!cascade)}
             aria-pressed={cascade}
             disabled={minimum}
-            className={`press glass-chip flex items-center gap-2 px-4 py-2 text-[13px] disabled:opacity-40 ${
+            className={`press glass-chip flex items-center gap-2 px-4 py-2 text-[13px] disabled:opacity-40 max-md:min-h-11 max-md:justify-center ${
               cascade ? 'text-label' : 'text-label-2'
             }`}
           >
@@ -136,31 +145,34 @@ export function PlanControls({
             {cascade ? 'Freed instalments roll on' : 'Freed instalments come back to you'}
           </button>
 
-          <Field
-            label="Lump sum"
-            value={lump > 0 ? lump : ''}
-            onCommit={(raw) => {
-              const n = Number(String(raw).replace(/[^\d.]/g, ''));
-              onLump(Number.isFinite(n) && n > 0 ? Math.round(n) : 0);
-            }}
-            prefix="R"
-            placeholder="0"
-            width="w-28"
-          />
+          {/* One row of two on a phone; `md:contents` hands the fields back to the flex row above it. */}
+          <div className={`grid grid-cols-2 gap-3 md:contents ${FIELD_TAP}`}>
+            <Field
+              label="Lump sum"
+              value={lump > 0 ? lump : ''}
+              onCommit={(raw) => {
+                const n = Number(String(raw).replace(/[^\d.]/g, ''));
+                onLump(Number.isFinite(n) && n > 0 ? Math.round(n) : 0);
+              }}
+              prefix="R"
+              placeholder="0"
+              width="w-28"
+            />
 
-          <Field
-            label="Prime rate"
-            value={primeRate ?? ''}
-            onCommit={(raw) => {
-              const s = String(raw).replace(/[^\d.]/g, '');
-              if (!s) return onPrimeRate(null);
-              const n = Number(s);
-              return onPrimeRate(Number.isFinite(n) && n >= 0 && n <= 40 ? n : null);
-            }}
-            suffix="%"
-            placeholder="not set"
-            width="w-20"
-          />
+            <Field
+              label="Prime rate"
+              value={primeRate ?? ''}
+              onCommit={(raw) => {
+                const s = String(raw).replace(/[^\d.]/g, '');
+                if (!s) return onPrimeRate(null);
+                const n = Number(s);
+                return onPrimeRate(Number.isFinite(n) && n >= 0 && n <= 40 ? n : null);
+              }}
+              suffix="%"
+              placeholder="not set"
+              width="w-20"
+            />
+          </div>
         </div>
       </div>
 
@@ -175,7 +187,7 @@ export function PlanControls({
                 onClick={() => move(i, -1)}
                 disabled={i === 0}
                 aria-label={`Move ${labelsById[id] ?? id} earlier`}
-                className="press rounded-full p-1 text-label-3 hover:bg-fill hover:text-label disabled:opacity-30"
+                className="press inline-flex items-center justify-center rounded-full p-1 text-label-3 hover:bg-fill hover:text-label disabled:opacity-30 max-md:min-h-11 max-md:min-w-11"
               >
                 <ArrowUp size={12} />
               </button>
@@ -184,7 +196,7 @@ export function PlanControls({
                 onClick={() => move(i, 1)}
                 disabled={i === ids.length - 1}
                 aria-label={`Move ${labelsById[id] ?? id} later`}
-                className="press rounded-full p-1 text-label-3 hover:bg-fill hover:text-label disabled:opacity-30"
+                className="press inline-flex items-center justify-center rounded-full p-1 text-label-3 hover:bg-fill hover:text-label disabled:opacity-30 max-md:min-h-11 max-md:min-w-11"
               >
                 <ArrowDown size={12} />
               </button>

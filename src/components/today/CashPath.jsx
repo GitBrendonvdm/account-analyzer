@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { Card, CardHead } from '../ui/Surface';
 import { useSeriesToggle } from '../charts/interactive';
+import { READOUT_CLASS, readoutStyle, useSpanDrag } from './useSpanDrag';
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 
 /**
@@ -18,7 +19,8 @@ import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
  * charts, with the low/high band showing how wide the guess is. The buffer rule is the user's own
  * figure (settings.cashBuffer); the first day under it is marked, because that is the day to act
  * before. Drag across the plot to zoom, hover for the day's balance and what lands on it, click an
- * account chip to see its own line — the trough is usually one account's, not everyone's.
+ * account chip to see its own line — the trough is usually one account's, not everyone's. On a
+ * phone a tap pins the readout and a vertical swipe still scrolls (see `useSpanDrag`).
  *
  * Until the backtest (scripts/backtest-cash.mjs) passes its gate the card says "Estimate" in so
  * many words. A forecast that has not yet been scored against the past should not dress as fact.
@@ -27,7 +29,6 @@ import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 const W = 1000;
 const H = 220;
 const PAD = 14;
-const MIN_SPAN_DAYS = 2;
 const TOTAL_COLOUR = '#f5f5f7';
 const ACCOUNT_COLOURS = ['#0a84ff', '#63e6e2', '#5e5ce6', '#ff9f0a', '#ff375f'];
 const DAY_MONTH = { day: 'numeric', month: 'short' };
@@ -97,57 +98,10 @@ function buildModel(cashPath) {
 
 export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = '' }) {
   const svgRef = useRef(null);
-  const [range, setRange] = useState(null);
-  const [drag, setDrag] = useState(null);
-  const [hover, setHover] = useState(null);
   const model = useMemo(() => buildModel(cashPath), [cashPath]);
   const { hidden, toggle } = useSeriesToggle();
-
   const length = model?.days.length ?? 0;
-  const from = range?.from ?? 0;
-  const to = range?.to ?? Math.max(0, length - 1);
-  const zoomed = range != null;
-
-  const dayAt = useCallback(
-    (clientX) => {
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return from;
-      const t = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      return Math.round(from + t * (to - from));
-    },
-    [from, to],
-  );
-  const onPointerDown = useCallback(
-    (e) => {
-      if (e.button != null && e.button !== 0) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      const day = dayAt(e.clientX);
-      setDrag({ from: day, to: day });
-    },
-    [dayAt],
-  );
-  const onPointerMove = useCallback(
-    (e) => {
-      const day = dayAt(e.clientX);
-      setHover(day);
-      setDrag((d) => (d ? { ...d, to: day } : d));
-    },
-    [dayAt],
-  );
-  const onPointerLeave = useCallback(() => setHover(null), []);
-  const onPointerUp = useCallback(() => {
-    setDrag((d) => {
-      if (!d) return null;
-      const lo = Math.min(d.from, d.to);
-      const hi = Math.max(d.from, d.to);
-      if (hi - lo >= MIN_SPAN_DAYS) setRange({ from: lo, to: hi });
-      return null;
-    });
-  }, []);
-  const reset = useCallback(() => {
-    setRange(null);
-    setDrag(null);
-  }, []);
+  const { drag, hover, from, to, zoomed, reset, svgProps, frameProps } = useSpanDrag({ svgRef, length });
 
   const geometry = useMemo(() => {
     if (!model) return null;
@@ -213,7 +167,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
 
   if (!cashPath || !model || !geometry) {
     return cashPath === undefined || cashPath === null ? null : (
-      <Card className={`materialize p-7 sm:p-8 ${className}`}>
+      <Card className={`materialize p-5 sm:p-8 ${className}`}>
         <CardHead title="Cash to payday" subtitle="Needs a Bank or Savings account with transactions to draw a path." />
       </Card>
     );
@@ -269,7 +223,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
       : null;
 
   return (
-    <Card className={`materialize flex flex-col p-7 sm:p-8 ${className}`}>
+    <Card className={`materialize flex flex-col p-5 sm:p-8 ${className}`}>
       <CardHead
         title="Cash to payday"
         subtitle={
@@ -297,7 +251,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
               <button
                 type="button"
                 onClick={onOpenAccounts}
-                className="glass-chip press px-3 py-1.5 text-[12px] font-medium text-info hover:brightness-125"
+                className="glass-chip press min-h-11 px-3 py-1.5 text-[12px] font-medium text-info hover:brightness-125 sm:min-h-0"
               >
                 Add balances
               </button>
@@ -309,7 +263,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
       <p className="t-sub mt-5">{sentence}</p>
       {lateLine && <p className="mt-1.5 text-[13.5px] text-warn">{lateLine}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-0 sm:gap-y-2">
         {model.series.map((s) => {
           const off = hidden.has(s.id);
           return (
@@ -318,7 +272,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
               type="button"
               aria-pressed={!off}
               onClick={() => toggle(s.id)}
-              className="press flex items-center gap-2 rounded-full px-1.5 py-0.5 text-[12.5px] hover:bg-fill"
+              className="press flex min-h-11 items-center gap-2 rounded-full px-1.5 py-0.5 text-[12.5px] hover:bg-fill sm:min-h-0"
               style={{ opacity: off ? 0.35 : 1 }}
             >
               <span className="block h-[3px] w-4 rounded-full" style={{ background: s.colour }} />
@@ -329,29 +283,14 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
         })}
       </div>
 
-      <div
-        className="mt-4 flex min-h-0 flex-grow flex-col"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') reset();
-        }}
-      >
+      <div className="mt-4 flex min-h-0 flex-grow flex-col" {...frameProps}>
         <div className="relative flex min-h-0 flex-grow flex-col">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${W} ${H}`}
             preserveAspectRatio="none"
-            className="chart-frame block w-full touch-none select-none"
             height="100%"
-            style={{ cursor: drag ? 'ew-resize' : 'crosshair' }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onPointerLeave={onPointerLeave}
-            onPointerOut={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget)) onPointerLeave();
-            }}
-            onDoubleClick={reset}
+            {...svgProps}
             role="img"
             aria-label={sentence}
           >
@@ -458,7 +397,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
 
           {trough && !readout && !band && (
             <div
-              className="num pointer-events-none absolute text-[11.5px] font-semibold text-bad"
+              className="num pointer-events-none absolute text-[12px] font-semibold text-bad"
               style={{
                 left: `${(trough.x / W) * 100}%`,
                 top: `${(trough.y / H) * 100}%`,
@@ -476,16 +415,10 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
           )}
 
           {readout && readout.rows.length > 0 && (
-            <div
-              className="glass pointer-events-none absolute top-2 z-10 min-w-[280px] rounded-[16px] p-3"
-              style={{
-                left: `${(readout.x / W) * 100}%`,
-                transform: readout.x / W > 0.62 ? 'translateX(calc(-100% - 14px))' : 'translateX(14px)',
-              }}
-            >
+            <div className={`${READOUT_CLASS} sm:min-w-[280px]`} style={readoutStyle(readout.x / W)}>
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <span className="text-[12px] font-medium text-label">{fmtDate(readout.day.date)}</span>
-                <span className="text-[11px] text-label-3">
+                <span className="text-[12px] text-label-3">
                   {readout.day.observed === false ? 'projected' : 'observed'} · day {readout.day.cycleDay}
                 </span>
               </div>
@@ -523,7 +456,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
             <button
               type="button"
               onClick={reset}
-              className="glass-chip press flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-label-2 hover:text-label"
+              className="glass-chip press flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-[12px] text-label-2 hover:text-label sm:min-h-0"
             >
               <X size={12} />
               {fmtDate(model.days[from]?.date)} – {fmtDate(model.days[to]?.date)} · reset
@@ -531,7 +464,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
           ) : (
             <span className="flex items-center gap-1.5">
               <Search size={12} />
-              Drag across the chart to zoom in · hover for the day's charges
+              Drag across the chart to zoom in · hover or tap for the day's charges
             </span>
           )}
         </div>

@@ -69,10 +69,14 @@ const monthLabel = (key) => {
 };
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/**
+ * Below `sm` the three chips fill the row at a 44px height so a thumb can land on one; from `sm` up
+ * they are the small inline group the desktop has always had.
+ */
 function OverrideControl({ line, value, onSet }) {
   if (!onSet) return null;
   return (
-    <span className="glass-chip flex shrink-0 gap-0.5 p-0.5" role="group" aria-label={`Override for ${line.label}`}>
+    <span className="glass-chip flex w-full gap-0.5 p-0.5 sm:w-auto sm:shrink-0" role="group" aria-label={`Override for ${line.label}`}>
       {OVERRIDES.map((o) => {
         const on = value === o.value;
         return (
@@ -81,7 +85,7 @@ function OverrideControl({ line, value, onSet }) {
             type="button"
             aria-pressed={on}
             onClick={() => onSet(line.id, on ? null : o.value)}
-            className={`press rounded-full px-2.5 py-1 text-[11px] ${on ? 'bg-fill-2 font-semibold text-label' : 'text-label-3 hover:text-label'}`}
+            className={`press min-h-11 flex-auto rounded-full px-2.5 py-1 text-[12px] whitespace-nowrap sm:min-h-0 sm:flex-none sm:text-[11px] ${on ? 'bg-fill-2 font-semibold text-label' : 'text-label-3 hover:text-label'}`}
           >
             {o.label}
           </button>
@@ -91,11 +95,18 @@ function OverrideControl({ line, value, onSet }) {
   );
 }
 
+/**
+ * One line of the audit. From `sm` up it is a five-column grid: name, cadence, status, step chart,
+ * override + amount. Below `sm` the same children reflow into a two-column stack — name beside the
+ * amount, then cadence and status, then the chart across the row, then the override chips — which
+ * is why the amount is pinned to the first row and the two pairs are wrapped in `display: contents`
+ * boxes that dissolve on the desktop grid.
+ */
 function LineRow({ line, override, onSet, asOf }) {
   const due = relative(line.nextDate, asOf);
   const status = line.cycleStatus;
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t px-6 py-3 sm:grid-cols-[minmax(0,14rem)_auto_auto_minmax(0,1fr)_auto]">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t px-4 py-3 sm:grid-cols-[minmax(0,14rem)_auto_auto_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-6">
       <div className="min-w-0">
         <div className="truncate text-[15px] font-medium">{line.label}</div>
         <div className="t-caption truncate">
@@ -108,18 +119,24 @@ function LineRow({ line, override, onSet, asOf }) {
           )}
         </div>
       </div>
-      <span className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-label-2">{line.cadence}</span>
-      <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-label-3 sm:col-span-1">
-        {due && <span>next {due}</span>}
-        {status && <span className={STATUS_TONE[status] ?? 'text-label-3'}>{STATUS_LABEL[status] ?? status}</span>}
-        {line.level && line.level !== 'high' && <span>{line.level} confidence</span>}
+      <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:contents">
+        <span className="rounded bg-fill px-1.5 py-0.5 text-[12px] text-label-2 sm:text-[10.5px]">{line.cadence}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-label-3">
+          {due && <span>next {due}</span>}
+          {status && <span className={STATUS_TONE[status] ?? 'text-label-3'}>{STATUS_LABEL[status] ?? status}</span>}
+          {line.level && line.level !== 'high' && <span>{line.level} confidence</span>}
+        </div>
       </div>
-      <div className="hidden sm:block">
+      <div className="col-span-2 sm:col-span-1">
         <StepChart regimes={line.regimes} />
       </div>
-      <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-end">
-        {!DEBT_KINDS.has(line.kind) && <OverrideControl line={line} value={override} onSet={onSet} />}
-        <div className="text-right">
+      <div className="contents sm:flex sm:items-center sm:justify-end sm:gap-3">
+        {!DEBT_KINDS.has(line.kind) && (
+          <div className="col-span-2">
+            <OverrideControl line={line} value={override} onSet={onSet} />
+          </div>
+        )}
+        <div className="col-start-2 row-start-1 text-right sm:col-auto sm:row-auto">
           <div className="num text-[15px] font-semibold">{formatCurrencyAbs(line.amount)}</div>
           <div className="t-caption num">{formatCurrencyAbs(line.perCycle * 12)} a year</div>
         </div>
@@ -148,7 +165,7 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
 
   return (
     <Card className={`materialize overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
         <CardHead
           title="Standing charges"
           subtitle="Every line that repeats, from the recurring engine: one merchant, one account, one price. Instalments and card repayments are listed but never totalled as subscriptions."
@@ -159,18 +176,18 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
         </div>
       </div>
 
-      <p className="t-sub border-b px-6 py-4">{sentence}</p>
+      <p className="t-sub border-b px-4 py-4 sm:px-6">{sentence}</p>
 
       {kinds.length > 0 && (
-        <div className="flex flex-wrap gap-x-9 gap-y-4 border-b px-6 py-5">
+        <div className="flex flex-wrap gap-x-9 gap-y-4 border-b px-4 py-5 sm:px-6">
           {kinds.map((k) => (
             <div key={k.kind}>
-              <div className={`text-[10px] font-medium tracking-[0.08em] uppercase ${k.kind === 'optional' ? 'text-good' : 'text-label-3'}`}>
+              <div className={`text-[12px] font-medium tracking-[0.08em] uppercase sm:text-[10px] ${k.kind === 'optional' ? 'text-good' : 'text-label-3'}`}>
                 {KIND_LABEL[k.kind] ?? k.kind}
               </div>
               <div className="num mt-1 text-[15px] font-semibold">
                 {formatCurrencyAbs(k.perYear ?? (k.perCycle ?? 0) * 12)}
-                <span className="ml-1.5 text-[11px] font-normal text-label-3">a year</span>
+                <span className="ml-1.5 text-[12px] font-normal text-label-3 sm:text-[11px]">a year</span>
               </div>
               <div className="t-caption">
                 {plural(k.count, 'line')} · {formatCurrencyAbs(k.perCycle ?? 0)} a cycle
@@ -181,7 +198,7 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
       )}
 
       {!anyServices && (
-        <p className="t-caption px-6 py-5">No standing charges found yet — the engine needs a few complete cycles.</p>
+        <p className="t-caption px-4 py-5 sm:px-6">No standing charges found yet — the engine needs a few complete cycles.</p>
       )}
 
       {services.length > 0 && (
@@ -194,7 +211,7 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
 
       {debt.length > 0 && (
         <>
-          <div className="border-t bg-fill px-6 py-2.5 text-[11px] font-semibold tracking-wide text-label-3 uppercase">
+          <div className="border-t bg-fill px-4 py-2.5 text-[12px] font-semibold tracking-wide text-label-3 uppercase sm:px-6 sm:text-[11px]">
             Instalments and repayments — debt, not subscriptions
           </div>
           <ol className="flex flex-col">
@@ -208,12 +225,12 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
       {collapsible && (
         <>
           {!showAll && (
-            <p className="t-caption px-6 py-2.5 text-center">{`${shown.length} of ${lines.length} shown · totals cover all`}</p>
+            <p className="t-caption px-4 py-2.5 text-center sm:px-6">{`${shown.length} of ${lines.length} shown · totals cover all`}</p>
           )}
           <button
             type="button"
             onClick={() => setShowAll((s) => !s)}
-            className="press w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label"
+            className="press min-h-11 w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label sm:min-h-0"
           >
             {showAll ? 'Show fewer' : `Show all ${lines.length} standing charges`}
           </button>
@@ -221,7 +238,7 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
       )}
 
       {subscriptions.annualItems?.length > 0 && (
-        <div className="border-t px-6 py-4">
+        <div className="border-t px-4 py-4 sm:px-6">
           <div className="t-label">Once a year</div>
           <ul className="mt-2 flex flex-col gap-1 text-[13.5px] text-label-2">
             {subscriptions.annualItems.map((a) => (
@@ -236,7 +253,7 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
       )}
 
       {subscriptions.assumptions?.length > 0 && (
-        <p className="t-caption border-t px-6 py-4">{subscriptions.assumptions.join(' ')}</p>
+        <p className="t-caption border-t px-4 py-4 sm:px-6">{subscriptions.assumptions.join(' ')}</p>
       )}
     </Card>
   );

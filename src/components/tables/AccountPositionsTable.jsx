@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronsRight, Minus } from 'lucide-react';
 import { formatCurrency } from '../../utils/format';
 import { ACCOUNT_TYPE_ORDER } from '../../lib/accounts';
 
@@ -12,6 +12,10 @@ import { ACCOUNT_TYPE_ORDER } from '../../lib/accounts';
  *
  * Direction is uniform — higher is better. More negative on a card is more debt; less negative on a
  * loan is debt repaid.
+ *
+ * A cycle per column means the table is always wider than a phone. It scrolls sideways inside its
+ * card, with the account column pinned so a number is never read without its row name, and a hint
+ * above the table says so — a scrollable region with no scrollbar gives nothing away on touch.
  */
 
 const TYPE_BLURB = {
@@ -20,6 +24,13 @@ const TYPE_BLURB = {
   Bank: 'Higher is better — cash on hand',
   Savings: 'Higher is better — cash on hand',
 };
+
+/**
+ * The pinned first column, below `md` only: above it the table fits and a pinned cell would only
+ * paint its own background over the group tint. The backing is the sticky-head material, opaque
+ * enough that the cycle columns sliding under it do not show through.
+ */
+const PIN = 'max-md:sticky max-md:left-0 max-md:z-[1] max-md:w-36 max-md:min-w-36 max-md:bg-[rgba(20,20,25,0.94)] max-md:backdrop-blur-md';
 
 function Delta({ value }) {
   if (Math.abs(value) < 1) {
@@ -38,6 +49,16 @@ function Delta({ value }) {
       <Icon size={11} className="shrink-0" />
       {formatCurrency(Math.abs(value))}
     </span>
+  );
+}
+
+/** The touch-only "this scrolls" hint; a desktop has a scrollbar and room. */
+export function SwipeHint({ children = 'Swipe sideways for more columns' }) {
+  return (
+    <p className="flex items-center gap-1.5 px-4 py-2 text-[12px] text-label-3 md:hidden">
+      <ChevronsRight size={13} aria-hidden />
+      {children}
+    </p>
   );
 }
 
@@ -69,15 +90,16 @@ export function AccountPositionsTable({
 
   return (
     <div className="glass overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-6 py-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-4 md:px-6 md:py-5">
         <h2 className="t-head">{title}</h2>
         <p className="t-label">{subtitle}</p>
       </div>
+      <SwipeHint>Swipe sideways for more cycles</SwipeHint>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky-head text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase">
             <tr>
-              <th className="border-b p-3 font-medium">Account</th>
+              <th className={`border-b p-3 font-medium ${PIN}`}>Account</th>
               <th className="border-b p-3 text-right font-medium text-label-3" title="Where the account stood before the first cycle shown.">
                 Start
               </th>
@@ -98,9 +120,10 @@ export function AccountPositionsTable({
             {byType.map(({ type, accounts }) => (
               <Fragment key={type}>
                 <tr className="bg-fill/70">
-                  <td className="border-t p-2 pl-3 text-xs font-semibold tracking-wide text-label-2 uppercase">
+                  <td className={`border-t p-2 pl-3 text-xs font-semibold tracking-wide text-label-2 uppercase ${PIN}`}>
                     {type}
-                    <span className="ml-2 text-[10px] font-normal normal-case text-label-3">
+                    {/* The direction blurb is the subtitle's sentence again; a 144px pinned cell has no room for it. */}
+                    <span className="ml-2 text-[10px] font-normal normal-case text-label-3 max-md:hidden">
                       {TYPE_BLURB[type] ?? ''}
                     </span>
                   </td>
@@ -123,7 +146,7 @@ export function AccountPositionsTable({
                 </tr>
                 {accounts.map((a) => (
                   <tr key={a.account} className="border-t hover:bg-fill">
-                    <td className="p-3 pl-6 text-label-2">
+                    <td className={`p-3 pl-6 text-label-2 max-md:pl-3 ${PIN}`}>
                       <span className="font-medium">{a.short || a.account}</span>
                       {a.bank && <span className="ml-2 text-xs text-label-3">{a.bank}</span>}
                     </td>

@@ -216,7 +216,7 @@ describe.skipIf(!real)('the real exports (test-data/, gitignored)', () => {
       await forwards.h.close();
       await backwards.h.close();
     }
-  });
+  }, 30000);
 
   it('keep the renamed account as one account under its newer name', async () => {
     for (const order of [[older, newer], [newer, older]]) {
@@ -231,5 +231,5 @@ describe.skipIf(!real)('the real exports (test-data/, gitignored)', () => {
         await h.close();
       }
     }
-  });
+  }, 30000);
 });

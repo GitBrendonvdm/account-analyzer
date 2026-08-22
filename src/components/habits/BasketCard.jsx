@@ -50,6 +50,11 @@ function sentenceOf(f, windowNote) {
   );
 }
 
+/**
+ * The row is one button so the whole of it opens the family. From `sm` up it reads name · sparks ·
+ * change on a line with the sentence beneath; below `sm` the change sits beside the name and the
+ * two sparks take a line of their own, done with `order` so the markup stays in the desktop order.
+ */
 function FamilyRow({ family, members, windowNote, lateCount, open, onToggle }) {
   const series = family.seriesByCycle ?? [];
   const up = (family.delta?.spend ?? 0) > 0;
@@ -60,33 +65,34 @@ function FamilyRow({ family, members, windowNote, lateCount, open, onToggle }) {
         type="button"
         onClick={canOpen ? onToggle : undefined}
         aria-expanded={canOpen ? open : undefined}
-        className={`flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4 text-left ${canOpen ? 'transition-colors hover:bg-fill' : 'cursor-default'}`}
+        className={`flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 text-left sm:px-6 ${canOpen ? 'transition-colors hover:bg-fill' : 'cursor-default'}`}
       >
-        <span className="flex min-w-0 flex-grow items-center gap-2 text-[15px] font-medium">
+        {/* Narrow: the name may wrap and the driver tag drops under it whole; wide: one truncating line. */}
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[15px] font-medium sm:flex-auto sm:flex-nowrap">
           {canOpen && (open ? <ChevronDown size={14} className="text-label-3" /> : <ChevronRight size={14} className="text-label-3" />)}
-          <span className="truncate">{family.label}</span>
-          <span className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] font-normal text-label-3">
+          <span className="sm:truncate">{family.label}</span>
+          <span className="rounded bg-fill px-1.5 py-0.5 text-[12px] font-normal whitespace-nowrap text-label-3 sm:text-[10.5px]">
             {DRIVER_LABEL[family.driver] ?? family.driver}
           </span>
         </span>
-        <span className="flex items-center gap-5">
+        <span className="order-2 flex basis-full items-center gap-5 sm:order-none sm:basis-auto">
           <span className="flex flex-col items-end gap-0.5">
             <Spark values={series.map((c) => c.visits)} lateCount={lateCount} tone="var(--color-info)" />
-            <span className="text-[10px] text-label-4">trips</span>
+            <span className="text-[12px] text-label-4 sm:text-[10px]">trips</span>
           </span>
           <span className="flex flex-col items-end gap-0.5">
             <Spark values={series.map((c) => c.meanTicket)} lateCount={lateCount} tone="var(--color-mint)" />
-            <span className="text-[10px] text-label-4">basket</span>
+            <span className="text-[12px] text-label-4 sm:text-[10px]">basket</span>
           </span>
         </span>
-        <span className={`num w-[92px] shrink-0 text-right text-[15px] font-semibold ${up ? 'text-bad' : 'text-good'}`}>
+        <span className={`num order-1 ml-auto shrink-0 text-right text-[15px] font-semibold sm:order-none sm:ml-0 sm:w-[92px] ${up ? 'text-bad' : 'text-good'}`}>
           {up ? '+' : '−'}
           {formatCurrencyAbs(family.delta?.spend)}
         </span>
-        <span className="w-full text-[13.5px] text-label-2">{sentenceOf(family, windowNote)}</span>
+        <span className="order-3 w-full text-[13.5px] text-label-2 sm:order-none">{sentenceOf(family, windowNote)}</span>
       </button>
       {open && members.length > 0 && (
-        <ul className="border-t bg-fill/50 px-6 py-2">
+        <ul className="border-t bg-fill/50 px-4 py-2 sm:px-6">
           {members.map((m) => (
             <li key={m.merchantFamily ?? m.label} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-1.5 text-[13px]">
               <span className="text-label-2">{sentenceOf(m, windowNote)}</span>
@@ -116,14 +122,14 @@ export function BasketCard({ basket, className = '' }) {
 
   return (
     <Card className={`materialize overflow-hidden ${className}`}>
-      <div className="border-b px-6 py-5">
+      <div className="border-b px-4 py-5 sm:px-6">
         <CardHead
           title="Trips or tickets?"
           subtitle={`Whether each family of spend changed because of more visits or a bigger basket — ${basket.windowNote ?? 'recent cycles against earlier ones'}. The two parts add exactly to the change.`}
         />
       </div>
       {categories.length === 0 ? (
-        <p className="t-caption px-6 py-5">Needs a few more complete cycles before trips and tickets can be told apart.</p>
+        <p className="t-caption px-4 py-5 sm:px-6">Needs a few more complete cycles before trips and tickets can be told apart.</p>
       ) : (
         <ol className="flex flex-col">
           {categories.map((f) => (
@@ -139,7 +145,7 @@ export function BasketCard({ basket, className = '' }) {
           ))}
         </ol>
       )}
-      {basket.assumptions?.length > 0 && <p className="t-caption border-t px-6 py-4">{basket.assumptions.join(' ')}</p>}
+      {basket.assumptions?.length > 0 && <p className="t-caption border-t px-4 py-4 sm:px-6">{basket.assumptions.join(' ')}</p>}
     </Card>
   );
 }

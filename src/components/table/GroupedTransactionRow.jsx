@@ -6,6 +6,7 @@ import { RowIcon } from './RowIcon';
 import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON } from './rowIcons';
 import { VariantTransactionRow } from './VariantTransactionRow';
 import { WeekCells } from './WeekCells';
+import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function GroupedTransactionRow({ group, months, highlightCells = false, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
@@ -16,12 +17,13 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
   return (
     <>
       <tr
-        className={`border-t text-xs ${
+        // Taller on a phone: a row that opens on tap needs 44px under the finger.
+        className={`border-t text-xs max-md:[&>td]:py-3.5 ${
           group.isException ? 'bg-warn/10 text-label-2' : 'bg-fill text-label-2'
         } ${hasVariants ? 'cursor-pointer hover:brightness-95' : ''}`}
         onClick={() => hasVariants && setExpanded(!expanded)}
       >
-        <td className="p-2 pl-20">
+        <td className={`p-2 pl-20 max-md:pl-8 ${group.isException ? PIN_WARN : PIN_FILL}`}>
           <span className="flex items-center gap-1.5">
             {hasVariants && (
               <ChevronRight size={12} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />

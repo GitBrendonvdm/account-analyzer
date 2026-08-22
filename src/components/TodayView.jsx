@@ -66,25 +66,35 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
   if (!rows.length) return null;
   const max = Math.max(...rows.map((r) => r.amount), 1);
   return (
-    <Card className={`materialize p-7 sm:p-8 ${className}`}>
+    <Card className={`materialize p-5 sm:p-8 ${className}`}>
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="t-head">Where it goes</h2>
+        {/* The padding is negative-margined away so the 44px hit area does not move the text. */}
         <button
           type="button"
           onClick={onOpenLedger}
-          className="press flex items-center gap-1.5 text-[13px] font-medium text-info hover:brightness-125"
+          className="press -my-3 -mr-2 flex min-h-11 items-center gap-1.5 py-3 pr-2 pl-2 text-[13px] font-medium text-info hover:brightness-125"
         >
           All transactions
           <ArrowRight size={13} />
         </button>
       </div>
+      {/* On a phone the row is two lines — name and amount, then the bar under both — because
+          a fixed 168px label plus a 92px amount left the bar itself 60px wide at 360. From `sm`
+          it is the single flex row it always was; `order` keeps one DOM order for both. */}
       <div className="mt-6 flex flex-col gap-4">
         {rows.map((r, i) => (
-          <div key={r.name} className="flex items-center gap-4">
-            <span className="w-[168px] shrink-0 truncate text-[14.5px]" title={r.name}>
+          <div
+            key={r.name}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:flex"
+          >
+            <span
+              className="order-1 min-w-0 truncate text-[14.5px] sm:order-none sm:w-[168px] sm:shrink-0"
+              title={r.name}
+            >
               {r.name}
             </span>
-            <span className="block h-2.5 flex-grow overflow-hidden rounded-full bg-fill">
+            <span className="order-3 col-span-2 block h-2.5 overflow-hidden rounded-full bg-fill sm:order-none sm:flex-grow">
               <span
                 className="block h-full rounded-full"
                 style={{
@@ -94,7 +104,7 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
                 }}
               />
             </span>
-            <span className="num w-[92px] shrink-0 text-right text-[14.5px] font-semibold">
+            <span className="num order-2 w-[92px] shrink-0 text-right text-[14.5px] font-semibold sm:order-none">
               {formatCurrencyAbs(r.amount)}
             </span>
           </div>
@@ -158,10 +168,11 @@ export function TodayView({
        1800px the page becomes a 12-track grid and the blocks pair up instead of stacking. */
     <div className="grid flex-grow grid-cols-1 gap-5 3xl:grid-cols-12">
       {/* hero */}
-      <Card className="materialize grid items-center gap-10 p-8 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-12 3xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div>
+      <Card className="materialize grid items-center gap-8 p-6 sm:gap-10 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-12 3xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
           <div className="t-label">Safe to spend before payday</div>
-          <div className={`t-hero num mt-2.5 ${negative ? 'text-bad' : 'text-good'}`}>
+          {/* The figure never wraps mid-number; `t-hero` clamps its size so it fits a 360 phone. */}
+          <div className={`t-hero num mt-2.5 whitespace-nowrap ${negative ? 'text-bad' : 'text-good'}`}>
             {formatCurrency(safe?.safe ?? 0)}
           </div>
           <p className="mt-4 max-w-[40ch] text-[15.5px] leading-relaxed text-label-2">
@@ -218,19 +229,19 @@ export function TodayView({
       )}
 
       {curve && (
-        <Card className="materialize flex flex-col p-7 sm:p-8 3xl:col-span-6">
+        <Card className="materialize flex flex-col p-5 sm:p-8 3xl:col-span-6">
           <SpendCurve curve={curve} />
         </Card>
       )}
 
       {balances && (
-        <Card className="materialize flex flex-col p-7 sm:p-8 3xl:col-span-6">
+        <Card className="materialize flex flex-col p-5 sm:p-8 3xl:col-span-6">
           <BalanceBands series={balances} />
         </Card>
       )}
 
       <div className="grid gap-4 md:grid-cols-3 3xl:col-span-12">
-        <Tile className="rise p-6">
+        <Tile className="rise p-5 sm:p-6">
           <Figure
             label="Came in"
             value={formatCurrencyAbs(summary.income.received)}
@@ -242,7 +253,7 @@ export function TodayView({
             }
           />
         </Tile>
-        <Tile className="rise p-6">
+        <Tile className="rise p-5 sm:p-6">
           <Figure
             label="Went out"
             value={formatCurrencyAbs(summary.expense.spent)}
@@ -257,7 +268,7 @@ export function TodayView({
             }
           />
         </Tile>
-        <Tile className="rise p-6">
+        <Tile className="rise p-5 sm:p-6">
           <Figure
             label={netWorth?.knownCount > 0 ? 'Net worth' : 'Owed on cards'}
             value={

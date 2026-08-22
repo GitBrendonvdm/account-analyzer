@@ -2,6 +2,7 @@ import { formatCurrency } from '../../utils/format';
 import { RowIcon } from './RowIcon';
 import { NET_TOTAL_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
+import { PIN_FILL_2 } from './stickyColumn';
 
 /**
  * On the dark row a plain white number gives no read on direction — a leading minus is the only
@@ -17,7 +18,7 @@ function NetAmount({ val }) {
 export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeeks, weeklyRemaining }) {
   return (
     <tr className="bg-fill-2 font-bold text-white">
-      <td className="p-4">
+      <td className={`p-4 ${PIN_FILL_2}`}>
         <span className="flex items-center gap-2">
           <RowIcon config={NET_TOTAL_ICON} size={16} />
           Net Total

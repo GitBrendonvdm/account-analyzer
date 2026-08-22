@@ -28,12 +28,13 @@ export function MigrateBanner({ dump, onMigrate, busy, onDismiss }) {
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      {/* On a phone the two buttons share the full width under the text, at thumb height. */}
+      <div className="flex items-center gap-2 max-md:w-full">
         <button
           type="button"
           onClick={onDismiss}
           disabled={busy}
-          className="press rounded-full px-4 py-2 text-[13px] text-label-3 hover:bg-fill hover:text-label-2"
+          className="press rounded-full px-4 py-2 text-[13px] text-label-3 hover:bg-fill hover:text-label-2 max-md:min-h-11 max-md:flex-1"
         >
           Not now
         </button>
@@ -41,7 +42,7 @@ export function MigrateBanner({ dump, onMigrate, busy, onDismiss }) {
           type="button"
           onClick={onMigrate}
           disabled={busy}
-          className="press flex items-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-60"
+          className="press flex items-center justify-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-60 max-md:min-h-11 max-md:flex-1"
         >
           {busy ? <Loader2 size={15} className="animate-spin" /> : <CloudUpload size={15} />}
           {busy ? 'Moving' : 'Move to server'}

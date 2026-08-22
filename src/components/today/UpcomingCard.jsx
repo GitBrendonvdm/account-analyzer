@@ -51,7 +51,7 @@ function StatusChip({ status, days }) {
             : null;
   if (!text) return null;
   const tone = status === 'overdue' ? 'text-warn' : status === 'landed' ? 'text-good' : 'text-label-3';
-  return <span className={`shrink-0 rounded bg-fill px-1.5 py-0.5 text-[10.5px] ${tone}`}>{text}</span>;
+  return <span className={`shrink-0 rounded bg-fill px-1.5 py-0.5 text-[12px] ${tone}`}>{text}</span>;
 }
 
 function ItemRow({ label, amount, level, status, days, account }) {
@@ -83,7 +83,7 @@ export function UpcomingCard({ upcoming, dataThrough, className = '' }) {
   };
 
   return (
-    <Card className={`materialize flex flex-col p-7 sm:p-8 ${className}`}>
+    <Card className={`materialize flex flex-col p-5 sm:p-8 ${className}`}>
       <CardHead
         title="Coming up"
         subtitle={`The next ${days} days of standing charges, read from what has repeated before.`}

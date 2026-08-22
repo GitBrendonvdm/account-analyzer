@@ -46,7 +46,7 @@ function DriftRow({ row, recent }) {
   const up = row.direction === 'up';
   const how = Math.abs(row.z ?? 0) >= 4 ? 'far' : 'well';
   return (
-    <li className="flex flex-col gap-2 border-t px-6 py-4 first:border-t-0">
+    <li className="flex flex-col gap-2 border-t px-4 py-4 first:border-t-0 sm:px-6">
       <div className="flex flex-wrap items-center gap-3">
         <span className={`flex items-center gap-1 text-[13px] font-semibold ${up ? 'text-bad' : 'text-good'}`}>
           {up ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
@@ -77,7 +77,7 @@ export function DriftCard({ drift, className = '' }) {
 
   return (
     <Card className={`materialize overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
         <CardHead
           title="What changed"
           subtitle={`The last ${plural(recentN, 'cycle')} against the median of the ${baselineN} before them. What moved outside its usual range — an explanation, not money found.`}
@@ -94,7 +94,7 @@ export function DriftCard({ drift, className = '' }) {
         )}
       </div>
       {flagged.length === 0 ? (
-        <p className="t-caption px-6 py-5">Nothing has moved outside its usual range over the last {plural(recentN, 'cycle')}.</p>
+        <p className="t-caption px-4 py-5 sm:px-6">Nothing has moved outside its usual range over the last {plural(recentN, 'cycle')}.</p>
       ) : (
         <ol className="flex flex-col">
           {flagged.map((row) => (
@@ -102,7 +102,7 @@ export function DriftCard({ drift, className = '' }) {
           ))}
         </ol>
       )}
-      {drift.assumptions?.length > 0 && <p className="t-caption border-t px-6 py-4">{drift.assumptions.join(' ')}</p>}
+      {drift.assumptions?.length > 0 && <p className="t-caption border-t px-4 py-4 sm:px-6">{drift.assumptions.join(' ')}</p>}
     </Card>
   );
 }

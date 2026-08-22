@@ -273,7 +273,7 @@ describe('PlanView blocks', () => {
     expect(html).toContain('Show all 61 standing charges');
     expect(html).toContain('12 of 61 shown · totals cover all');
     expect(html).not.toContain('Show fewer');
-    expect(html.match(/max-w-\[16rem\] truncate/g)).toHaveLength(12);
+    expect(html.match(/truncate text-sm text-label md:max-w-\[16rem\]/g)).toHaveLength(12);
     expect(html).toContain('Override for Pad line 1"');
     expect(html).not.toContain('Pad line 2');
     expectClean(html);

@@ -70,15 +70,17 @@ function Timeline({ solution, debts }) {
       {rows.map((r) => {
         const share = r.reachable ? Math.min(1, (r.clearedCycle ?? cycles) / cycles) : 1;
         return (
-          <li key={r.id} className="flex items-center gap-3 text-[13px]">
-            <span className="w-44 shrink-0 truncate text-label-2">{labelOf(r)}</span>
-            <span className="h-2 flex-1 overflow-hidden rounded-full bg-fill">
+          // Label, bar and reading share one line on a desktop; on a phone the fixed-width ends
+          // alone overrun 360px, so the bar drops to its own line under the label and reading.
+          <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+            <span className="min-w-0 flex-1 truncate text-label-2 md:w-44 md:flex-none">{labelOf(r)}</span>
+            <span className="h-2 overflow-hidden rounded-full bg-fill max-md:order-3 max-md:basis-full md:flex-1">
               <span
                 className={`block h-full rounded-full ${r.reachable ? 'bg-good' : 'bg-bad'}`}
                 style={{ width: `${Math.max(3, share * 100)}%` }}
               />
             </span>
-            <span className={`num w-40 shrink-0 text-right ${r.reachable ? 'text-label-2' : 'text-bad'}`}>
+            <span className={`num shrink-0 text-right md:w-40 ${r.reachable ? 'text-label-2' : 'text-bad'}`}>
               {r.reachable ? `${monthYear(r.clearedDate)} · ${r.clearedCycle} cycles` : `${formatCurrencyAbs(r.balanceAtTarget)} still owed`}
             </span>
           </li>
@@ -181,7 +183,8 @@ export function SolverPanel({ debts, debtBudget, solverInputs, solve, monthlySav
 
   return (
     <section className={`glass overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-6 py-5">
+      {/* Card padding steps down to 16px on a phone: the card is already full-bleed there. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-4 md:px-6 md:py-5">
         <div>
           <h2 className="t-head">What would it take</h2>
           <p className="t-label mt-1.5 max-w-prose">
@@ -189,21 +192,35 @@ export function SolverPanel({ debts, debtBudget, solverInputs, solve, monthlySav
           </p>
         </div>
         {onOpenDebt && (
-          <button type="button" onClick={onOpenDebt} className="press flex items-center gap-1.5 text-[13px] font-medium text-info hover:brightness-125">
+          <button type="button" onClick={onOpenDebt} className="press flex items-center gap-1.5 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11">
             The full plan <ArrowRight size={13} />
           </button>
         )}
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 border-b px-6 py-4">
-        <Field label="By" type="date" inputMode="none" value={targetDate} onCommit={(v) => toDate(v) && setTargetDate(v)} width="w-40" max={isoOf(addMonths(new Date(), 600))} />
+      {/*
+        The controls sit in one row on a desktop. On a phone each one takes the full width and a
+        44px height, so a thumb lands on the date, the select and the segmented control without
+        aiming. Field's `width` is its input's class slot, which is how the input gets both.
+      */}
+      <div className="flex flex-wrap items-end gap-4 border-b px-4 py-4 max-md:flex-col max-md:items-stretch md:px-6">
+        <Field
+          label="By"
+          type="date"
+          inputMode="none"
+          value={targetDate}
+          onCommit={(v) => toDate(v) && setTargetDate(v)}
+          width="w-40 max-md:h-11 max-md:w-full"
+          className="max-md:w-full"
+          max={isoOf(addMonths(new Date(), 600))}
+        />
         <label className="inline-flex flex-col gap-1.5">
           <span className="t-label">Clear</span>
           <select
             value={scopeKnown ? scope : 'all'}
             onChange={(e) => setScope(e.target.value)}
             aria-label="Which debts to clear"
-            className="rounded border bg-transparent px-2 py-1 text-sm text-label focus:border-info/30 focus:outline-none"
+            className="rounded border bg-transparent px-2 py-1 text-sm text-label focus:border-info/30 focus:outline-none max-md:h-11 max-md:w-full"
           >
             <option value="all">Everything</option>
             {debtList.map((d) => (
@@ -222,7 +239,7 @@ export function SolverPanel({ debts, debtBudget, solverInputs, solve, monthlySav
                 type="button"
                 aria-pressed={strategy === s.id}
                 onClick={() => setStrategy(s.id)}
-                className={`press rounded-full px-3 py-1 text-[12px] ${strategy === s.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'}`}
+                className={`press rounded-full px-3 py-1 text-[12px] max-md:min-h-11 max-md:flex-1 ${strategy === s.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'}`}
               >
                 {s.label}
               </button>
@@ -230,11 +247,20 @@ export function SolverPanel({ debts, debtBudget, solverInputs, solve, monthlySav
           </div>
         </div>
         {typeof api.solveExtraForGoal === 'function' && (
-          <Field label="Or save" prefix="R" value={goal} onChange={setGoal} onCommit={setGoal} placeholder="goal" width="w-28" />
+          <Field
+            label="Or save"
+            prefix="R"
+            value={goal}
+            onChange={setGoal}
+            onCommit={setGoal}
+            placeholder="goal"
+            width="w-28 max-md:h-11 max-md:w-full"
+            className="max-md:w-full"
+          />
         )}
       </div>
 
-      <div className="px-6 py-5">
+      <div className="px-4 py-5 md:px-6">
         {!debtList.length ? (
           <p className="text-sm text-label-2">
             Nothing to solve yet — type a balance and a rate under Debt, or upload an account summary, and this asks what it would take.

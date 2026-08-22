@@ -40,8 +40,8 @@ export function WinsCard({ subscriptions, className = '' }) {
 
   return (
     <div className={`grid gap-4 lg:grid-cols-2 ${className}`}>
-      <Tile className="rise p-6">
-        <div className={`flex items-center gap-2 text-[11px] font-medium tracking-[0.08em] uppercase ${headline ? 'text-warn' : 'text-label-3'}`}>
+      <Tile className="rise p-5 sm:p-6">
+        <div className={`flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] uppercase sm:text-[11px] ${headline ? 'text-warn' : 'text-label-3'}`}>
           <Sparkles size={12} />
           {since ? `New since ${since}` : 'New charges'}
         </div>
@@ -53,7 +53,7 @@ export function WinsCard({ subscriptions, className = '' }) {
               <li key={l.id ?? l.label} className={`text-[14px] ${l.headline ? 'text-label' : 'text-label-2'}`}>
                 {l.sentence ?? `${l.label}: ${l.wording ?? 'new charge'} — ${formatCurrencyAbs(l.perCycle)} a cycle`}
                 {l.trialConverted && (
-                  <span className="ml-2 rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-warn">trial converted</span>
+                  <span className="ml-2 rounded bg-fill px-1.5 py-0.5 text-[12px] text-warn sm:text-[10.5px]">trial converted</span>
                 )}
               </li>
             ))}
@@ -61,8 +61,8 @@ export function WinsCard({ subscriptions, className = '' }) {
         )}
       </Tile>
 
-      <Tile className="rise p-6">
-        <div className="flex items-center gap-2 text-[11px] font-medium tracking-[0.08em] text-good uppercase">
+      <Tile className="rise p-5 sm:p-6">
+        <div className="flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] text-good uppercase sm:text-[11px]">
           <TrendingDown size={12} />
           Wins
         </div>

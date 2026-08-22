@@ -14,6 +14,9 @@ import { formatCurrencyAbs } from '../../utils/format';
  * compared without leaving the row. Validation is the record's (§4): rates 0–40%, minimum 1–20%,
  * term 0–480 months, amounts as absolute numbers, an as-of date no later than today. A balance is
  * typed positive, as owed, and stored negative, as the record wants it.
+ *
+ * On a phone the fields run full width at 44px with 16px type (under 16px iOS zooms the page on
+ * focus), one per row; from `md` up they keep the kit's compact size in a two- or four-column grid.
  */
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
@@ -48,8 +51,11 @@ function parseNumber(raw) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+/** Make the kit's small numeric inputs phone-sized: full width, 44px, 16px type. */
+const FIELD_TAP = 'max-md:[&_input]:min-h-11 max-md:[&_input]:w-full max-md:[&_input]:text-base max-md:[&_label]:flex';
+
 function Inferred({ children }) {
-  return <span className="t-caption mt-1 block max-w-[22ch] leading-snug">{children}</span>;
+  return <span className="t-caption mt-1 block max-w-[22ch] leading-snug max-md:max-w-none">{children}</span>;
 }
 
 export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onClose }) {
@@ -120,8 +126,9 @@ export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onCl
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        {/* `flex-1` keeps the close button on the title row instead of wrapping under it on a phone. */}
+        <div className="min-w-0 flex-1">
           <h3 className="t-sub">{term.label} — terms</h3>
           <p className="t-caption mt-1">
             Typed values win and are labelled "from you". Leave a field blank to go back to the
@@ -133,20 +140,20 @@ export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onCl
             type="button"
             onClick={onClose}
             aria-label="Close the terms editor"
-            className="press rounded-full p-2 text-label-3 hover:bg-fill-2 hover:text-label"
+            className="press inline-flex items-center justify-center rounded-full p-2 text-label-3 hover:bg-fill-2 hover:text-label max-md:min-h-11 max-md:min-w-11"
           >
             <X size={15} />
           </button>
         )}
       </div>
 
-      <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 ${FIELD_TAP}`}>
         <div>
           <Field
             label="Interest rate"
             value={stored('interestRate')}
             onCommit={(raw) => commitNumber('interestRate', raw)}
-            suffix="% a year"
+            suffix={<span className="whitespace-nowrap">% a year</span>}
             placeholder={Number.isFinite(term.rateNominal) ? (term.rateNominal * 100).toFixed(2) : '—'}
           />
           <Inferred>
@@ -165,7 +172,7 @@ export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onCl
               label="Minimum payment"
               value={stored('minimumPayment')}
               onCommit={(raw) => commitNumber('minimumPayment', raw)}
-              suffix="% of balance"
+              suffix={<span className="whitespace-nowrap">% of balance</span>}
               placeholder={String(term.minimumPct ?? 5)}
             />
             <Inferred>default {term.minimumPct ?? 5}% when blank</Inferred>

@@ -7,6 +7,7 @@ import { getGroupIconConfig } from './rowIcons';
 import { TransferMatchRow } from './TransferMatchRow';
 import { groupMatches } from './groupMatches';
 import { WeekCells } from './WeekCells';
+import { PIN_PLAIN } from './stickyColumn';
 
 export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
   const [expanded, setExpanded] = useState(false);
@@ -25,8 +26,8 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
         className="cursor-pointer border-t border-deep/25 bg-deep/12/60 text-label-2 hover:bg-deep/12"
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="p-3 pl-12">
-          <span className="flex items-center gap-2 font-medium">
+        <td className={`p-3 pl-12 max-md:pl-6 ${PIN_PLAIN}`}>
+          <span className="flex flex-wrap items-center gap-2 font-medium">
             <ChevronRight size={14} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />
             <RowIcon config={pairIcon} />
             {sub.isReversal ? (

@@ -82,7 +82,7 @@ function Movement({ account }) {
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
               content={<ChartTooltip deltaFrom={first} />}
             />
             <Area
@@ -114,7 +114,7 @@ export function AccountMovementChart({ series }) {
 
   if (accounts.length === 0) {
     return (
-      <div className="glass p-6">
+      <div className="glass p-4 md:p-6">
         <h2 className="t-head">Account movement</h2>
         <div className="flex h-40 items-center justify-center text-sm text-label-2">
           No account activity in the selected range.
@@ -124,7 +124,7 @@ export function AccountMovementChart({ series }) {
   }
 
   return (
-    <div className="glass p-6">
+    <div className="glass p-4 md:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="t-head">Account movement</h2>
         <p className="t-label">

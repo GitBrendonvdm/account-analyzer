@@ -30,6 +30,12 @@ const KIND_LABEL = {
   'card-interest': 'card interest',
 };
 
+/**
+ * Below `sm` the row is sentence + amount on the first line and the chips on a line of their own
+ * underneath: a 360px screen has no room for all three abreast, and the action chip's text must be
+ * free to wrap rather than push the card wide. From `sm` up the row is the single wrapping line it
+ * always was, so the desktop layout is untouched.
+ */
 function Item({ item }) {
   const kinds = item.kinds?.length ? item.kinds : [item.kind];
   return (
@@ -38,23 +44,23 @@ function Item({ item }) {
         className={`inline-block h-2 w-2 shrink-0 rounded-full ${CONFIDENCE_CLASS[item.confidence] ?? CONFIDENCE_CLASS.low}`}
         title={`${item.confidence} confidence`}
       />
-      <span className="min-w-0 flex-grow text-[14px] text-label-2">
+      <span className="min-w-0 flex-1 text-[14px] text-label-2 sm:flex-auto">
         {item.sentence ?? `${item.label}: ${formatCurrencyAbs(item.perCycle)} a cycle`}
       </span>
-      <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+      <span className="order-last flex min-w-0 basis-full flex-wrap items-center gap-1.5 pl-5 sm:order-none sm:basis-auto sm:shrink-0 sm:pl-0">
         {kinds.map((k) => (
-          <span key={k} className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-label-3">
+          <span key={k} className="rounded bg-fill px-1.5 py-0.5 text-[12px] text-label-3 sm:text-[10.5px]">
             {KIND_LABEL[k] ?? k}
           </span>
         ))}
         {item.bucket === 'behavioural' && (
-          <span className="rounded bg-fill px-1.5 py-0.5 text-[10.5px] text-label-3">potential</span>
+          <span className="rounded bg-fill px-1.5 py-0.5 text-[12px] text-label-3 sm:text-[10.5px]">potential</span>
         )}
         {item.action && (
-          <span className="glass-chip px-2.5 py-1 text-[11.5px] text-label">{item.action}</span>
+          <span className="glass-chip px-2.5 py-1 text-[12px] text-label sm:text-[11.5px]">{item.action}</span>
         )}
       </span>
-      <span className={`num w-[92px] shrink-0 text-right text-[14px] font-semibold ${item.bucket === 'behavioural' ? 'text-label-2' : 'text-good'}`}>
+      <span className={`num ml-auto shrink-0 text-right text-[14px] font-semibold sm:ml-0 sm:w-[92px] ${item.bucket === 'behavioural' ? 'text-label-2' : 'text-good'}`}>
         {formatCurrencyAbs(item.perCycle)}
       </span>
     </li>
@@ -73,7 +79,7 @@ export function FindHero({ finder, className = '' }) {
     `${pct == null ? '' : `${pct}% of the ${formatCurrencyAbs(finder.deficit)} gap · `}${formatCurrencyAbs(finder.behaviouralPotential ?? 0)} more if the trips and drift below change`;
 
   return (
-    <Card className={`materialize p-7 sm:p-8 ${className}`}>
+    <Card className={`materialize p-5 sm:p-8 ${className}`}>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div>
           <div className="t-label">Savings finder</div>
@@ -92,7 +98,8 @@ export function FindHero({ finder, className = '' }) {
               <div className="num mt-1 text-[17px] font-semibold text-good">{formatCurrencyAbs(found)}</div>
               <div className="t-caption">{cancellable.length} item{cancellable.length === 1 ? '' : 's'} · {formatCurrencyAbs(finder.foundPerYear ?? found * 12)} a year</div>
             </div>
-            <div className="border-l pl-8">
+            {/* The dividing rule only makes sense while the two sit side by side. */}
+            <div className="sm:border-l sm:pl-8">
               <div className="t-label">Behavioural</div>
               <div className="num mt-1 text-[17px] font-semibold text-label-2">{formatCurrencyAbs(finder.behaviouralPotential ?? 0)}</div>
               <div className="t-caption">{behavioural.length} pattern{behavioural.length === 1 ? '' : 's'} · shown, never counted</div>

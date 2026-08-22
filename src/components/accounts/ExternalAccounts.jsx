@@ -38,18 +38,23 @@ function Row({ account, onDelete }) {
       <span className={`num text-sm font-semibold ${owed ? 'text-bad' : 'text-label'}`}>
         {balance == null ? '—' : `${owed || balance < 0 ? '−' : ''}${formatCurrencyAbs(balance)}`}
       </span>
+      {/* The buttons are chips at a desktop pointer and grow to a 44px finger target below `md`. */}
       {onDelete &&
         (confirming ? (
-          <span className="flex items-center gap-2 text-xs">
+          <span className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-label-2">Delete {accountLabel(account)}?</span>
             <button
               type="button"
               onClick={() => onDelete(account.id)}
-              className="press rounded-full bg-bad/15 px-3 py-1 font-medium text-bad hover:bg-bad/25"
+              className="press rounded-full bg-bad/15 px-3 py-1 font-medium text-bad hover:bg-bad/25 max-md:min-h-11 max-md:px-4"
             >
               Yes, delete
             </button>
-            <button type="button" onClick={() => setConfirming(false)} className="press rounded-full px-3 py-1 text-label-2 hover:bg-fill">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="press rounded-full px-3 py-1 text-label-2 hover:bg-fill max-md:min-h-11 max-md:px-4"
+            >
               Keep
             </button>
           </span>
@@ -58,7 +63,7 @@ function Row({ account, onDelete }) {
             type="button"
             onClick={() => setConfirming(true)}
             aria-label={`Delete ${accountLabel(account)}`}
-            className="press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-label-3 hover:bg-fill hover:text-bad"
+            className="press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-label-3 hover:bg-fill hover:text-bad max-md:min-h-11 max-md:px-4"
           >
             <Trash2 size={13} /> Delete
           </button>

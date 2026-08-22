@@ -92,6 +92,17 @@ describe('DebtView', () => {
     expect(html).toContain('Example Store Card');
   });
 
+  it('lays the liabilities out twice: a table from md up, stacked cards below it', () => {
+    const html = render(fixtureProps());
+    expect(html).toMatch(/<div class="hidden overflow-x-auto md:block"><table/);
+    expect(html).toMatch(/<ul class="md:hidden" aria-label="Your debts">/);
+    const stacked = html.split('aria-label="Your debts"')[1];
+    for (const label of ['Example Bond', 'Example Card', 'Example Store Card']) expect(stacked).toContain(label);
+    expect(stacked).toContain('Fee-adjusted');
+    // And the marginal table the same way.
+    expect(html).toMatch(/<ol class="md:hidden" aria-label="Where the rand does the most">/);
+  });
+
   it('lists the rate steps and the debt cost line', () => {
     const html = render(fixtureProps());
     expect(html).toContain('Example Bond rate moved to 9.45%');

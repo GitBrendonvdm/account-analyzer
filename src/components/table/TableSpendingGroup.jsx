@@ -7,6 +7,7 @@ import { RowIcon } from './RowIcon';
 import { getSpendingGroupIconConfig } from './rowIcons';
 import { TableSubcategory } from './TableSubcategory';
 import { WeekCells } from './WeekCells';
+import { PIN_FILL } from './stickyColumn';
 
 /**
  * The Spending Group level — the export's own taxonomy sitting between a flow and its categories.
@@ -23,7 +24,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
         className="cursor-pointer border-t bg-fill font-medium text-label-2 hover:bg-fill"
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="p-3 pl-8">
+        <td className={`p-3 pl-8 max-md:pl-5 ${PIN_FILL}`}>
           <span className="flex items-center gap-2">
             <ChevronRight size={14} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} />
             <RowIcon config={icon} size={14} />

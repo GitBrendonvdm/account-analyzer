@@ -85,7 +85,7 @@ function CardTile({ term, account, planEntry, onOpenAccounts }) {
             <button
               type="button"
               onClick={onOpenAccounts}
-              className="press mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-info hover:brightness-125"
+              className="press mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11"
             >
               Accounts
               <ArrowRight size={12} />
@@ -142,7 +142,7 @@ function CardTile({ term, account, planEntry, onOpenAccounts }) {
             type="button"
             onClick={() => setPayInFull((v) => !v)}
             aria-pressed={payInFull}
-            className={`press glass-chip mt-4 px-3.5 py-1.5 text-[12.5px] ${payInFull ? 'text-good' : 'text-label-2'}`}
+            className={`press glass-chip mt-4 px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 ${payInFull ? 'text-good' : 'text-label-2'}`}
           >
             {payInFull ? 'Paid in full each month' : 'Revolving'}
           </button>

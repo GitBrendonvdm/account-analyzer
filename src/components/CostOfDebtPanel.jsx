@@ -21,7 +21,7 @@ export function CostOfDebtPanel({ cost, fees }) {
   const worsening = (cost?.trend ?? 0) > 50;
 
   return (
-    <div className="glass p-7">
+    <div className="glass p-4 md:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h2 className="t-head">What the debt costs</h2>
@@ -45,13 +45,18 @@ export function CostOfDebtPanel({ cost, fees }) {
 
       {hasCost && (
         <>
-          <div className="mt-5 space-y-2">
+          {/* Below `md` the bar takes a line of its own under the name and figure; three columns
+              across a phone left a 60px track, which is no bar at all. */}
+          <div className="mt-5 space-y-2 max-md:space-y-3">
             {cost.accounts.map((a) => (
-              <div key={a.account} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3">
+              <div
+                key={a.account}
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,11rem)_1fr_auto]"
+              >
                 <span className="truncate text-xs text-label-2" title={a.account}>
                   {a.account}
                 </span>
-                <span className="h-2.5 overflow-hidden rounded-full bg-fill">
+                <span className="h-2.5 overflow-hidden rounded-full bg-fill max-md:order-3 max-md:col-span-2">
                   <span
                     className="block h-full rounded-full bg-bad"
                     style={{ width: `${Math.max(1, (a.total / max) * 100)}%` }}

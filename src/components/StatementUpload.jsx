@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, FileText, Loader2, ScanText, X } from 'lucide-react';
 import { accountLabel } from '../db/accountIdentity';
 import { formatCurrency } from '../utils/format';
@@ -69,7 +70,15 @@ function provenance(account) {
   return `was: set${when ? ` ${when}` : ' earlier'}`;
 }
 
-function Sheet({ title, subtitle, onClose, children }) {
+/**
+ * The preview's frame. A centred card on a desktop; on a phone a bottom sheet that rises to at
+ * most the screen's height, with the heading and the Confirm/Cancel row pinned while the account
+ * list scrolls between them — a long FNB page must not push the buttons out of reach.
+ *
+ * Rendered into the body through a portal: the upload chip lives inside the top bar's phone menu,
+ * which is display:none while closed, and a fixed overlay under a hidden ancestor is hidden too.
+ */
+function Sheet({ title, subtitle, onClose, footer, children }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
@@ -78,17 +87,24 @@ function Sheet({ title, subtitle, onClose, children }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-label={title}>
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end md:block md:overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
       <button
         type="button"
         className="fixed inset-0 cursor-default bg-ground/70"
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative mx-auto my-24 w-full max-w-2xl px-4">
-        <Card className="materialize p-6">
-          <div className="flex items-start justify-between gap-4">
+      <div className="relative w-full md:mx-auto md:my-24 md:max-w-2xl md:px-4">
+        {/* `.glass` sets the radius outside Tailwind's layers, so squaring the bottom corners on a
+            phone needs the important flag to win. */}
+        <Card className="materialize flex max-h-[calc(100dvh-2rem)] flex-col p-6 max-md:rounded-b-none! max-md:px-5 max-md:pt-5 max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] md:max-h-none">
+          <div className="flex shrink-0 items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="t-head">{title}</h2>
               {subtitle && <p className="t-label mt-1.5 max-w-prose">{subtitle}</p>}
@@ -97,15 +113,17 @@ function Sheet({ title, subtitle, onClose, children }) {
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="press shrink-0 rounded-full p-1.5 text-label-3 hover:bg-fill hover:text-label"
+              className="press -m-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-label-3 hover:bg-fill hover:text-label"
             >
               <X size={16} />
             </button>
           </div>
-          {children}
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          {footer && <div className="shrink-0">{footer}</div>}
         </Card>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -152,8 +170,8 @@ function UnmatchedRow({ entry, checked, onToggle }) {
   const kind = parsed.kind ? ` · ${parsed.kind}` : '';
   return (
     <li className="flex items-center justify-between gap-4 border-b py-2.5 last:border-0">
-      <label className="flex min-w-0 cursor-pointer items-center gap-3">
-        <input type="checkbox" className="accent-info" checked={checked} onChange={onToggle} />
+      <label className="flex min-w-0 cursor-pointer items-center gap-3 max-md:min-h-11">
+        <input type="checkbox" className="h-4 w-4 accent-info" checked={checked} onChange={onToggle} />
         <div className="min-w-0">
           <div className="truncate text-sm text-label">{parsed.name}</div>
           <div className="t-caption truncate">
@@ -178,10 +196,10 @@ function AttentionRow({ entry, bank, asOf, choice, onChange }) {
       : `looks like a ${parsed.type.toLowerCase()}, but the page did not say`;
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b py-2.5 last:border-0">
-      <label className={`flex min-w-0 items-center gap-3 ${choice.type ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+      <label className={`flex min-w-0 items-center gap-3 max-md:min-h-11 ${choice.type ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
         <input
           type="checkbox"
-          className="accent-info"
+          className="h-4 w-4 accent-info"
           checked={choice.add}
           disabled={!choice.type}
           onChange={() => onChange({ ...choice, add: !choice.add })}
@@ -198,7 +216,7 @@ function AttentionRow({ entry, bank, asOf, choice, onChange }) {
           value={choice.type}
           onChange={(e) => onChange({ type: e.target.value, add: choice.add && !!e.target.value })}
           aria-label={`Type for ${parsed.name}`}
-          className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none"
+          className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none max-md:min-h-11"
         >
           <option value="">Type…</option>
           {TYPE_CHOICES.map((t) => (
@@ -338,8 +356,10 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
 
   return (
     <>
+      {/* A chip in the desktop top bar; inside the phone's overflow menu it is a full-width row at
+          thumb height, like the Import and Export actions beside it. */}
       <label
-        className={`glass-chip press flex items-center gap-2 px-4 py-2 text-[12.5px] text-label-2 hover:text-label ${
+        className={`glass-chip press flex items-center gap-2 px-4 py-2 text-[12.5px] text-label-2 hover:text-label max-md:min-h-11 max-md:w-full max-md:text-[14px] ${
           busy ? 'cursor-wait' : 'cursor-pointer'
         }`}
         title="Upload the account overview PDF from FNB or Nedbank online banking"
@@ -356,18 +376,24 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
       </label>
 
       {phase === 'error' && (
-        <Sheet title="Account summary" subtitle="Nothing was changed." onClose={reset}>
+        <Sheet
+          title="Account summary"
+          subtitle="Nothing was changed."
+          onClose={reset}
+          footer={
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={reset}
+                className="glass-chip press px-4 py-2 text-[13px] text-label-2 hover:text-label max-md:min-h-11 max-md:w-full"
+              >
+                Close
+              </button>
+            </div>
+          }
+        >
           <p className="mt-5 text-sm text-bad">{error?.message}</p>
           {error?.detail && <p className="t-caption mt-1.5">{error.detail}</p>}
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={reset}
-              className="glass-chip press px-4 py-2 text-[13px] text-label-2 hover:text-label"
-            >
-              Close
-            </button>
-          </div>
         </Sheet>
       )}
 
@@ -378,6 +404,34 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
             result.method === 'ocr' ? 'read from an image' : 'read from the PDF text'
           }`}
           onClose={reset}
+          footer={
+            <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={reset}
+                disabled={phase === 'confirming'}
+                className="glass-chip press px-4 py-2 text-[13px] text-label-2 hover:text-label disabled:opacity-50 max-md:min-h-11 max-md:flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirm}
+                disabled={phase === 'confirming' || toUpdate + toAdd === 0}
+                className="press flex items-center justify-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50 max-md:min-h-11 max-md:flex-[2]"
+              >
+                {phase === 'confirming' ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Check size={15} />
+                )}
+                {toUpdate > 0 && `Update ${toUpdate}`}
+                {toUpdate > 0 && toAdd > 0 && ' · '}
+                {toAdd > 0 && `Add ${toAdd}`}
+                {toUpdate + toAdd === 0 && (unchangedCount > 0 ? 'All up to date' : 'Nothing to apply')}
+              </button>
+            </div>
+          }
         >
           {result.method === 'ocr' && (
             <p className="mt-4 flex items-center gap-2 rounded-full bg-warn/10 px-3 py-1.5 text-[12.5px] text-warn">
@@ -396,7 +450,7 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
               value={asOf}
               max={today}
               onChange={(e) => e.target.value && setAsOf(clampDay(e.target.value, today))}
-              className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none"
+              className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none max-md:min-h-11 max-md:flex-1"
             />
             <span className="t-caption">Use the date you saved the PDF.</span>
           </div>
@@ -470,33 +524,6 @@ export function StatementUpload({ accounts, onPatchAccount, onCreateAccount, onD
           )}
 
           {error && <p className="mt-4 text-sm text-bad">{error.message}</p>}
-
-          <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={reset}
-              disabled={phase === 'confirming'}
-              className="glass-chip press px-4 py-2 text-[13px] text-label-2 hover:text-label disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirm}
-              disabled={phase === 'confirming' || toUpdate + toAdd === 0}
-              className="press flex items-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
-            >
-              {phase === 'confirming' ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Check size={15} />
-              )}
-              {toUpdate > 0 && `Update ${toUpdate}`}
-              {toUpdate > 0 && toAdd > 0 && ' · '}
-              {toAdd > 0 && `Add ${toAdd}`}
-              {toUpdate + toAdd === 0 && (unchangedCount > 0 ? 'All up to date' : 'Nothing to apply')}
-            </button>
-          </div>
         </Sheet>
       )}
     </>

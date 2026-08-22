@@ -9,6 +9,7 @@ import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { WeekCells } from './WeekCells';
+import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function TableGroup({ group, months, sort, cycleWeeks }) {
   const [collapsed, setCollapsed] = useState(true);
@@ -23,15 +24,19 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
         }`}
         onClick={() => setCollapsed(!collapsed)}
       >
-        <td className="flex items-center gap-2 p-4">
-          <ChevronRight size={16} className={`shrink-0 ${collapsed ? '' : 'rotate-90'}`} />
-          <RowIcon config={groupIcon} size={16} />
-          {group.name}
-          {group.isTransfer && (
-            <span className="text-xs font-normal text-label-3">
-              always 0 — money moving between your own accounts
-            </span>
-          )}
+        {/* The cell stays a table cell (it is the pinned one); the flex row is the span inside. */}
+        <td className={`p-4 ${group.isException ? PIN_WARN : PIN_FILL}`}>
+          <span className="flex items-center gap-2">
+            <ChevronRight size={16} className={`shrink-0 ${collapsed ? '' : 'rotate-90'}`} />
+            <RowIcon config={groupIcon} size={16} />
+            {group.name}
+            {group.isTransfer && (
+              // The 160px pinned cell has no room for the sentence; the footnote carries it.
+              <span className="text-xs font-normal text-label-3 max-md:hidden">
+                always 0 — money moving between your own accounts
+              </span>
+            )}
+          </span>
         </td>
         {months.map((m) => (
           <td

@@ -13,6 +13,10 @@ import { CardTiles } from './debt/CardTiles';
 import { SensitivityStrip } from './debt/SensitivityStrip';
 import { MARGINAL_AMOUNT_DEFAULT, MARGINAL_HORIZON_MONTHS } from '../constants';
 
+// A card's inset. 28px either side of a 360px phone left 304px for eight columns of figures; 20px
+// gives the content the width back while the card still reads as a surface. Unchanged from `sm` up.
+const CARD = 'materialize p-5 sm:p-8';
+
 /**
  * Debt — what is owed, at what rate, and what each rand of extra is worth.
  *
@@ -197,7 +201,7 @@ export function DebtView({
       />
 
       {!debtList.length || !plansShown ? (
-        <Card className="materialize flex flex-wrap items-center gap-4 p-7 sm:p-8">
+        <Card className={`${CARD} flex flex-wrap items-center gap-4`}>
           <Landmark size={22} className="shrink-0 text-label-3" />
           <div className="min-w-0 flex-grow">
             <h2 className="t-head">No debt has a balance yet</h2>
@@ -210,7 +214,7 @@ export function DebtView({
             <button
               type="button"
               onClick={onOpenAccounts}
-              className="press glass-chip px-4 py-2 text-[13px] font-medium text-info hover:brightness-125"
+              className="press glass-chip px-4 py-2 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11"
             >
               Open Accounts
             </button>
@@ -218,7 +222,7 @@ export function DebtView({
         </Card>
       ) : (
         <>
-          <Card className="materialize p-7 sm:p-8">
+          <Card className={CARD}>
             <PlanControls
               strategies={STRATEGIES}
               strategy={strategy}
@@ -256,13 +260,13 @@ export function DebtView({
           </Card>
 
           {hasPlan && (
-            <Card className="materialize p-7 sm:p-8">
+            <Card className={CARD}>
               <BalanceChart plan={plan} debts={debtList} labelsById={labelsById} />
             </Card>
           )}
 
           {hasPlan && (
-            <Card className="materialize p-7 sm:p-8">
+            <Card className={CARD}>
               <CommittedLine
                 plan={plan}
                 timeline={timeline}
@@ -283,7 +287,7 @@ export function DebtView({
             />
           </Card>
 
-          <Card className="materialize p-7 sm:p-8">
+          <Card className={CARD}>
             <LumpWhatIf
               result={lumpResult}
               marginal={marginalShown ?? EMPTY}
@@ -306,7 +310,7 @@ export function DebtView({
             />
           )}
 
-          <Card className="materialize p-7 sm:p-8">
+          <Card className={CARD}>
             <SensitivityStrip
               rows={sensitivityShown ?? EMPTY}
               debts={debtList}

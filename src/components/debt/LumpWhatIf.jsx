@@ -19,6 +19,8 @@ const valid = (d) => d && !Number.isNaN(d.getTime());
 const fmtMonthYear = (d) => (valid(toDate(d)) ? toDate(d).toLocaleDateString('en-ZA', MONTH_YEAR) : null);
 const fmtDayMonth = (d) => (valid(toDate(d)) ? toDate(d).toLocaleDateString('en-ZA', DAY_MONTH) : null);
 const money = (v) => (Number.isFinite(v) ? formatCurrencyAbs(v) : '—');
+/** Make the kit's small numeric input phone-sized: full width, 44px, 16px type. */
+const FIELD_TAP = 'max-md:[&_input]:min-h-11 max-md:[&_input]:w-full max-md:[&_input]:text-base max-md:[&_label]:flex';
 
 function Bar({ value, max, tone }) {
   return (
@@ -84,7 +86,9 @@ export function LumpWhatIf({
         title="A lump sum"
         subtitle="Try an amount on every debt: what it saves this year, what it saves over the life, and how much sooner that debt is gone."
         right={
-          <div className="flex flex-wrap items-end gap-4">
+          // On a phone the two controls stack full width under the title: the month's option text
+          // ("23 Aug (next payday)") does not fit half a 360px row.
+          <div className={`grid gap-3 max-md:w-full md:flex md:flex-wrap md:items-end md:gap-4 ${FIELD_TAP}`}>
             <Field
               label="Amount"
               value={amount > 0 ? amount : ''}
@@ -101,7 +105,7 @@ export function LumpWhatIf({
               <select
                 value={month}
                 onChange={(e) => onMonth?.(Number(e.target.value))}
-                className="rounded border bg-transparent px-2 py-1 text-sm text-label focus:border-info/30 focus:outline-none"
+                className="rounded border bg-transparent px-2 py-1 text-sm text-label focus:border-info/30 focus:outline-none max-md:min-h-11 max-md:w-full max-md:text-base"
                 aria-label="Month the lump lands"
               >
                 {months.length === 0 && <option value={1}>next payday</option>}
@@ -142,7 +146,7 @@ export function LumpWhatIf({
                   <Bar value={r.saved12} max={max} tone="bg-info" />
                   <Bar value={r.savedLife} max={max} tone="bg-deep" />
                 </div>
-                <div className="num text-right text-[13px]">
+                <div className="num text-right text-[13px] max-sm:text-left">
                   <div className="text-label">{money(r.saved12)} <span className="text-label-3">this year</span></div>
                   <div className="text-label-2">{money(r.savedLife)} <span className="text-label-3">over its life</span></div>
                 </div>

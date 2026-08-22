@@ -167,7 +167,7 @@ function VitalTile({ spec, vital, onOpenAccounts }) {
         <button
           type="button"
           onClick={onOpenAccounts}
-          className="glass-chip press self-start px-3 py-1.5 text-[12px] font-medium text-info hover:brightness-125"
+          className="glass-chip press flex min-h-11 items-center self-start px-3 py-1.5 text-[12px] font-medium text-info hover:brightness-125 sm:min-h-0"
         >
           Add balances
         </button>
@@ -192,7 +192,9 @@ export function VitalsRow({ vitals, onOpenAccounts, className = '' }) {
 
   return (
     <div className={className}>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-6">
+      {/* One column on the narrowest phones: at 167px a tile truncates "R 28 132" and "1.2 cycles",
+          and a vital you cannot read is worse than one you scroll to. Two across from 430px. */}
+      <div className="grid gap-4 min-[430px]:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-6">
         {TILES.map((spec) => (
           <VitalTile key={spec.id} spec={spec} vital={vitals.vitals[spec.id]} onOpenAccounts={onOpenAccounts} />
         ))}

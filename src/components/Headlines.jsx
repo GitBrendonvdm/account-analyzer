@@ -1,4 +1,5 @@
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Info } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronDown, Info } from 'lucide-react';
 
 const TONE = {
   critical: { box: 'border-bad/25 bg-bad/10', text: 'text-bad', sub: 'text-bad', Icon: AlertTriangle, icon: 'text-bad' },
@@ -13,16 +14,26 @@ const TONE = {
  * Deliberately placed above the tabs: the table below is a reference you consult, this is the part
  * you read. Each line carries the arithmetic that produced it underneath, so nothing has to be
  * taken on trust.
+ *
+ * On a phone five of these fill the whole first screen before the view you tapped for has drawn a
+ * pixel, so below md only the first one shows with the rest a tap away. From md up all of them sit
+ * in their grid exactly as before.
  */
 export function Headlines({ headlines }) {
+  const [expanded, setExpanded] = useState(false);
   if (!headlines?.length) return null;
+  const more = headlines.length - 1;
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {headlines.map((h) => {
+      {headlines.map((h, i) => {
         const tone = TONE[h.tone] ?? TONE.neutral;
         const { Icon } = tone;
+        const folded = i > 0 && !expanded;
         return (
-          <div key={h.id} className={`flex gap-2.5 rounded-[22px] border p-4 ${tone.box}`}>
+          <div
+            key={h.id}
+            className={`${folded ? 'hidden md:flex' : 'flex'} gap-2.5 rounded-[22px] border p-4 ${tone.box}`}
+          >
             <Icon size={16} className={`mt-0.5 shrink-0 ${tone.icon}`} />
             <div className="min-w-0">
               <p className={`text-sm leading-snug font-medium ${tone.text}`}>{h.text}</p>
@@ -31,6 +42,17 @@ export function Headlines({ headlines }) {
           </div>
         );
       })}
+      {more > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
+          className="press glass-chip flex min-h-11 items-center justify-center gap-1.5 text-[13px] text-label-2 hover:text-label md:hidden"
+        >
+          {expanded ? 'Fewer headlines' : `${more} more headline${more === 1 ? '' : 's'}`}
+          <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      )}
     </div>
   );
 }

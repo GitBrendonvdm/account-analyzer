@@ -183,6 +183,66 @@ body {
   max-height: 30vh;
 }
 
+/**
+ * The phone tab bar. Chrome again, not a surface: content scrolls under it, so it gets the same
+ * blurred material as the sticky table head, a top hairline, and room for the home indicator.
+ */
+.tab-bar {
+  background: rgba(14, 14, 18, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid var(--color-hair-strong);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .tab-bar {
+    background: #14141a;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/**
+ * A pinned first column for tables that scroll sideways on a phone. Rows pass underneath it, so
+ * like the sticky head it needs real body behind it rather than the card's translucency.
+ */
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: rgba(20, 20, 25, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sticky-col {
+    background: #14141a;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* A bottom sheet rises from the edge it belongs to; materialise scales from the centre. */
+.sheet-rise {
+  animation: sheet-rise 420ms var(--ease-out) both;
+}
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A tapped chart should not wear a focus ring; keyboard focus still does. */
+.recharts-surface:focus:not(:focus-visible),
+svg[role='img']:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Content scrolls under floating chrome; a gradient mask replaces the 1px divider. */
 .chrome-fade {
   background: linear-gradient(to bottom, var(--color-ground) 30%, transparent);
@@ -269,7 +329,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .materialize {
+  .materialize,
+  .sheet-rise {
     animation: fade 200ms ease both;
   }
   .press:active {

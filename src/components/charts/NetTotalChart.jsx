@@ -24,6 +24,7 @@ import {
   selectionStyle,
   useReducedMotion,
   useSeriesToggle,
+  useTooltipPosition,
   useZoomDomain,
   yAxisStyle,
 } from './interactive';
@@ -62,6 +63,7 @@ export function NetTotalChart({ chartData }) {
   const zoom = useZoomDomain(points, 'label');
   const toggles = useSeriesToggle(SERIES);
   const reduced = useReducedMotion();
+  const tooltipPosition = useTooltipPosition();
 
   if (!points.length) {
     return (
@@ -141,7 +143,8 @@ export function NetTotalChart({ chartData }) {
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
+              position={tooltipPosition}
               content={<ChartTooltip deltaFrom={first} footer={todayFooter} />}
             />
             <Legend

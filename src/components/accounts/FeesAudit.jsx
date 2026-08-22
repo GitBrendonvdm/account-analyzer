@@ -65,12 +65,17 @@ function AccountBar({ row, max }) {
   const parts = KIND_ORDER.map((kind) => ({ kind, value: row.kinds?.[kind]?.perYear ?? 0 })).filter((p) => p.value > 0);
   const total = parts.reduce((s, p) => s + p.value, 0);
   if (!(total > 0)) return null;
+  // Below `md` the bar drops to its own line under the name and figure, the same shape as the
+  // cost-of-debt bars above it, because a 60px track cannot show a stacked bar's parts.
   return (
-    <div className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3">
+    <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,11rem)_1fr_auto]">
       <span className="truncate text-xs text-label-2" title={row.label}>
         {row.label}
       </span>
-      <span className="flex h-2.5 overflow-hidden rounded-full bg-fill" style={{ width: `${Math.max(2, (total / max) * 100)}%` }}>
+      <span
+        className="flex h-2.5 overflow-hidden rounded-full bg-fill max-md:order-3 max-md:col-span-2"
+        style={{ width: `${Math.max(2, (total / max) * 100)}%` }}
+      >
         {parts.map((p) => (
           <span
             key={p.kind}
@@ -119,7 +124,7 @@ export function FeesAudit({ fees, className = '' }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2 max-md:space-y-3">
           {rows.map((r) => (
             <AccountBar key={r.accountId ?? r.label} row={r} max={max} />
           ))}

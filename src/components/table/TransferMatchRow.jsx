@@ -2,11 +2,12 @@ import { formatCurrency } from '../../utils/format';
 import { RowIcon } from './RowIcon';
 import { TRANSFER_MATCH_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
+import { PIN_PLAIN } from './stickyColumn';
 
 export function TransferMatchRow({ group, months, cycleWeeks }) {
   return (
     <tr className="border-t bg-transparent text-xs text-label-2">
-      <td className="p-2 pl-16">
+      <td className={`p-2 pl-16 max-md:pl-8 ${PIN_PLAIN}`}>
         <div className="flex items-start gap-2">
           <span className="mt-0.5">
             <RowIcon config={TRANSFER_MATCH_ICON} size={12} />

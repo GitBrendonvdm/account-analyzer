@@ -30,6 +30,7 @@ import {
   useZoomDomain,
   yAxisStyle,
 } from '../charts/interactive';
+import { LEGEND_TAP, useNarrowViewport } from './narrow';
 
 /**
  * The cash committed to instalments each month, and when it comes back.
@@ -83,6 +84,11 @@ function deriveTimeline(plan, debts, cascade) {
 }
 
 const SERIES = ['committed', 'relief'];
+/** What Recharts would hand the legend, for drawing it outside the frame on a phone. */
+const LEGEND_PAYLOAD = [
+  { dataKey: 'committed', value: 'Committed to instalments', color: LABEL, type: 'line' },
+  { dataKey: 'relief', value: 'Back to you', color: GOOD, type: 'line' },
+];
 
 export function CommittedLine({ plan, timeline, debts = [], labelsById = {}, cascade = true, strategy }) {
   const tl = useMemo(
@@ -104,6 +110,8 @@ export function CommittedLine({ plan, timeline, debts = [], labelsById = {}, cas
   const zoom = useZoomDomain(data, 'payMonth');
   const toggles = useSeriesToggle(SERIES);
   const reduced = useReducedMotion();
+  // On a phone the legend moves out of the frame, below it, so the plot keeps its height.
+  const narrow = useNarrowViewport();
 
   if (!data.length) return null;
 
@@ -147,14 +155,16 @@ export function CommittedLine({ plan, timeline, debts = [], labelsById = {}, cas
             <Tooltip
               cursor={cursorStyle}
               isAnimationActive={false}
-              active={zoom.dragging ? false : undefined}
+              {...zoom.tooltipProps}
               content={<ChartTooltip />}
             />
-            <Legend
-              content={
-                <ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} swatch={{ relief: DASHED_SWATCH }} />
-              }
-            />
+            {!narrow && (
+              <Legend
+                content={
+                  <ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} swatch={{ relief: DASHED_SWATCH }} />
+                }
+              />
+            )}
             <Line
               type="stepAfter"
               dataKey="committed"
@@ -188,11 +198,21 @@ export function CommittedLine({ plan, timeline, debts = [], labelsById = {}, cas
         </ResponsiveContainer>
       </ChartFrame>
 
+      {narrow && (
+        <ChartLegend
+          payload={LEGEND_PAYLOAD}
+          toggle={toggles.toggle}
+          isHidden={toggles.isHidden}
+          swatch={{ relief: DASHED_SWATCH }}
+          className={LEGEND_TAP}
+        />
+      )}
+
       <ZoomHint
         zoomed={zoom.zoomed}
         onReset={zoom.reset}
         label={zoom.zoomed ? `${first.label} – ${last.label}` : null}
-        className="mt-3"
+        className={`mt-3 ${LEGEND_TAP}`}
       />
 
       {steps.length > 0 ? (

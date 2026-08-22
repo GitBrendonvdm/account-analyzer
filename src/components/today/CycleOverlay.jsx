@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { formatCurrency } from '../../utils/format';
+import { READOUT_CLASS, readoutStyle, useSpanDrag } from './useSpanDrag';
 
 /**
  * Several pay cycles overlaid on one set of axes, with drag-to-zoom.
@@ -22,7 +23,8 @@ import { formatCurrency } from '../../utils/format';
  * because rescaling y is what turns a stretch that looked flat into something with shape in it.
  * The selection tracks the pointer 1:1 and is drawn from the moment the button goes down rather
  * than on release, so the gesture is visible while it happens instead of resolving afterwards.
- * Double-click, Escape or the reset chip puts it back.
+ * Double-click, Escape or the reset chip puts it back. On a phone the same drag zooms and a
+ * vertical swipe still scrolls the page — see `useSpanDrag` for how the two are told apart.
  *
  * LEGEND TOGGLES. Clicking a cycle in the legend takes its line off the plot, and the y-range is
  * recomputed from what is left, so hiding the outlier cycle is how you zoom the others into
@@ -33,8 +35,6 @@ import { formatCurrency } from '../../utils/format';
 const W = 1000;
 const H = 210;
 const PAD = 14;
-/** Below this the drag was a click, not a selection. */
-const MIN_SPAN_DAYS = 2;
 
 /** Vibrancy by how far back the cycle is — index 0 is the current one. */
 const DEPTH_OPACITY = [1, 0.66, 0.44, 0.32];
@@ -61,69 +61,12 @@ export function CycleOverlay({
   hidden,
 }) {
   const svgRef = useRef(null);
-  const [range, setRange] = useState(null); // {from,to} in days; null = the whole cycle
-  const [drag, setDrag] = useState(null); // {from,to} while the pointer is down
-  const [hover, setHover] = useState(null); // day index under the pointer
+  const { drag, hover, from, to, zoomed, reset, svgProps, frameProps } = useSpanDrag({ svgRef, length });
 
   const shown = useMemo(
     () => (hidden?.size ? series?.filter((s) => !hidden.has(s.id)) : series),
     [series, hidden],
   );
-
-  const from = range?.from ?? 0;
-  const to = range?.to ?? length - 1;
-  const zoomed = range != null;
-
-  /** Where the pointer is, in days. Linear, because the viewBox does not preserve aspect ratio. */
-  const dayAt = useCallback(
-    (clientX) => {
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return from;
-      const t = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      return Math.round(from + t * (to - from));
-    },
-    [from, to],
-  );
-
-  const onPointerDown = useCallback(
-    (e) => {
-      if (e.button != null && e.button !== 0) return;
-      // Capture, so the drag survives the pointer leaving the chart's bounds.
-      e.currentTarget.setPointerCapture(e.pointerId);
-      const day = dayAt(e.clientX);
-      setDrag({ from: day, to: day });
-    },
-    [dayAt],
-  );
-
-  const onPointerMove = useCallback(
-    (e) => {
-      const day = dayAt(e.clientX);
-      setHover(day);
-      setDrag((d) => (d ? { ...d, to: day } : d));
-    },
-    [dayAt],
-  );
-
-  // Both handlers: pointerleave does not bubble, so React delegates it through pointerout, and a
-  // pointer lifted outside the plot can otherwise leave the crosshair stranded.
-  const onPointerLeave = useCallback(() => setHover(null), []);
-
-  const onPointerUp = useCallback(() => {
-    setDrag((d) => {
-      if (!d) return null;
-      const lo = Math.min(d.from, d.to);
-      const hi = Math.max(d.from, d.to);
-      // A tap is not a selection — leave the view alone rather than zooming to a sliver.
-      if (hi - lo >= MIN_SPAN_DAYS) setRange({ from: lo, to: hi });
-      return null;
-    });
-  }, []);
-
-  const reset = useCallback(() => {
-    setRange(null);
-    setDrag(null);
-  }, []);
 
   const geometry = useMemo(() => {
     if (!series?.length || !length) return null;
@@ -227,29 +170,14 @@ export function CycleOverlay({
       : null;
 
   return (
-    <div
-      className="flex min-h-0 flex-grow flex-col"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') reset();
-      }}
-    >
+    <div className="flex min-h-0 flex-grow flex-col" {...frameProps}>
       <div className="relative flex min-h-0 flex-grow flex-col">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
-          className="chart-frame block w-full touch-none select-none"
           height="100%"
-          style={{ cursor: drag ? 'ew-resize' : 'crosshair' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onPointerLeave={onPointerLeave}
-          onPointerOut={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) onPointerLeave();
-          }}
-          onDoubleClick={reset}
+          {...svgProps}
           role="img"
           aria-label={shown.map((s) => `${s.label}: ${formatCurrency(s.total)}`).join('. ')}
         >
@@ -366,18 +294,10 @@ export function CycleOverlay({
         )}
 
         {readout && readout.rows.length > 0 && (
-          <div
-            className="glass pointer-events-none absolute top-2 z-10 min-w-[300px] rounded-[16px] p-3"
-            style={{
-              // Flip to the other side of the crosshair near the right edge, so the card never
-              // hangs off the chart and covers what you are pointing at.
-              left: `${(readout.x / W) * 100}%`,
-              transform: readout.x / W > 0.62 ? 'translateX(calc(-100% - 14px))' : 'translateX(14px)',
-            }}
-          >
+          <div className={`${READOUT_CLASS} sm:min-w-[300px]`} style={readoutStyle(readout.x / W)}>
             <div className="mb-2 flex items-baseline justify-between gap-3">
               <span className="text-[12px] font-medium text-label">{dayLabel(readout.day)}</span>
-              <span className="text-[11px] text-label-3">{readout.baselineLabel}</span>
+              <span className="text-[12px] text-label-3">{readout.baselineLabel}</span>
             </div>
             <div className="flex flex-col gap-1.5">
               {readout.rows.map((r) => (
@@ -416,7 +336,7 @@ export function CycleOverlay({
           <button
             type="button"
             onClick={reset}
-            className="glass-chip press flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-label-2 hover:text-label"
+            className="glass-chip press flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-[12px] text-label-2 hover:text-label sm:min-h-0"
           >
             <X size={12} />
             {dayLabel(from)} – {dayLabel(to)} · reset
@@ -438,8 +358,10 @@ export function CycleOverlay({
  * so the way back is where the way in was.
  */
 export function CycleLegend({ series, tone, hidden, onToggle }) {
+  // Entries are 44px tall on a phone (hit target) and each takes its own row there, so the row
+  // gap goes to zero; from `sm` they sit inline at their natural height.
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-0 sm:gap-y-2">
       {series.map((s) => {
         const off = hidden?.has(s.id) ?? false;
         const body = (
@@ -472,7 +394,7 @@ export function CycleLegend({ series, tone, hidden, onToggle }) {
             type="button"
             aria-pressed={!off}
             onClick={() => onToggle(s.id)}
-            className="press flex items-center gap-2 rounded-full px-1.5 py-0.5 text-[12.5px] hover:bg-fill"
+            className="press flex min-h-11 items-center gap-2 rounded-full px-1.5 py-0.5 text-[12.5px] hover:bg-fill sm:min-h-0"
             style={{ opacity: off ? 0.35 : 1 }}
           >
             {body}

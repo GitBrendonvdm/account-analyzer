@@ -66,10 +66,11 @@ export function ImportSummary({ summary, onDismiss }) {
             )}
           </div>
         </div>
+        {/* A 44px hit area around a 16px glyph; the negative margin keeps the glyph where it was. */}
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 rounded p-1 text-good hover:bg-good/15"
+          className="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-good hover:bg-good/15"
           aria-label="Dismiss import summary"
         >
           <X size={16} />

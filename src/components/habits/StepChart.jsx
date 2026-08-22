@@ -13,6 +13,10 @@ import { formatCurrencyAbs } from '../../utils/format';
  * Takes either a RecurringLine's `regimes` (cycle-keyed runs at one amount) or a price-creep item
  * (`first`, `last`, `steps`); both become the same cycle-by-cycle series. Hovering reads the cycle
  * and the amount, which is how "when did it go up" gets answered without a table.
+ *
+ * On a phone the chart spans the row rather than sitting in a 160px cell, and a finger dragging
+ * across it reads the same readout. It allows vertical panning (`touch-pan-y`) so that a swipe
+ * that starts on a full-width chart still scrolls the page; only a horizontal drag is the chart's.
  */
 
 const W = 320;
@@ -89,6 +93,8 @@ export function StepChart({ regimes, first, last, steps, className = '' }) {
     [points.length],
   );
   const onPointerLeave = useCallback(() => setHover(null), []);
+  // A tap reads too; a drag the browser takes over for scrolling must not leave a readout behind.
+  const onPointerCancel = useCallback(() => setHover(null), []);
 
   if (!points.length) return null;
 
@@ -114,16 +120,18 @@ export function StepChart({ regimes, first, last, steps, className = '' }) {
   const current = hover != null ? points[hover] : null;
 
   return (
-    <span className={`relative inline-block ${className}`} style={{ width: 160, height: H }}>
+    <span className={`relative inline-block h-10 w-full sm:w-40 ${className}`}>
       <svg
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="block h-full w-full touch-none"
+        className="block h-full w-full touch-pan-y"
         role="img"
         aria-label={summary}
+        onPointerDown={onPointerMove}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
+        onPointerCancel={onPointerCancel}
       >
         <path d={d} fill="none" stroke="var(--color-label-2)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
         {stepIndexes.map((i) => (

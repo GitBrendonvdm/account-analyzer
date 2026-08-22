@@ -2,11 +2,13 @@ import { formatCurrency } from '../../utils/format';
 import { RowIcon } from './RowIcon';
 import { VARIANT_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
+import { PIN_PLAIN } from './stickyColumn';
 
 export function VariantTransactionRow({ variant, months, cycleWeeks }) {
   return (
-    <tr className="border-t bg-transparent text-[11px] text-label-2">
-      <td className="p-1.5 pl-28">
+    // 11px is the floor for a data row on a desktop; on a phone held at arm's length it is not.
+    <tr className="border-t bg-transparent text-[11px] text-label-2 max-md:text-xs">
+      <td className={`p-1.5 pl-28 max-md:pl-10 ${PIN_PLAIN}`}>
         <span className="flex items-center gap-1.5">
           <RowIcon config={VARIANT_ICON} size={11} />
           {variant.description}

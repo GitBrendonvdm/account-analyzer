@@ -16,7 +16,7 @@
  */
 
 const INPUT_CLASS =
-  'rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none';
+  'rounded border px-2 py-1 text-right text-sm tabular-nums focus:border-info/30 focus:outline-none max-md:min-h-11 max-md:w-full max-md:min-w-0 max-md:text-base';
 
 export function Field({
   label,
@@ -61,10 +61,10 @@ export function Field({
   return (
     <label className={`inline-flex flex-col gap-1.5 ${className}`}>
       {label && <span className="t-label">{label}</span>}
-      <span className="flex items-center gap-1.5">
-        {prefix && <span className="text-xs text-label-3">{prefix}</span>}
+      <span className="flex items-center gap-1.5 max-md:w-full">
+        {prefix && <span className="text-xs whitespace-nowrap text-label-3">{prefix}</span>}
         {input}
-        {suffix && <span className="text-xs text-label-3">{suffix}</span>}
+        {suffix && <span className="text-xs whitespace-nowrap text-label-3">{suffix}</span>}
       </span>
     </label>
   );

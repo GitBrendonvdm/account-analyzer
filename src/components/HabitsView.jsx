@@ -41,13 +41,14 @@ function MerchantList({ merchants, months }) {
       {merchants.map((m, i) => (
         <li
           key={m.key}
-          className="grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t px-6 py-3.5 transition-colors hover:bg-fill sm:grid-cols-[26px_minmax(0,14rem)_minmax(0,1fr)_auto]"
+          className="grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t px-4 py-3.5 transition-colors hover:bg-fill sm:grid-cols-[26px_minmax(0,14rem)_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-6"
         >
           <span className="num text-[13px] text-label-4">{i + 1}</span>
 
           <div className="min-w-0">
             <div className="truncate text-[15px] font-medium">{m.label}</div>
-            <div className="t-caption truncate">
+            {/* Narrow screens let the cadence wrap: a truncated "Groceries · 103× · 23/2…" loses the point. */}
+            <div className="t-caption sm:truncate">
               {m.category} · {m.count}× · {m.cyclesPresent}/{months.length} cycles
             </div>
           </div>
@@ -128,12 +129,13 @@ export function HabitsView({
 
       {habits && (
         <Card className="materialize overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
             <CardHead
               title="Where the money goes"
               subtitle="By merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so one shop reads as one line."
             />
-            <div className="glass-chip flex shrink-0 gap-1 p-1">
+            {/* Below `sm` the sort control spans the card and its two halves are 44px tall. */}
+            <div className="glass-chip flex w-full shrink-0 gap-1 p-1 sm:w-auto">
               {[
                 { id: 'spend', label: 'By amount' },
                 { id: 'count', label: 'By frequency' },
@@ -143,7 +145,7 @@ export function HabitsView({
                   type="button"
                   onClick={() => setSortBy(opt.id)}
                   aria-pressed={sortBy === opt.id}
-                  className={`press rounded-full px-3.5 py-1.5 text-[12.5px] ${
+                  className={`press min-h-11 flex-1 rounded-full px-3.5 py-1.5 text-[12.5px] sm:min-h-0 sm:flex-none ${
                     sortBy === opt.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
                   }`}
                 >
@@ -158,30 +160,38 @@ export function HabitsView({
 
       {habits && weekday.length > 0 && (
         <Card className="materialize overflow-hidden">
-          <div className="border-b px-6 py-5">
+          <div className="border-b px-4 py-5 sm:px-6">
             <CardHead
               title="When you spend"
               subtitle={`${habits.busiest.day} is the heaviest day of the week, ${habits.quietest.day} the lightest.`}
             />
           </div>
-          <div className="p-6">
-            <div className="flex h-44 items-end gap-3">
+          <div className="p-4 sm:p-6">
+            {/*
+              Each column is the full height of the strip and the bar is absolutely positioned at
+              its foot: a percentage height on a block inside an auto-height flex column resolves
+              to nothing, which is how the bars went missing. The strip is 7 × (gap + column) wide
+              at 360px — the gap is the narrow one there so the label "Wed" never wraps.
+            */}
+            <div className="flex h-44 items-stretch gap-2 sm:gap-3">
               {weekday.map((w) => (
-                <div key={w.day} className="flex flex-1 flex-col items-center gap-2">
-                  <span className="num text-[11px] text-label-3">
+                <div key={w.day} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                  <span className="num text-[12px] text-label-3 sm:text-[11px]">
                     {Math.round(w.perCycle / 1000)}k
                   </span>
-                  <div
-                    className="w-full rounded-t-md"
-                    style={{
-                      height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%`,
-                      background:
-                        w.day === habits.busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
-                      transition: 'height 700ms var(--ease-out)',
-                    }}
-                    title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
-                  />
-                  <span className="text-[11px] font-medium text-label-2">{w.day}</span>
+                  <div className="relative w-full flex-1">
+                    <div
+                      className="absolute inset-x-0 bottom-0 rounded-t-md"
+                      style={{
+                        height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%`,
+                        background:
+                          w.day === habits.busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
+                        transition: 'height 700ms var(--ease-out)',
+                      }}
+                      title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
+                    />
+                  </div>
+                  <span className="text-[12px] font-medium text-label-2 sm:text-[11px]">{w.day}</span>
                 </div>
               ))}
             </div>
