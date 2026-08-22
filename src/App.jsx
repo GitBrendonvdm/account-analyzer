@@ -28,6 +28,7 @@ import { EmptyState } from './components/EmptyState';
 import { LedgerView } from './components/LedgerView';
 import { Login } from './components/Login';
 import { MigrateBanner } from './components/MigrateBanner';
+import { StatementUpload } from './components/StatementUpload';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -35,10 +36,14 @@ import { usePlanState } from './hooks/usePlanState';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('today');
+  // The last account-summary upload, shown as one line until dismissed — the import banner's
+  // shape is about rows, and this one is about balances.
+  const [statementDone, setStatementDone] = useState(null);
   const {
     ready,
     data,
     accounts,
+    createAccount,
     selectedIds,
     selectedAccounts,
     monthRange,
@@ -204,8 +209,30 @@ export default function App() {
           staleLevel={summary?.staleLevel}
           exportUrl={exportUrl}
           onSignOut={signOut}
+          extraControls={
+            <StatementUpload
+              accounts={accounts}
+              onPatchAccount={updateAccount}
+              onCreateAccount={createAccount}
+              onDone={setStatementDone}
+            />
+          }
         />
         <div className="flex min-h-[calc(100vh-9.5rem)] flex-col gap-5 pt-2">
+          {statementDone && (
+            <div className="glass-tile flex flex-wrap items-center justify-between gap-4 px-5 py-3 text-[13px]">
+              <span className="text-label-2">
+                <b className="font-semibold text-label">{statementDone.bank ?? 'Account'} summary</b>
+                {statementDone.asOf ? ` as of ${statementDone.asOf}` : ''}
+                {` — ${statementDone.updated} balance${statementDone.updated === 1 ? '' : 's'} updated`}
+                {statementDone.created > 0 && `, ${statementDone.created} account${statementDone.created === 1 ? '' : 's'} added`}
+                {statementDone.method === 'ocr' && ' (read by OCR — worth a glance under Accounts)'}
+              </span>
+              <button type="button" onClick={() => setStatementDone(null)} className="press text-label-3 hover:text-label">
+                Dismiss
+              </button>
+            </div>
+          )}
           {localDump && (
             <MigrateBanner
               dump={localDump}

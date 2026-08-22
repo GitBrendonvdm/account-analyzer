@@ -39,3 +39,6 @@ test-data/master.csv
 
 # Local PGlite database written by `npm run server` when DATABASE_URL is unset
 data/
+
+# OCR + pdf.js runtime assets, copied from node_modules by scripts/copy-ocr-assets.mjs
+public/ocr/

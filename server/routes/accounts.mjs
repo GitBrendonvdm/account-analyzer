@@ -36,6 +36,10 @@ const PATCHABLE = {
   termMonths: integer,
   balloon: number,
   feesMonthly: number,
+  // Where the balance came from, so the UI can say "from your FNB summary, 22 Aug" rather than
+  // implying the user typed it.
+  source: (v) => v === null || ['csv', 'statement', 'manual'].includes(v),
+  statementName: text,
 };
 
 const SOURCES = new Set(['statement', 'manual']);
