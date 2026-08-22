@@ -3,14 +3,17 @@ import {
   CASH_EXTEND_DAYS,
   CASH_HISTORY_CYCLES,
   CASH_SMOOTH_DAYS,
+  INCOME_BAND_TOLERANCE,
   LATE_SALARY_MIN_RISK,
 } from '../constants';
 import { parseTransactionDate } from '../utils/date';
 import { accountIdOf } from './accounts';
 import { cycleDay } from './cycleCurve';
-import { completeMonths, spendRows } from './flows';
+import { isSalaryLikeIncome } from './effectivePayMonth';
+import { completeMonths } from './flows';
 import { accountRows, balanceAt } from './ledger';
-import { quantile } from './stats';
+// Written by scripts/backtest-cash.mjs: how this path has scored on past cycles (aggregates only).
+import backtest from './cashBacktest.json';
 
 /**
  * Cash, day by day, until the next salary — and the week after it.
@@ -18,14 +21,36 @@ import { quantile } from './stats';
  * The question is "will I make it to the 23rd", and the old answer (a net figure for the cycle)
  * could not say WHEN the money runs out, which is the only thing that decides whether a debit
  * order bounces. So this walks every liquid account one calendar day at a time from the last day
- * the data covers to a week past payday, adding what is known and subtracting what is usual:
+ * the data covers to a week past payday, adding what is known and what is usual:
  *
  *   scheduled       the bills calendar's items on that day, on that account (upcoming.js) —
  *                   only the ones the engine is confident about, never one that already landed
- *   income          income sources expected on that day (incomeProfile.js)
- *   discretionary   the account's own pace of unexplained spend for that day of the cycle, shaped
- *                   by the weekday — learned from the last six complete cycles of spend rows that
- *                   no recurring line claims, so a bill is never counted twice
+ *   income          income sources the profile places (incomeProfile.js): a salary on the day of
+ *                   the cycle it usually lands, anything else on its predicted next date — plus
+ *                   the residual inflow below
+ *   residual        everything else that usually moves the account at this point in the cycle,
+ *                   money in and money out, learned from the last six complete cycles
+ *
+ * The residual is the part that earned its place the hard way. The first version projected only
+ * "unexplained spend" — spend rows no recurring line claimed — and scripts/backtest-cash.mjs showed
+ * that this household barely spends from its bank accounts at all: the thing that moves the liquid
+ * total after payday is the card repayments, tens of thousands of rand a cycle, which the recurring
+ * engine sees (one line per card) but can never schedule, because they are paid ad hoc on no
+ * cadence and so sit at `low` confidence with no date to step. Refunds, interest, the small
+ * regular credits with no monthly date, and the low-confidence lines were all missing for the same
+ * reason. So the residual now takes EVERY row on the account in the history cycles and removes only
+ * what the walk already accounts for — rows of a counted line the calendar can step forward, credits
+ * matching an income source the profile places, and the legs of a transfer whose other side is
+ * another liquid account (a savings sweep nets to nothing on the total) — so nothing is counted
+ * twice and nothing that is systematically there is dropped.
+ *
+ * How the residual is read matters as much as what goes into it. A card repayment falls on a
+ * different day each cycle, so per-day statistics across six cycles are mostly zeros: a median
+ * loses the money and a mean is hostage to one settlement (one cycle here moved R180 000 in and out
+ * on three adjacent days). The curve is therefore the recency-weighted MEDIAN of the CUMULATIVE
+ * residual path by day of cycle, differenced day to day: dense, so the mass and the timing of the
+ * usual repayments survive, and robust, so an abnormal cycle is one vote rather than the level.
+ * Outflows are then shaped by the weekday and the rate is smoothed over three days.
  *
  * The path starts from the ledger's balance at `dataThrough`, anchored at the record's own as-of
  * date, so a balance typed on the 10th is not silently re-based to the 20th. Days between the data
@@ -36,9 +61,15 @@ import { quantile } from './stats';
  * here, it arrives through the repayment line on the paying account. A card's own path is what
  * tells you the day it reaches its limit.
  *
- * Everything about the discretionary pace is an estimate, and the module says so: until
- * scripts/backtest-cash.mjs passes its gate on past cycles the output carries `estimate:true` and
- * the Today card labels the chart an estimate.
+ * Everything about the residual is an estimate, and the module says so: until the backtest passes
+ * its gate on past cycles the output carries `estimate:true` and the Today card labels the chart an
+ * estimate. At the time of writing it does not pass: the trough's DAY is decided, in five of the
+ * twelve scored cycles, by items under R1 000 landing in an otherwise flat tail — an oracle that
+ * knew every future row of R1 000 or more would still miss the 3-day gate at cycle day 7 — so the
+ * day-of-trough error is a floor the data sets, not one the model can lower without fitting noise.
+ * What the model does get right is the money: the sign of the dip (does the cycle fall more than
+ * R10 000 below its opening) at 83% and 100% of cycles at days 7 and 14, where the spend-only
+ * version managed 75% and 92%.
  */
 
 /** Flipped by scripts/backtest-cash.mjs passing its gate (minimum-day MAE ≤ 3, sign accuracy ≥ 75%). */
@@ -72,11 +103,23 @@ function iso(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// ---- the discretionary pace ---------------------------------------------------------------------
+// ---- the residual flow ---------------------------------------------------------------------------
 
 /**
- * Spend by day of cycle over the history cycles, one vector per cycle (newest last), plus the
- * weekday shape of the same rows. Rows are the account's spend that no recurring line explains.
+ * The rows that moved the account in the history cycles and that nothing else in the walk will
+ * put back: every row on the account except the ones the bills calendar will schedule (rows of a
+ * counted line with a cadence the calendar can step), the ones the income profile will place, and
+ * the legs of a transfer whose other side is another liquid account (a savings sweep moves money
+ * between two lines of the same chart and nets to nothing on the total).
+ */
+function residualRows(rows, { historyCycles, modelled, internalLegs }) {
+  const cycles = new Set(historyCycles);
+  return rows.filter((t) => cycles.has(t['Pay Month']) && !modelled.has(t) && !internalLegs.has(t.id));
+}
+
+/**
+ * Net residual by day of cycle over the history cycles, one vector per cycle (newest last) —
+ * money in positive, money out negative — plus the weekday shape of the outflows alone.
  */
 function paceHistory(rows, historyCycles, calendar) {
   const index = new Map(historyCycles.map((m, i) => [m, i]));
@@ -96,8 +139,8 @@ function paceHistory(rows, historyCycles, calendar) {
     if (i == null || !d) return;
     const m = historyCycles[i];
     const k = cycleDay(d, calendar.starts[m], calendar.lengths[m] ?? 30);
-    perCycle[i].byDay[k] += Math.abs(t.AmountNum);
-    weekdayMass[d.getDay()] += Math.abs(t.AmountNum);
+    perCycle[i].byDay[k] += t.AmountNum;
+    if (t.AmountNum < 0) weekdayMass[d.getDay()] += -t.AmountNum;
   });
   const perDay = weekdayMass.map((mass, dow) => (weekdayDays[dow] ? mass / weekdayDays[dow] : 0));
   const overall = sum(perDay) / 7;
@@ -107,25 +150,45 @@ function paceHistory(rows, historyCycles, calendar) {
 }
 
 /**
- * Spend on cycle day k: the recency-weighted mean over the cycles long enough to have a day k
- * (`q` null), or the q-quantile for the bands. Smoothed over a centred CASH_SMOOTH_DAYS window so
- * one big Tuesday does not become a spike the path expects every cycle.
+ * Weighted lower quantile: the smallest value at which the running weight reaches `q` of the
+ * total. With six cycles and recency weights the median leans to the recent ones.
  */
-function paceFunction(perCycle, q = null) {
+function weightedQuantile(pairs, q) {
+  const sorted = [...pairs].sort((a, b) => a.value - b.value);
+  const total = sum(sorted.map((p) => p.weight));
+  let running = 0;
+  for (const p of sorted) {
+    running += p.weight;
+    if (running >= q * total) return p.value;
+  }
+  return sorted.length ? sorted[sorted.length - 1].value : 0;
+}
+
+/**
+ * Net residual on cycle day k, read off the CUMULATIVE residual path rather than the day's own
+ * rows. A card repayment falls on a different day each cycle, so the quantile of any one day's
+ * value across cycles is mostly zero and the mean is hostage to one settlement; the cumulative
+ * path is dense and its recency-weighted quantile across cycles keeps both the mass and the
+ * timing of what usually happens while one abnormal cycle can only ever be one vote. Day k's
+ * rate is the quantile path's step from k−1 to k over the cycles long enough to have a day k,
+ * smoothed over a centred CASH_SMOOTH_DAYS window so a repayment that fell on a Tuesday once is
+ * spread, not spiked. `q` is 0.5 for the central path, 0.25 and 0.75 for the bands.
+ */
+function paceFunction(perCycle, q = 0.5) {
+  const cumulative = perCycle.map((c) => {
+    const out = new Array(MAX_CYCLE_DAYS + 2).fill(0);
+    for (let k = 1; k <= MAX_CYCLE_DAYS + 1; k += 1) out[k] = out[k - 1] + c.byDay[k];
+    return out;
+  });
   const at = (k) => {
     if (k < 1 || k > MAX_CYCLE_DAYS + 1) return null;
-    const cycles = perCycle.filter((c) => k <= c.length);
-    if (!cycles.length) return null;
-    const values = cycles.map((c) => c.byDay[k]);
-    if (q != null) return quantile(values, q);
-    let weighted = 0;
-    let total = 0;
-    [...cycles].reverse().forEach((c, i) => {
-      const w = AVG_RECENCY_DECAY ** i;
-      weighted += c.byDay[k] * w;
-      total += w;
+    const pairs = [];
+    [...perCycle].reverse().forEach((c, i) => {
+      if (k <= c.length) pairs.push({ weight: AVG_RECENCY_DECAY ** i, index: perCycle.length - 1 - i });
     });
-    return total ? weighted / total : 0;
+    if (!pairs.length) return null;
+    const level = (day) => weightedQuantile(pairs.map((p) => ({ value: cumulative[p.index][day], weight: p.weight })), q);
+    return level(k) - level(k - 1);
   };
   const half = Math.floor(CASH_SMOOTH_DAYS / 2);
   return (k) => {
@@ -160,12 +223,20 @@ function walk({ start, days, scheduled, income, pace, floor, buffer }) {
     const counted = items.filter((it) => COUNTED.has(it.level));
     const inc = income(day);
     const rate = pace(day);
-    const dow = day.date.getDay();
-    const disc = rate.mean * rate.weekday[dow];
-    balance += inc - sum(counted.map((it) => it.amount)) - disc;
-    low += inc - sum(items.map((it) => it.amount)) - rate.low * rate.weekday[dow];
-    high += inc - sum(items.filter((it) => it.level === 'high').map((it) => it.amount)) - rate.high * rate.weekday[dow];
-    out.push({ ...day, scheduled: counted, income: inc, discretionary: -disc, balance, low, high });
+    const shaped = (net) => (net < 0 ? net * rate.weekday[day.date.getDay()] : net);
+    const net = shaped(rate.mean);
+    balance += inc - sum(counted.map((it) => it.amount)) + net;
+    low += inc - sum(items.map((it) => it.amount)) + shaped(rate.low);
+    high += inc - sum(items.filter((it) => it.level === 'high').map((it) => it.amount)) + shaped(rate.high);
+    out.push({
+      ...day,
+      scheduled: counted,
+      income: inc + Math.max(0, net),
+      discretionary: Math.min(0, net),
+      balance,
+      low,
+      high,
+    });
   });
   return { days: out, ...pathStats(out, floor, buffer) };
 }
@@ -192,7 +263,6 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
     calendar,
     transfers,
     lines = [],
-    explained = null,
     upcoming = null,
     incomeProfile = null,
     buffer = 0,
@@ -225,13 +295,61 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
   }
 
   const historyCycles = completeMonths(calendar).slice(-CASH_HISTORY_CYCLES);
-  const explainedSet = explained ?? new Set();
-  const spend = spendRows(data, { transfers, accounts, months: historyCycles }).filter((t) => !explainedSet.has(t));
-  const spendById = new Map();
-  spend.forEach((t) => {
-    const id = accountIdOf(t.Account);
-    if (!spendById.has(id)) spendById.set(id, []);
-    spendById.get(id).push(t);
+
+  // Liquid accounts: Bank or Savings by the record's type, not hidden, with rows or external.
+  const liquid = accounts.filter((a) => LIQUID.has(typeOfRecord(a)) && !a.hidden);
+  const liquidIds = new Set(liquid.map((a) => a.id));
+
+  // Income the profile will place: a salary on its usual day of the cycle (a calendar-month step
+  // from its last date can land a salary inside the current cycle on a day it has never come),
+  // anything else on its predicted next date; the late-salary rerun shifts every salary source.
+  const placed = (incomeProfile?.sources ?? []).filter((s) => s.presence >= INCOME_PRESENCE && s.expectedAmount > 0);
+  const incomeByAccount = new Map();
+  placed.forEach((s) => {
+    const k = s.kind === 'salary' && s.timing?.typicalCycleDay != null ? Math.round(s.timing.typicalCycleDay) : null;
+    // A salary that lands late in its own cycle is due this cycle if that day is still ahead.
+    const lateInCurrent = k != null && k > cycleLength / 2 ? addDays(currentStart, k - 1) : null;
+    let date = k == null ? (s.expectedNext ? toDay(s.expectedNext) : null) : lateInCurrent && lateInCurrent > dataThrough ? lateInCurrent : addDays(nextPayDate, k - 1);
+    if (!date) return;
+    if (s.kind === 'salary' && salaryShiftDays) date = addDays(date, salaryShiftDays);
+    if (!incomeByAccount.has(s.accountId)) incomeByAccount.set(s.accountId, new Map());
+    const byDay = incomeByAccount.get(s.accountId);
+    byDay.set(dayKey(date), (byDay.get(dayKey(date)) ?? 0) + s.expectedAmount);
+  });
+  const incomeFor = (id) => {
+    const byDay = incomeByAccount.get(id);
+    return (day) => byDay?.get(dayKey(day.date)) ?? 0;
+  };
+
+  // What the walk already accounts for, so the residual never counts it twice: rows of a counted
+  // line the calendar can step forward, and credits that belong to an income source placed above.
+  const modelled = new Set();
+  (lines ?? []).forEach((line) => {
+    if (COUNTED.has(line.level) && line.perYear) (line.items ?? []).forEach((row) => modelled.add(row));
+  });
+  const placedByAccount = new Map();
+  placed.forEach((s) => {
+    if (!placedByAccount.has(s.accountId)) placedByAccount.set(s.accountId, []);
+    placedByAccount.get(s.accountId).push(s);
+  });
+  const matchesPlaced = (t) => {
+    if (!(t.AmountNum > 0)) return false;
+    const sources = placedByAccount.get(accountIdOf(t.Account));
+    if (!sources) return false;
+    return sources.some(
+      (s) =>
+        (s.kind === 'salary' && isSalaryLikeIncome(t)) ||
+        Math.abs(t.AmountNum - s.expectedAmount) <= INCOME_BAND_TOLERANCE * s.expectedAmount,
+    );
+  };
+  data.forEach((t) => {
+    if (matchesPlaced(t)) modelled.add(t);
+  });
+  const internalLegs = new Set();
+  (transfers?.pairs ?? []).forEach((pair) => {
+    if (liquidIds.has(accountIdOf(pair.fromAccount)) && liquidIds.has(accountIdOf(pair.toAccount))) {
+      pair.items.forEach((t) => internalLegs.add(t.id));
+    }
   });
 
   // Scheduled items by paying account and day, from the bills calendar. Landed items are out: the
@@ -253,43 +371,23 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
     return (day) => byDay?.get(dayKey(day.date)) ?? [];
   };
 
-  // Income by account and day. A salary source with no predicted date but a known cycle day is
-  // placed on that day of the next cycle; the late-salary rerun shifts every salary source.
-  const incomeByAccount = new Map();
-  (incomeProfile?.sources ?? []).forEach((s) => {
-    if (s.presence < INCOME_PRESENCE || !(s.expectedAmount > 0)) return;
-    let date = s.expectedNext ? toDay(s.expectedNext) : null;
-    if (!date && s.kind === 'salary' && s.timing?.typicalCycleDay != null) {
-      date = addDays(nextPayDate, Math.round(s.timing.typicalCycleDay) - 1);
-    }
-    if (!date) return;
-    if (s.kind === 'salary' && salaryShiftDays) date = addDays(date, salaryShiftDays);
-    if (!incomeByAccount.has(s.accountId)) incomeByAccount.set(s.accountId, new Map());
-    const byDay = incomeByAccount.get(s.accountId);
-    byDay.set(dayKey(date), (byDay.get(dayKey(date)) ?? 0) + s.expectedAmount);
-  });
-  const incomeFor = (id) => {
-    const byDay = incomeByAccount.get(id);
-    return (day) => byDay?.get(dayKey(day.date)) ?? 0;
-  };
-
-  const paceFor = (id) => {
-    const history = paceHistory(spendById.get(id) ?? [], historyCycles, calendar);
+  // The residual pace of an account: signed net by day of cycle. An override (tests) is a spend
+  // per cycle day, so it enters with its sign flipped.
+  const paceFor = (id, rows) => {
     const override = overrides?.pace?.[id];
     const flatWeek = new Array(7).fill(1);
-    const weekday = override || (overrides && overrides.weekdayFactor === null) ? flatWeek : history.weekdayFactor;
     if (override) {
-      const fixed = (k) => override[Math.min(override.length - 1, Math.max(0, k))] ?? 0;
-      return (day) => ({ mean: fixed(day.cycleDay), low: fixed(day.cycleDay), high: fixed(day.cycleDay), weekday });
+      const fixed = (k) => -(override[Math.min(override.length - 1, Math.max(0, k))] ?? 0);
+      return (day) => ({ mean: fixed(day.cycleDay), low: fixed(day.cycleDay), high: fixed(day.cycleDay), weekday: flatWeek });
     }
+    const history = paceHistory(residualRows(rows, { historyCycles, modelled, internalLegs }), historyCycles, calendar);
+    const weekday = overrides && overrides.weekdayFactor === null ? flatWeek : history.weekdayFactor;
     const mean = paceFunction(history.perCycle);
-    const low = paceFunction(history.perCycle, 0.75);
-    const high = paceFunction(history.perCycle, 0.25);
+    const low = paceFunction(history.perCycle, 0.25);
+    const high = paceFunction(history.perCycle, 0.75);
     return (day) => ({ mean: mean(day.cycleDay), low: low(day.cycleDay), high: high(day.cycleDay), weekday });
   };
 
-  // Liquid accounts: Bank or Savings by the record's type, not hidden, with rows or external.
-  const liquid = accounts.filter((a) => LIQUID.has(typeOfRecord(a)) && !a.hidden);
   const assumptions = [];
   const accountPaths = [];
   liquid.forEach((a) => {
@@ -303,7 +401,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
       days,
       scheduled: scheduledFor(a.id),
       income: incomeFor(a.id),
-      pace: paceFor(a.id),
+      pace: paceFor(a.id, rows),
       floor,
       buffer,
     });
@@ -335,7 +433,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
     const start = overrides?.start?.[card.id] ?? balanceAt(rows, card, dataThrough);
     const limit = card.creditLimit ?? null;
     const scheduled = scheduledFor(card.id);
-    const pace = paceFor(card.id);
+    const pace = paceFor(card.id, rows);
     const repaymentByDay = new Map();
     (lines ?? [])
       .filter((line) => line.source === 'repayment' && line.cardAccountId === card.id && line.status === 'active' && line.nextDate)
@@ -349,7 +447,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
       if (i > 0) {
         const rate = pace(day);
         const counted = scheduled(day).filter((it) => COUNTED.has(it.level));
-        balance += (repaymentByDay.get(dayKey(day.date)) ?? 0) - sum(counted.map((it) => it.amount)) - rate.mean * rate.weekday[day.date.getDay()];
+        balance += (repaymentByDay.get(dayKey(day.date)) ?? 0) - sum(counted.map((it) => it.amount)) + (rate.mean < 0 ? rate.mean * rate.weekday[day.date.getDay()] : rate.mean);
         if (limit != null && balance <= -limit) {
           balance = -limit;
           if (!firstLimit) firstLimit = { date: day.date, cycleDay: day.cycleDay, value: balance };
@@ -388,13 +486,13 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
 
   const mediumItems = totalDays.flatMap((d) => d.scheduled.filter((it) => it.level === 'medium'));
   assumptions.push(
-    `Daily spend pace from the last ${historyCycles.length} complete cycles of spend not explained by a recurring line, by day of cycle and weekday.`,
-    'Card repayments are assumed at their usual amount on their usual day, leaving the paying account and arriving on the card.',
+    `Usual movement by day of cycle — card repayments, refunds, interest and spend no confident line explains — from the last ${historyCycles.length} complete cycles, as the median path with the newest cycles weighted most.`,
+    'Card repayments leave the paying account at their usual pace and arrive on the card on the day the repayment line usually lands.',
   );
   if (mediumItems.length) {
     assumptions.push(`${mediumItems.length} medium-confidence item${mediumItems.length === 1 ? '' : 's'} (${formatRand(sum(mediumItems.map((it) => it.amount)))}) counted; low-confidence ones only widen the band.`);
   }
-  if (!upcoming) assumptions.push('No bills calendar was given, so only the spend pace is projected.');
+  if (!upcoming) assumptions.push('No bills calendar was given, so only the usual movement is projected.');
 
   return {
     anchored,
@@ -408,14 +506,19 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
     lateSalary: null,
     assumptions,
     estimate: !VALIDATED,
+    // The measured reliability, so the card can say how often the call was right rather than
+    // only that it is an estimate.
+    backtest,
   };
 }
 
 /**
  * @param options  data, accounts: AccountRecord[], calendar, transfers: buildFullTransfers(data),
- *                 lines: RecurringLine[], explained: Set<Transaction>, upcoming: buildUpcoming(...),
- *                 incomeProfile, asOf: Date, dataThrough: Date, buffer = 0, extendDays = 7,
- *                 overrides (tests): { pace: { [accountId]: number[] /* index = cycle day *\/ },
+ *                 lines: RecurringLine[] (their `items` are what the residual leaves out; the old
+ *                 `explained` set is accepted and ignored, because it also covered the low lines the
+ *                 residual must keep), upcoming: buildUpcoming(...), incomeProfile, asOf: Date,
+ *                 dataThrough: Date, buffer = 0, extendDays = 7,
+ *                 overrides (tests): { pace: { [accountId]: number[] /* spend per cycle day *\/ },
  *                                      start: { [accountId]: number }, weekdayFactor: null }
  * @returns {CashPath|null} — shape at the foot of this file; null without a liquid account
  */

@@ -1,0 +1,24 @@
+{
+  "generatedOn": "2026-08-22",
+  "cycles": 12,
+  "gatePassed": false,
+  "flatBand": 1000,
+  "day7": {
+    "cycles": 12,
+    "windowMae": 4.17,
+    "singleDayMae": 7.92,
+    "signAccuracy": 0.833,
+    "signHits": 10,
+    "valueMedian": 4156,
+    "valueGate": 5093
+  },
+  "day14": {
+    "cycles": 12,
+    "windowMae": 2.33,
+    "singleDayMae": 6.33,
+    "signAccuracy": 1,
+    "signHits": 12,
+    "valueMedian": 5131,
+    "valueGate": 5093
+  }
+}

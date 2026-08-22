@@ -67,7 +67,7 @@ describe('buildCashToPayday', () => {
     expect(p.total.min.value).toBe(p.total.endOfHorizon);
     expect(p.estimate).toBe(true);
     expect(p.anchored).toBe(false); // the start came from the override, not a typed balance
-    expect(p.assumptions.some((a) => /spend pace/.test(a))).toBe(true);
+    expect(p.assumptions.some((a) => /Usual movement by day of cycle/.test(a))).toBe(true);
   });
 
   it('measures the buffer from the floor', () => {
@@ -181,5 +181,121 @@ describe('buildCashToPayday', () => {
 
   it('returns null without a liquid account', () => {
     expect(run({ accounts: [] })).toBeNull();
+  });
+});
+
+/**
+ * One complete history cycle (23 Jun – 22 Jul 2026, 30 days) before the current one; the data
+ * still ends on Mon 27 Jul, cycle day 5. The residual is learned from the history cycle alone, so
+ * with one cycle the median path IS that cycle's path, smoothed over three days.
+ */
+const CAL2 = {
+  ...CAL,
+  starts: { '2026-07': d(2026, 6, 23), '2026-08': d(2026, 7, 23) },
+  ends: { '2026-07': d(2026, 7, 22), '2026-08': d(2026, 8, 22) },
+  lengths: { '2026-07': 30, '2026-08': 31 },
+  isPartial: { '2026-07': false, '2026-08': false },
+  isProjected: { '2026-07': false, '2026-08': true },
+};
+const SAVINGS = 'fnb|4444';
+let nextId = 100;
+const row = (date, account, amount, extra = {}) => ({
+  id: nextId++,
+  Date: date,
+  DateObj: parseTransactionDate(date),
+  Description: 'Row',
+  Account: account,
+  Category: 'Groceries',
+  'Pay Month': date < '2026-07-23' ? '2026-07' : '2026-08',
+  AmountNum: amount,
+  ...extra,
+});
+const BANK_NAME = 'FNB Bank *1111';
+const CARD_NAME = 'FNB Credit Card *2222';
+const SAVINGS_NAME = 'FNB Savings *4444';
+
+function runHistory(data, over = {}) {
+  const accounts = over.accounts ?? [account(BANK, BANK_NAME, 'Bank'), account(CARD, CARD_NAME, 'Credit Card')];
+  return buildCashToPayday({
+    data,
+    accounts,
+    calendar: CAL2,
+    transfers: buildFullTransfers(data, { accounts }),
+    lines: [],
+    upcoming: { entries: [] },
+    incomeProfile: null,
+    asOf: d(2026, 7, 27),
+    dataThrough: d(2026, 7, 27),
+    extendDays: 0,
+    overrides: { start: { [BANK]: 20000, [SAVINGS]: 1000 }, weekdayFactor: null },
+    ...over,
+  });
+}
+
+describe('buildCashToPayday: the residual learned from history', () => {
+  it('projects a card repayment, an unexplained debit and a refund on their usual cycle days', () => {
+    const data = [
+      row('2026-07-02', BANK_NAME, -8000, { Category: 'Credit Card Repayment' }), // cycle day 10, paired below
+      row('2026-07-02', CARD_NAME, 8000, { Category: 'Credit Card Repayment' }),
+      row('2026-07-05', BANK_NAME, -500), // cycle day 13
+      row('2026-07-15', BANK_NAME, 300, { Category: 'Refund' }), // cycle day 23
+      row('2026-07-24', BANK_NAME, -100), // the current cycle, before the anchor: not history
+    ];
+    const p = runHistory(data);
+    // The R8 000 spreads over days 9–11 and the R500 over 12–14; the refund comes back over 22–24.
+    expect(dayOf(p.total, 8).balance).toBeCloseTo(20000, 0);
+    expect(dayOf(p.total, 11).balance).toBeCloseTo(12000, 0);
+    expect(dayOf(p.total, 14).balance).toBeCloseTo(11500, 0);
+    expect(dayOf(p.total, 21).balance).toBeCloseTo(11500, 0);
+    expect(dayOf(p.total, 24).balance).toBeCloseTo(11800, 0);
+    expect(dayOf(p.accounts[0], 10).discretionary).toBeLessThan(0);
+    expect(dayOf(p.accounts[0], 23).income).toBeGreaterThan(0);
+    expect(dayOf(p.total, 23).income).toBeGreaterThan(0);
+    expect(p.assumptions.some((a) => /card repayments, refunds, interest/.test(a))).toBe(true);
+  });
+
+  it('nets out a transfer between two liquid accounts', () => {
+    const data = [
+      row('2026-07-08', BANK_NAME, -5000, { Category: 'Transfer' }),
+      row('2026-07-08', SAVINGS_NAME, 5000, { Category: 'Transfer' }),
+    ];
+    const accounts = [account(BANK, BANK_NAME, 'Bank'), account(SAVINGS, SAVINGS_NAME, 'Savings')];
+    const p = runHistory(data, { accounts });
+    expect(p.accounts).toHaveLength(2);
+    expect(dayOf(p.total, 20).balance).toBe(21000);
+    expect(dayOf(p.accounts[0], 20).balance).toBe(20000);
+    expect(dayOf(p.accounts[1], 20).balance).toBe(1000);
+  });
+
+  it('leaves out the rows of a counted line the calendar will schedule, and keeps a low one', () => {
+    const scheduled = row('2026-07-01', BANK_NAME, -2000, { Category: 'Other Insurance' }); // cycle day 9
+    const soft = row('2026-07-03', BANK_NAME, -1000); // cycle day 11
+    const lines = [
+      { id: 'a', level: 'high', perYear: 12, items: [scheduled] },
+      { id: 'b', level: 'low', perYear: 12, items: [soft] },
+    ];
+    const p = runHistory([scheduled, soft], { lines });
+    expect(dayOf(p.total, 8).balance).toBeCloseTo(20000, 0);
+    expect(dayOf(p.total, 13).balance).toBeCloseTo(19000, 0);
+  });
+
+  it('places the salary on its usual cycle day, never on a calendar step inside the current cycle', () => {
+    const salary = row('2026-06-25', BANK_NAME, 75000, { Category: 'Salary' }); // history cycle day 3
+    const incomeProfile = {
+      sources: [
+        {
+          id: 's', accountId: BANK, kind: 'salary', presence: 1, expectedAmount: 75000,
+          expectedNext: d(2026, 8, 20), timing: { typicalCycleDay: 3 },
+        },
+      ],
+      salary: { lateRisk: 0, lateDelayP90: 0 },
+    };
+    const p = runHistory([salary], { incomeProfile, extendDays: 7 });
+    expect(dayOf(p.total, 29).income).toBe(0);
+    const landing = p.total.days.find((x) => x.cycle === 'next' && x.cycleDay === 3);
+    expect(iso(landing.date)).toBe('2026-08-25');
+    // Exactly once: the history salary row is the source's own and stays out of the residual.
+    expect(landing.income).toBe(75000);
+    expect(p.total.days.filter((x) => x.income > 0)).toHaveLength(1);
   });
 });

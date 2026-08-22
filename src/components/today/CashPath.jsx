@@ -280,7 +280,18 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
         right={
           <div className="flex flex-wrap items-center gap-2">
             {estimate && (
-              <span className="glass-chip px-3 py-1.5 text-[12px] text-warn">Estimate — not yet validated against past cycles</span>
+              <span
+                className="glass-chip px-3 py-1.5 text-[12px] text-warn"
+                title={
+                  cashPath.backtest?.day7
+                    ? `Backtested on ${cashPath.backtest.cycles} past cycles: from day 7 the dip call was right ${cashPath.backtest.day7.signHits} of ${cashPath.backtest.day7.cycles} times and the low point within R${cashPath.backtest.day7.valueMedian.toLocaleString('en-ZA')}; from day 14, ${cashPath.backtest.day14?.signHits} of ${cashPath.backtest.day14?.cycles} and within R${cashPath.backtest.day14?.valueMedian.toLocaleString('en-ZA')}.`
+                    : 'Not yet validated against past cycles'
+                }
+              >
+                {cashPath.backtest?.day7
+                  ? `Estimate — dip called right ${cashPath.backtest.day7.signHits} of ${cashPath.backtest.day7.cycles} times from day 7, ${cashPath.backtest.day14?.signHits} of ${cashPath.backtest.day14?.cycles} from day 14`
+                  : 'Estimate — not yet validated against past cycles'}
+              </span>
             )}
             {!anchored && (
               <button
