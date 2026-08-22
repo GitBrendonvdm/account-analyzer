@@ -172,6 +172,8 @@ describe('selfAnchored', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('ledger on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   it('self-anchors at least three of the loan accounts', () => {
     const loans = [...new Set(real.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan');
     expect(loans.length).toBeGreaterThanOrEqual(3);

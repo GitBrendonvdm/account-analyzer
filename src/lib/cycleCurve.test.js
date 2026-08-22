@@ -108,6 +108,8 @@ describe('cycleDay', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('buildCycleCalendar against the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const months = [...new Set(real?.map((t) => t['Pay Month']) ?? [])].sort();
   const asOf = new Date(2026, 7, 6);
 

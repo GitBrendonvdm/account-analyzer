@@ -232,6 +232,8 @@ describe('costOfDebt.isCost', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('flows on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   // The describe body runs even when skipped, so nothing here may touch a null export.
   const data = real ?? [];
   const transfers = real ? buildFullTransfers(data) : null;

@@ -243,6 +243,8 @@ describe('inferRates building blocks', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('inferRates on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   it('infers the four loans as the spec reconciles them', () => {
     real.forEach((t) => {
       t.DateObj = parseTransactionDate(t.Date);

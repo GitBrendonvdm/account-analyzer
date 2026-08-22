@@ -179,6 +179,8 @@ describe('buildDirection', () => {
 });
 
 describe.skipIf(!real)('vitals against the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const data = real ?? [];
   data.forEach((t) => {
     t.DateObj = parseTransactionDate(t.Date);

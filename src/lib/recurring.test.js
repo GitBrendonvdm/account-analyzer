@@ -427,6 +427,8 @@ describe('buildRecurringLines', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('recurring on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   // The bootstrap hands rows over with their stable keys; the raw CSV does not carry them yet.
   const data = real ? assignKeys(real) : [];
   const months = [...new Set(data.map((t) => t['Pay Month']))].sort();

@@ -136,6 +136,8 @@ describe('buildPriceCreep', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('price creep on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const asOf = new Date(2026, 7, 22);
   const allMonths = [...new Set((real ?? []).map((t) => t['Pay Month']))].sort();
   const calendar = buildCycleCalendar(real, allMonths, asOf);

@@ -95,6 +95,8 @@ describe('stats', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('stats on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   it('orders the quartiles of per-cycle spend and keeps them finite', () => {
     const byCycle = new Map();
     real.forEach((t) => {

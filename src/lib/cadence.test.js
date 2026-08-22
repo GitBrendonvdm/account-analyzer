@@ -108,6 +108,8 @@ describe('nextExpected', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('cadence on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   it('reads the largest loan account as a monthly instalment', () => {
     const loans = [...new Set(real.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan');
     expect(loans.length).toBeGreaterThan(0);

@@ -25,6 +25,8 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const lastDate = (rows) => rows.map((t) => t.Date).sort().at(-1);
 
 describe.skipIf(!real)('processTransactionData against the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
   const asOf = new Date(2026, 7, 6); // Thu 6 Aug 2026
   const processed = processTransactionData(real, accounts, 6, asOf);
@@ -353,6 +355,8 @@ function refExceptionSets(items, months, transferIds) {
 }
 
 describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches the old rules', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
   const allMonths = [...new Set(real?.map((t) => t['Pay Month']) ?? [])].sort();
   const loans = new Set(accounts.filter((a) => parseAccount(a).type === 'Loan'));

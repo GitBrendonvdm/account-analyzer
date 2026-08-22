@@ -139,6 +139,8 @@ describe('buildBasket', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('basket on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const allMonths = months(real ?? []);
   const calendar = buildCycleCalendar(real, allMonths, ASOF);
   const transfers = buildFullTransfers(real);

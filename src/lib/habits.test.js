@@ -74,6 +74,8 @@ describe('buildHabits with the full-file transfer set', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('buildHabits on the real export', () => {
+  // The body runs even when skipped; a missing export must not break collection.
+  if (!real) return;
   const accounts = [...new Set((real ?? []).map((t) => t.Account))];
   const processed = processTransactionData(real, accounts, 6, ASOF);
   const transfers = buildFullTransfers(real);
