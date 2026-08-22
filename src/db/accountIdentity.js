@@ -57,8 +57,41 @@ export function buildAccountRecord(rawNames, existing = null, seenThrough = null
     currentBalance: existing?.currentBalance ?? null,
     balanceAsOf: existing?.balanceAsOf ?? null,
     creditLimit: existing?.creditLimit ?? null,
+    overdraftLimit: existing?.overdraftLimit ?? null,
     hidden: existing?.hidden ?? false,
+    // The liability terms the Debt view lets the user type. Every one is named here explicitly
+    // rather than spread from `existing`, so that the legacy Dexie path and the server path agree
+    // field for field on what an import preserves — a field missing from this list would survive
+    // one of them and vanish from the other.
+    interestRate: existing?.interestRate ?? null, //     percentage, annual nominal (9.33)
+    minimumPayment: existing?.minimumPayment ?? null, // percentage of the balance (5)
+    termMonths: existing?.termMonths ?? null, //         months remaining as of balanceAsOf
+    balloon: existing?.balloon ?? null, //               positive rand due at contract end
+    feesMonthly: existing?.feesMonthly ?? null, //       positive rand inside the account each month
+    // An account with transactions behind it is never external, whatever it was created as: the
+    // rows anchor it from here on, and a statement-created record that later appears in an export
+    // becomes an ordinary one without losing what the statement said about it.
+    external: false,
+    source: existing?.source ?? 'csv',
+    statementName: existing?.statementName ?? null,
   };
+}
+
+const LIABILITY = new Set(['Credit Card', 'Loan']);
+
+/**
+ * Apply a user patch to a record — pure, and the same rule as the server's accounts route: spread
+ * the patch over the record, and when it carries a `typeOverride` re-derive `type` and
+ * `isLiability` from it, because the type is user-authoritative once set and it decides which
+ * direction is "better" for the balance.
+ */
+export function applyAccountPatch(existing, patch) {
+  const next = { ...(existing ?? {}), ...(patch ?? {}) };
+  if (patch && patch.typeOverride !== undefined) {
+    next.type = patch.typeOverride ?? existing?.type;
+    next.isLiability = LIABILITY.has(next.type);
+  }
+  return next;
 }
 
 /** What to show for an account: the user's own name for it, else the export's. */

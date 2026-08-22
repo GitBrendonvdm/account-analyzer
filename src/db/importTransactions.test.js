@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db, loadAllTransactions, openDatabase } from './db';
 import { importTransactions } from './importTransactions';
+import { applyAccountPatch, buildAccountRecord } from './accountIdentity';
 
 /**
  * The property that matters: importing exports in any order converges on the same data.
@@ -150,5 +151,88 @@ describe('importTransactions', () => {
     const rows = await loadAllTransactions(accounts);
     const names = [...new Set(rows.map((t) => t.Account))].sort();
     expect(names).toEqual(['FNB Bank *9547', 'FNB Bank *9986']);
+  });
+
+  it('round-trips the liability terms and the overdraft through an import', async () => {
+    await importTransactions(clone(OLDER), 'older.csv');
+    await db.accounts.update('fnb|9547', {
+      overdraftLimit: 18298.4,
+      termMonths: 12,
+      interestRate: 9.33,
+      minimumPayment: 5,
+      balloon: 25000,
+      feesMonthly: 69,
+      balanceAsOf: '2026-07-01',
+    });
+    await importTransactions(clone(NEWER), 'newer.csv');
+
+    const account = await db.accounts.get('fnb|9547');
+    expect(account.overdraftLimit).toBe(18298.4);
+    expect(account.termMonths).toBe(12);
+    expect(account.interestRate).toBe(9.33);
+    expect(account.minimumPayment).toBe(5);
+    expect(account.balloon).toBe(25000);
+    expect(account.feesMonthly).toBe(69);
+    expect(account.balanceAsOf).toBe('2026-07-01');
+    expect(account.external).toBe(false);
+    expect(account.source).toBe('csv');
+    expect(account.statementName).toBeNull();
+  });
+});
+
+describe('buildAccountRecord', () => {
+  it('keeps what a statement said about an account once its rows arrive, and stops calling it external', () => {
+    const fromStatement = {
+      ...buildAccountRecord(['FNB Loan *1143']),
+      interestRate: 17.2,
+      termMonths: 56,
+      currentBalance: -171031.41,
+      balanceAsOf: '2026-08-10',
+      external: true,
+      source: 'statement',
+      statementName: 'FNB Personal Loan',
+    };
+    const next = buildAccountRecord(['FNB Loan *1143'], fromStatement, '2026-08-21');
+    expect(next.interestRate).toBe(17.2);
+    expect(next.termMonths).toBe(56);
+    expect(next.currentBalance).toBe(-171031.41);
+    expect(next.balanceAsOf).toBe('2026-08-10');
+    expect(next.statementName).toBe('FNB Personal Loan');
+    expect(next.source).toBe('statement');
+    expect(next.external).toBe(false);
+    expect(next.isLiability).toBe(true);
+  });
+
+  it('defaults every authored field explicitly on a fresh record', () => {
+    const fresh = buildAccountRecord(['Nedbank Credit Card *4714'], null, '2026-08-21');
+    expect(fresh).toMatchObject({
+      overdraftLimit: null,
+      interestRate: null,
+      minimumPayment: null,
+      termMonths: null,
+      balloon: null,
+      feesMonthly: null,
+      external: false,
+      source: 'csv',
+      statementName: null,
+    });
+  });
+});
+
+describe('applyAccountPatch', () => {
+  it('re-derives the type and liability flag from a type override', () => {
+    const next = applyAccountPatch({ type: 'Bank', isLiability: false, label: null }, { typeOverride: 'Loan' });
+    expect(next.type).toBe('Loan');
+    expect(next.isLiability).toBe(true);
+    expect(next.typeOverride).toBe('Loan');
+  });
+
+  it('spreads ordinary fields and leaves the type alone without an override', () => {
+    const existing = { type: 'Credit Card', isLiability: true, currentBalance: null };
+    const next = applyAccountPatch(existing, { currentBalance: -50000, creditLimit: 60000 });
+    expect(next).toEqual({ type: 'Credit Card', isLiability: true, currentBalance: -50000, creditLimit: 60000 });
+    expect(existing.currentBalance).toBeNull();
+    // Clearing the override keeps the record's current type, as the server does.
+    expect(applyAccountPatch({ type: 'Loan', typeOverride: 'Loan' }, { typeOverride: null }).type).toBe('Loan');
   });
 });

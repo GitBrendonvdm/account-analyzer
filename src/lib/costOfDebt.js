@@ -15,12 +15,19 @@ import { parseAccount } from './accounts';
  * different question from "what did I spend".
  */
 
-const COST_CATEGORIES = new Set(['Interest', 'Bank Charges']);
+export const COST_CATEGORIES = new Set(['Interest', 'Bank Charges']);
 
-/** Fee-like descriptions that aren't categorised as such by the export. */
-const COST_DESCRIPTION = /\b(finance charge|service fee|initiation fee|admin fee|account fee|monthly fee|insurance premium|protection ins)\b/i;
+/**
+ * Fee-like descriptions that aren't categorised as such by the export. Shared with the fees audit
+ * and the rate inferrer, which is why the list reaches past what this panel needs: the per-
+ * transaction fees, the card's budget finance charge and the loan's credit-life premium all cost
+ * money the same way, and three modules keeping three lists would drift apart.
+ */
+export const COST_DESCRIPTION =
+  /\b(finance charge|service fee|initiation fee|admin fee|account fee|monthly fee|insurance premium|protection ins|vat on fee|payment fee|electronic trf fee|declined auth fee|cpp insurance|budget finance charge)\b/i;
 
-function isCost(t) {
+/** Money out that is a cost of carrying the account: interest, a fee, or cover sold inside the debt. */
+export function isCost(t) {
   if (t.AmountNum >= 0) return false;
   return COST_CATEGORIES.has(t.Category) || COST_DESCRIPTION.test(t.Description ?? '');
 }

@@ -1,3 +1,4 @@
+import { MERGE_PREFIX_MIN_LENGTH } from '../constants';
 /**
  * Who you actually paid.
  *
@@ -97,3 +98,44 @@ export function groupByMerchant(rows) {
   });
   return byKey;
 }
+
+/**
+ * Map truncation variants onto one key.
+ *
+ * The same subscription arrives as "Apple.Com/Bi", "Apple.Com/Bil" and "Apple.Com/Bill" depending
+ * on how much of the descriptor the bank kept that month, and `merchantKeyOf` faithfully produces
+ * three keys. For recurrence that is fatal: three lines of four charges each, none of them monthly.
+ * When key B starts with key A, both share the first token and A is long enough to be specific
+ * (MERGE_PREFIX_MIN_LENGTH), B is folded onto A. Keys that merely share a first token — two Engen
+ * forecourts — are NOT merged, and a short key like "spar" is never a prefix of anything.
+ *
+ * @param {Iterable<string>} keys
+ * @returns {Map<string, string>} every key → its canonical key (itself when nothing merged)
+ */
+export function mergePrefixKeys(keys) {
+  const distinct = [...new Set([...keys].filter(Boolean))].sort(
+    (a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0),
+  );
+  const canonical = new Map();
+  const anchors = [];
+  distinct.forEach((key) => {
+    const first = key.split(' ')[0];
+    const anchor = anchors.find(
+      (a) => key.startsWith(a) && a.split(' ')[0] === first && a.length >= MERGE_PREFIX_MIN_LENGTH,
+    );
+    if (anchor) {
+      canonical.set(key, canonical.get(anchor));
+    } else {
+      canonical.set(key, key);
+      anchors.push(key);
+    }
+  });
+  return canonical;
+}
+
+/** /^1sa\b/i on the raw description — a person-to-person payment whose key would be someone's name. */
+export function isPersonPayment(description) {
+  return /^1sa\b/i.test((description ?? '').toString().trim());
+}
+
+export const PERSON_LABEL = 'Payment to a person';
