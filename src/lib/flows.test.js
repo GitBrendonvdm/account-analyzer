@@ -232,9 +232,10 @@ describe('costOfDebt.isCost', () => {
 const real = loadRealExport();
 
 describe.skipIf(!real)('flows on the real export', () => {
-  const data = real;
-  const transfers = buildFullTransfers(data);
-  const calendar = buildCycleCalendar(data, months(data), ASOF);
+  // The describe body runs even when skipped, so nothing here may touch a null export.
+  const data = real ?? [];
+  const transfers = real ? buildFullTransfers(data) : null;
+  const calendar = real ? buildCycleCalendar(data, months(data), ASOF) : null;
 
   it('finds every loan, pairs instalments and card repayments across the whole file', () => {
     const loansByName = [...new Set(data.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan');
