@@ -53,6 +53,26 @@
   color-scheme: dark;
 }
 
+/**
+ * Native selects. The popup a <select> opens is drawn by the browser, not by the page: without an
+ * explicit colour scheme on the element it comes up light, and the label colours the page inherits
+ * into it are light too — white-on-white options. Declaring the scheme on the control itself is
+ * what Chrome and Firefox read for the popup; the option colours cover the engines that paint
+ * options from CSS.
+ */
+select {
+  color-scheme: dark;
+  accent-color: var(--color-info);
+}
+select option,
+select optgroup {
+  background: #16161c;
+  color: var(--color-label);
+}
+select option:disabled {
+  color: var(--color-label-3);
+}
+
 /* Tailwind v4 defaults borders to currentColor; every bare `border` in the app wants the hairline. */
 *,
 *::before,
