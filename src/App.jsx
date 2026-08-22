@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Aurora } from './components/Aurora';
 import { TopBar } from './components/TopBar';
 import { TodayView } from './components/TodayView';
-import { ChartsView } from './components/ChartsView';
-import { AccountsView } from './components/AccountsView';
 import { Headlines } from './components/Headlines';
 import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
-import { HabitsView } from './components/HabitsView';
 import { ImportSummary } from './components/ImportSummary';
-import { PlanView } from './components/PlanView';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
   buildAccountMovementSeries,
@@ -25,11 +21,8 @@ import { buildBudgetProgress } from './lib/budgets';
 import { buildGapClosers, buildTrajectory } from './lib/trajectory';
 import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
-import { LedgerView } from './components/LedgerView';
 import { Login } from './components/Login';
 import { MigrateBanner } from './components/MigrateBanner';
-import { StatementUpload } from './components/StatementUpload';
-import { DebtView } from './components/DebtView';
 import { buildCycleCalendar } from './lib/cycleCurve';
 import { buildFullTransfers } from './lib/flows';
 import { buildLiabilityTerms, rateSteps as buildRateSteps, toDebt } from './lib/inferRates';
@@ -56,6 +49,19 @@ import { buildBasket } from './lib/basket';
 import { buildFeesAudit } from './lib/fees';
 import { buildSavingsFinder } from './lib/savingsFinder';
 import { solveExtraForDate, solveExtraForGoal } from './lib/solver';
+// Everything that is not the opening screen loads on first use. Today is a hand-drawn page; the
+// other views carry Recharts, the debt engine's UI and the PDF reader, which together doubled the
+// first paint for a screen that needed none of them.
+const LedgerView = lazy(() => import('./components/LedgerView').then((m) => ({ default: m.LedgerView })));
+const ChartsView = lazy(() => import('./components/ChartsView').then((m) => ({ default: m.ChartsView })));
+const HabitsView = lazy(() => import('./components/HabitsView').then((m) => ({ default: m.HabitsView })));
+const PlanView = lazy(() => import('./components/PlanView').then((m) => ({ default: m.PlanView })));
+const DebtView = lazy(() => import('./components/DebtView').then((m) => ({ default: m.DebtView })));
+const AccountsView = lazy(() => import('./components/AccountsView').then((m) => ({ default: m.AccountsView })));
+const StatementUpload = lazy(() =>
+  import('./components/StatementUpload').then((m) => ({ default: m.StatementUpload })),
+);
+
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -408,12 +414,14 @@ export default function App() {
           exportUrl={exportUrl}
           onSignOut={signOut}
           extraControls={
-            <StatementUpload
-              accounts={accounts}
-              onPatchAccount={updateAccount}
-              onCreateAccount={createAccount}
-              onDone={setStatementDone}
-            />
+            <Suspense fallback={null}>
+              <StatementUpload
+                accounts={accounts}
+                onPatchAccount={updateAccount}
+                onCreateAccount={createAccount}
+                onDone={setStatementDone}
+              />
+            </Suspense>
           }
         />
         <div className="flex min-h-[calc(100vh-9.5rem)] flex-col gap-5 pt-2">
@@ -449,7 +457,7 @@ export default function App() {
           )}
           <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
           {processed ? (
-            <>
+            <Suspense fallback={<div className="t-caption px-2 py-6">Loading…</div>}>
               {activeTab === 'today' && (
                 <TodayView
                   summary={summary}
@@ -543,7 +551,7 @@ export default function App() {
                   onDeleteAccount={deleteAccount}
                 />
               )}
-            </>
+            </Suspense>
           ) : (
             <EmptyState />
           )}
