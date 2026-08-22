@@ -1,3 +1,6 @@
+import { accountIdOf, parseAccount } from './accounts';
+import { accountRows, anchorOffset, positionAt } from './ledger';
+
 /**
  * Real balances, from one number per account.
  *
@@ -6,39 +9,143 @@
  * the bond reads −R2 747 083: two years of movement, not a debt.
  *
  * One figure fixes all of it. Rather than asking for an opening balance from 2024 that nobody
- * remembers, the app asks what an account holds TODAY — a number that's one glance at a banking
- * app away — and works backwards:
+ * remembers, the app asks what an account holds on a given day — a number that's one glance at a
+ * banking app away — and works backwards:
  *
- *   offset  = balanceToday − positionAtLatestCycle
+ *   offset  = balance − positionAt(balanceAsOf)
  *   balance = position + offset            (for every cycle, past and present)
  *
- * That makes the offset self-correcting: re-enter today's balance after any import and every
- * historical balance re-bases with it.
+ * WHERE THE ANCHOR SITS. The first version took the anchor to be whichever cycle happened to be
+ * current, which meant a balance typed on the 10th and an export imported on the 20th silently
+ * re-anchored to the 20th: ten days of movement leaked into every historical figure with each new
+ * file. When the rows are given the offset now comes from ledger.js, anchored at the record's own
+ * `balanceAsOf` (falling back to the account's last row), so appending rows can never move a
+ * balance that was stated for an earlier day. Without the rows the legacy current-cycle rule still
+ * applies, for callers that only hold positions.
+ *
+ * EXTERNAL ACCOUNTS. A retirement annuity or a savings account the bank summary lists has no rows
+ * in the export and never will, but it is part of what the household is worth. Records marked
+ * `external` (and records whose rows simply have not arrived yet) are appended as flat lines at
+ * their stated balance, so net worth counts them and nothing downstream has to special-case them.
  *
  * Accounts without a balance are reported as unknown rather than assumed to be zero. A net worth
  * that quietly treats an unentered bond as R0 is worse than one that says it's incomplete.
  */
 
-/** @returns positions decorated with real balances, or nulls where no balance has been given. */
-export function applyBalances(positions, accountsById, months) {
+const LIABILITY = new Set(['Credit Card', 'Loan']);
+
+/** The record's own idea of its type, which wins over the name parsed off the export. */
+function typeOf(account, fallback) {
+  return account?.typeOverride ?? fallback ?? account?.type ?? 'Other';
+}
+
+function isKnownBalance(value) {
+  return value != null && Number.isFinite(value);
+}
+
+/**
+ * A renamed account appears in the positions under both its labels; the record's balance belongs
+ * to the CURRENT label only. Counting the retired label as known too would count the balance twice.
+ */
+function isRetiredName(position, account) {
+  if (!account?.rawName || (account.seenNames?.length ?? 0) < 2) return false;
+  return position.account !== account.rawName;
+}
+
+/**
+ * @param positions     buildAccountPositions(data, selectedAccounts, months)
+ * @param accountsById  Map<AccountRecord.id, AccountRecord> — every record, selected or not
+ * @param months        the visible cycle keys, ascending
+ * @param options.data  every row; when given the offset is anchored at `balanceAsOf` (ledger.js)
+ * @returns positions decorated with real balances (nulls where no balance has been given), plus one
+ *   flat entry per record with no position — external accounts and records whose rows have not
+ *   arrived — marked `external: true`.
+ */
+export function applyBalances(positions, accountsById, months, { data = null } = {}) {
   const currentMonth = months[months.length - 1];
-  return positions.map((p) => {
+  const placed = new Set();
+
+  const balanced = positions.map((p) => {
     const account = accountsById.get(p.id ?? p.accountId) ?? accountsById.get(p.account);
+    if (account) placed.add(account.id);
+    const type = typeOf(account, p.type);
     const anchor = account?.currentBalance;
-    const known = anchor != null && Number.isFinite(anchor);
-    const offset = known ? anchor - (p.positionByMonth[currentMonth] ?? 0) : 0;
+    const known = isKnownBalance(anchor) && !isRetiredName(p, account);
+
+    let offset = 0;
+    let balance = null;
+    if (known) {
+      if (data) {
+        // Rows of this label only, so the ledger position and the table position agree row for row.
+        const rows = accountRows(data, { rawNames: [p.account] });
+        offset = anchorOffset(rows, account) ?? 0;
+        const last = rows.length ? rows[rows.length - 1] : null;
+        balance = (last ? positionAt(rows, last.DateObj ?? last.Date) : 0) + offset;
+      } else {
+        offset = anchor - (p.positionByMonth[currentMonth] ?? 0);
+        balance = anchor;
+      }
+    }
+
     return {
       ...p,
+      type,
+      isLiability: LIABILITY.has(type),
       label: account?.label || p.account,
       creditLimit: account?.creditLimit ?? null,
+      overdraftLimit: account?.overdraftLimit ?? null,
+      source: account?.source ?? null,
+      balanceAsOf: account?.balanceAsOf ?? null,
+      external: false,
       known,
       offset,
-      balance: known ? anchor : null,
+      balance,
       balanceByMonth: Object.fromEntries(
         months.map((m) => [m, known && p.positionByMonth[m] != null ? p.positionByMonth[m] + offset : null]),
       ),
     };
   });
+
+  accountsById.forEach((account) => {
+    if (placed.has(account.id)) return;
+    // A record without a position is external or has no rows yet. A deselected account with rows
+    // is neither, and must not reappear here as a flat line: the chips removed it on purpose.
+    const hasRows = data ? accountRows(data, { accountId: account.id }).length > 0 : false;
+    if (!account.external && (hasRows || !data)) return;
+    const rawName = account.rawName ?? account.label ?? account.id;
+    const meta = parseAccount(rawName);
+    const type = typeOf(account, meta.type);
+    const known = isKnownBalance(account.currentBalance);
+    const balance = known ? account.currentBalance : null;
+    balanced.push({
+      account: rawName,
+      accountId: account.id ?? accountIdOf(rawName),
+      bank: account.bank ?? meta.bank,
+      mask: account.mask ?? meta.mask,
+      short: meta.short,
+      type,
+      isLiability: LIABILITY.has(type),
+      label: account.label || rawName,
+      known,
+      offset: 0,
+      balance,
+      balanceByMonth: Object.fromEntries(months.map((m) => [m, balance])),
+      positionByMonth: {},
+      deltaByMonth: {},
+      openingPosition: 0,
+      currentDelta: 0,
+      typicalDelta: 0,
+      windowChange: 0,
+      external: true,
+      creditLimit: account.creditLimit ?? null,
+      overdraftLimit: account.overdraftLimit ?? null,
+      source: account.source ?? null,
+      balanceAsOf: account.balanceAsOf ?? null,
+      hidden: account.hidden ?? false,
+    });
+  });
+
+  return balanced;
 }
 
 /**
@@ -89,6 +196,25 @@ export function cardHeadroom(balanced) {
       limit: b.creditLimit,
       used: Math.min(1, Math.abs(b.balance) / b.creditLimit),
       available: b.creditLimit - Math.abs(b.balance),
+      overdraftLimit: null,
     }))
     .sort((a, b) => b.used - a.used);
+}
+
+/**
+ * The same question for current accounts with an overdraft: how far into it you already are.
+ * `available` is the facility plus the balance when the balance is negative — an account in the
+ * black has the whole facility left.
+ * @returns [{ account, balance, limit, available }]
+ */
+export function overdraftHeadroom(balanced) {
+  return balanced
+    .filter((b) => b.type === 'Bank' && b.known && b.overdraftLimit)
+    .map((b) => ({
+      account: b.label ?? b.account,
+      balance: b.balance,
+      limit: b.overdraftLimit,
+      available: b.overdraftLimit + Math.min(0, b.balance),
+    }))
+    .sort((a, b) => a.available - b.available);
 }

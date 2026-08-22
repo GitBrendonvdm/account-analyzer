@@ -1,8 +1,9 @@
 import { GROUP_ORDER } from '../constants';
 import { parseAccount } from './accounts';
-import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
+import { addMonthsToKey, enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { monthlyAvg } from './expected';
+import { cycleBoundsOf } from './flows';
 import { addDays, buildCycleCalendar, cycleDay } from './cycleCurve';
 import {
   buildWeeklyAvg,
@@ -152,8 +153,24 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const touchesLoan = (pair) => loanAccounts.has(pair.toAccount) || loanAccounts.has(pair.fromAccount);
   const loanPairs = pairs.filter(touchesLoan);
   const transferPairs = pairs.filter((pair) => !touchesLoan(pair));
-  loanPairs.forEach((pair) => pair.items.forEach((t) => transferIds.delete(t.id)));
-  const exceptionState = { ...buildExceptionClusters(scopedData, calcMonths, transferIds), transferIds };
+  // The paying legs, exposed so that anything counting debt service (vitals, direction) can find
+  // them without re-running the pairing.
+  const loanInstalmentIds = new Set();
+  loanPairs.forEach((pair) =>
+    pair.items.forEach((t) => {
+      transferIds.delete(t.id);
+      if (!loanAccounts.has(t.Account)) loanInstalmentIds.add(t.id);
+    }),
+  );
+  const clusters = buildExceptionClusters(scopedData, calcMonths, transferIds);
+  // Read by name, not spread: `descToCluster` is a lazy, display-only getter and spreading the
+  // object would compute it for nothing.
+  const exceptionState = {
+    incomeSparseCategories: clusters.incomeSparseCategories,
+    expenseSparseCategories: clusters.expenseSparseCategories,
+    outlierTransactionIds: clusters.outlierTransactionIds,
+    transferIds,
+  };
   scopedData.forEach((t) => {
     const mainGroup = resolveMainGroup(t, exceptionState);
     const m = mainGroup === 'Transfers' ? t['Pay Month'] : getPayMonth(t);
@@ -244,12 +261,34 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const dayRanges = weekDayRanges(currentCycleStart, currentCycleEnd);
   const dataThrough = calendar.dataThrough;
 
+  // The cycle after this one, under the same boundary rule the calendar closes the current cycle
+  // with. Its shape is what cash-to-payday needs for the week after payday and what the Debt view
+  // calls "next cycle's shape"; the history behind it is the prior cycles, plus the current one
+  // only once the data has reached its end — a half-seen cycle would drag every later column down.
+  const nextBounds = currentMonth ? cycleBoundsOf(addMonthsToKey(currentMonth, 1), calendar) : null;
+  const nextCycle = nextBounds
+    ? {
+        start: nextPayDate,
+        end: nextBounds.end,
+        length: Math.round((nextBounds.end - nextPayDate) / 86400000) + 1,
+        dayRanges: weekDayRanges(nextPayDate, nextBounds.end),
+      }
+    : null;
+  const nextCycleHistory =
+    nextCycle && currentCycleEnd && dataThrough && dataThrough >= currentCycleEnd
+      ? [...priorMonths, currentMonth]
+      : priorMonths;
+
+  // One bucketing for every model: the effective pay month, so the doubled salary the table moves
+  // into the next cycle is averaged where its total lands.
+  const monthOf = getPayMonth;
+
   // One weekday shape per flow: how a typical week's spend is distributed Mon→Sun. Per-category
   // curves would be noise at ~25 observations, so income and expense each get one.
   const nonTransfer = scopedData.filter((t) => !transferIds.has(t.id));
   const weekdayCurves = {
-    Income: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum > 0), priorMonths),
-    Expense: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum < 0), priorMonths),
+    Income: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum > 0), priorMonths, { monthOf }),
+    Expense: buildWeekdayCurve(nonTransfer.filter((t) => t.AmountNum < 0), priorMonths, { monthOf }),
   };
 
   const zeroWeeks = () => new Array(weekCount).fill(0);
@@ -259,12 +298,12 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
    * test errs toward including: treating an occasional discrete category as committed understates
    * what's safe, which is the direction to be wrong in.
    */
-  const looksLikeBill = (catItems) => {
-    if (!isDiscreteCadence(catItems, priorMonths)) return false;
+  const looksLikeBill = (catItems, discrete) => {
+    if (!discrete) return false;
     if (priorMonths.length === 0) return false;
     const totals = new Map();
     catItems.forEach((t) => {
-      const m = t['Pay Month'];
+      const m = monthOf(t);
       if (priorMonths.includes(m)) totals.set(m, (totals.get(m) ?? 0) + t.AmountNum);
     });
     if (totals.size / priorMonths.length < 0.6) return false;
@@ -273,23 +312,35 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // deducted from what's safe to spend.
     return isRegularAmount([...totals.values()]);
   };
-  const catWeeklyRemaining = (items, flow) => {
+  /** The envelope inputs for one category: its cadence verdict, weekly averages and remaining. */
+  const catEnvelope = (items, flow) => {
     const catItems = items.filter((t) => !transferIds.has(t.id));
-    return weeklyRemainingByWeek(
+    const discrete = isDiscreteCadence(catItems, priorMonths, { monthOf });
+    const weeklyAvg = buildWeeklyAvg(catItems, priorMonths, starts, dayRanges, { monthOf });
+    const weeklyRemaining = weeklyRemainingByWeek(
       catItems,
       currentMonth,
       starts,
       currentWeek,
-      buildWeeklyAvg(catItems, priorMonths, starts, dayRanges),
+      weeklyAvg,
       {
         sign: flow === 'Income' ? 1 : -1,
         weekdayCurve: weekdayCurves[flow] ?? weekdayCurves.Expense,
         asOf,
         dataThrough,
         dayRanges,
-        discrete: isDiscreteCadence(catItems, priorMonths),
+        discrete,
+        observedDay,
+        monthOf,
       },
     );
+    const nextCycleAvg = nextCycle
+      ? buildWeeklyAvg(catItems, nextCycleHistory, starts, nextCycle.dayRanges, { monthOf }).reduce(
+          (s, x) => s + x,
+          0,
+        )
+      : 0;
+    return { discrete, weeklyAvg, weeklyRemaining, nextCycleAvg };
   };
 
   const { sub: transferSubs, pairedIds } = buildTransferSubcategories(
@@ -338,18 +389,25 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       // sData.items is already account-scoped — the filter happens once, at accumulation.
       if (sData.items.length === 0) return null;
       // Per-category weekly-envelope remaining, split by cycle-week; total is the sum.
-      const weeklyRemaining = skipExpected ? zeroWeeks() : catWeeklyRemaining(sData.items, flow);
+      const envelope = skipExpected
+        ? { discrete: false, weeklyAvg: zeroWeeks(), weeklyRemaining: zeroWeeks(), nextCycleAvg: 0 }
+        : catEnvelope(sData.items, flow);
       const nonTransferItems = sData.items.filter((t) => !transferIds.has(t.id));
       return {
         name: sName,
         key: `${gName}|${level}|${sName}`,
         spendingGroup: level === FLAT_LEVEL ? null : level,
         // Committed spend vs spend you choose — see safeToSpend.js.
-        isBill: !skipExpected && flow === 'Expense' && looksLikeBill(nonTransferItems),
+        isBill: !skipExpected && flow === 'Expense' && looksLikeBill(nonTransferItems, envelope.discrete),
+        // A payment lands, rather than a stream of purchases — the envelope's own verdict, exposed
+        // so safeToSpend can tell committed from discretionary.
+        discrete: envelope.discrete,
         totalsByMonth: totalsForItems(sData.items, calcMonths),
         avg: monthlyAvg(sData.totals, calcMonths, { excludeMonths }),
-        weeklyRemaining,
-        expected: weeklyRemaining.reduce((s, x) => s + x, 0),
+        weeklyAvg: envelope.weeklyAvg,
+        weeklyRemaining: envelope.weeklyRemaining,
+        expected: envelope.weeklyRemaining.reduce((s, x) => s + x, 0),
+        nextCycleAvg: envelope.nextCycleAvg,
         items: sData.items,
         isException: isExceptionGroup,
         skipExpected,
@@ -357,7 +415,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         // now but hasn't this cycle. See missedPayments.js.
         missed: skipExpected
           ? false
-          : isMissedThisCycle(sData.items, priorMonths, currentMonth, starts, observedDay),
+          : isMissedThisCycle(sData.items, priorMonths, currentMonth, starts, observedDay, { monthOf }),
       };
     };
 
@@ -375,6 +433,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         avg: monthlyAvg(sgData.totals, calcMonths, { excludeMonths }),
         weeklyRemaining: weekly,
         expected: weekly.reduce((s, x) => s + x, 0),
+        nextCycleAvg: categories.reduce((s, c) => s + (c.nextCycleAvg ?? 0), 0),
         sub: categories.sort((a, b) => a.name.localeCompare(b.name)),
         items: categories.flatMap((c) => c.items),
         isException: isExceptionGroup,
@@ -417,6 +476,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       avg: isTransferGroup ? 0 : monthlyAvg(gData.totals, calcMonths, { excludeMonths }),
       weeklyRemaining: groupWeekly,
       expected: groupWeekly.reduce((s, x) => s + x, 0),
+      nextCycleAvg: skipExpected ? 0 : sub.reduce((s, x) => s + (x.nextCycleAvg ?? 0), 0),
       sub,
       isException: isExceptionGroup,
       isTransfer: gName === 'Transfers',
@@ -461,6 +521,12 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const netWeeklyRemaining = zeroWeeks().map(
     (_, w) => (incomeRow?.weeklyRemaining?.[w] ?? 0) + (expenseRow?.weeklyRemaining?.[w] ?? 0),
   );
+  // What the cycle after this one is expected to do, from the regular flows alone.
+  const nextCycleExpected = {
+    income: incomeRow?.nextCycleAvg ?? 0,
+    expense: expenseRow?.nextCycleAvg ?? 0,
+    net: (incomeRow?.nextCycleAvg ?? 0) + (expenseRow?.nextCycleAvg ?? 0),
+  };
 
   return {
     rows,
@@ -490,8 +556,13 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     daysToPayday: Math.max(0, cycleLen - curDay),
     isProjectedCycleEnd: calendar.isProjected[currentMonth] ?? false,
     dataThrough: calendar.dataThrough,
+    calendar,
+    cycleLengths: calendar.lengths,
+    nextCycle,
+    nextCycleExpected,
     missedPayments,
     transferIds,
     reversalIds,
+    loanInstalmentIds,
   };
 }

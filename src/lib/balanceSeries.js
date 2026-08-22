@@ -1,6 +1,8 @@
 import { CYCLE_TONES } from '../constants';
 import { parseTransactionDate } from '../utils/date';
-import { accountIdOf, parseAccount } from './accounts';
+import { accountIdOf } from './accounts';
+import { accountTypeOf } from './flows';
+import { accountRows, anchorOffset } from './ledger';
 
 /**
  * Where the money stood, one series per pay cycle, on a day-of-cycle axis.
@@ -11,13 +13,17 @@ import { accountIdOf, parseAccount } from './accounts';
  * at the same point, which a single continuous line across three months cannot show.
  *
  * Loans are excluded and not optional: a bond amortises on a schedule that has nothing to do with
- * the month you are having, and its size would flatten everything else against the axis.
+ * the month you are having, and its size would flatten everything else against the axis. The type
+ * that decides this is the RECORD's — a user who has overridden an account's type sees it treated
+ * that way here too, not the way the export's label would have it.
  *
  * WHERE THE LEVEL COMES FROM. The export has no balance column, so a position is a cumulative sum
  * anchored at zero on the first row in the file — the shape is exact, the level is not. When an
- * account has a balance entered against it, its series is offset so the last point matches and it
- * becomes a true balance. `anchored` reports which of the two you are looking at, so the chart can
- * say so rather than implying a precision it does not have.
+ * account has a balance entered against it, its series is offset so that it reads that balance ON
+ * THE DAY THE BALANCE WAS TRUE (`balanceAsOf`, via ledger.js) — not on the file's last row, which
+ * moved every time a new export arrived and dragged the whole series with it. `anchored` reports
+ * which of the two you are looking at, so the chart can say so rather than implying a precision
+ * it does not have.
  */
 
 const DAY_MS = 86400000;
@@ -37,11 +43,11 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
 
   const length = Math.max(1, Math.round((currentCycleEnd - currentCycleStart) / DAY_MS) + 1);
   const selected = new Set(selectedAccounts ?? []);
-  const balanceById = new Map((accounts ?? []).map((a) => [a.id, a.currentBalance]));
+  const recordById = new Map((accounts ?? []).map((a) => [a.id, a]));
 
   const rows = data
     .filter((t) => {
-      const type = parseAccount(t.Account).type;
+      const type = accountTypeOf(t.Account, accounts);
       if (type === 'Loan' || !INCLUDED.has(type)) return false;
       return !selectedAccounts || selected.has(t.Account);
     })
@@ -55,19 +61,17 @@ export function buildBalanceBands(data, selectedAccounts, accounts, processed, {
 
   if (rows.length === 0) return null;
 
-  // Accumulate from the first row in the file so each cycle's line enters at the right height.
-  const running = new Map();
-  rows.forEach((r) => running.set(r.account, (running.get(r.account) ?? 0) + r.amount));
-
-  // The offset that turns positions into balances, where a balance has been given.
+  // The offset that turns positions into balances, where a balance has been given — anchored at
+  // the record's `balanceAsOf`, so a later import cannot move it.
   const present = [...new Set(rows.map((r) => r.account))];
   const offsets = new Map();
   let anchored = 0;
   present.forEach((account) => {
-    const known = balanceById.get(accountIdOf(account));
-    if (known == null || !Number.isFinite(known)) return;
+    const record = recordById.get(accountIdOf(account));
+    const offset = record ? anchorOffset(accountRows(data, { rawNames: [account] }), record) : null;
+    if (offset == null) return;
     anchored += 1;
-    offsets.set(account, known - (running.get(account) ?? 0));
+    offsets.set(account, offset);
   });
   const totalOffset = present.reduce((s, a) => s + (offsets.get(a) ?? 0), 0);
 

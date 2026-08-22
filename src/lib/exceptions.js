@@ -30,56 +30,66 @@ function median(values) {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function activeMonthsForCategory(items, category) {
-  const months = new Set();
+/**
+ * One pass over a flow's rows: per category, the months it is active in and its monthly
+ * magnitude totals.
+ *
+ * This used to be recomputed from scratch for every question asked of it — `isSparseCategory`
+ * walked every row once per category, and `isOutlierTransaction` walked every row once per
+ * CURRENT-MONTH ROW, which at a 26-cycle range made exception clustering the single most
+ * expensive step in the pipeline (≈ 25 ms of a 45 ms run). The answers never changed between
+ * calls, so they are computed once here and read from the map below. The arithmetic is the
+ * same to the cent: magnitudes summed by effective pay month, months recorded as a set.
+ *
+ * @returns {Map<string, { totals: Record<string, number>, active: Set<string> }>}
+ */
+function profileCategories(items, months) {
+  const monthSet = new Set(months);
+  const profile = new Map();
   items.forEach((t) => {
-    if (categoryName(t) === category) months.add(getPayMonth(t));
+    const category = categoryName(t);
+    const m = getPayMonth(t);
+    let entry = profile.get(category);
+    if (!entry) {
+      entry = { totals: Object.fromEntries(months.map((month) => [month, 0])), active: new Set() };
+      profile.set(category, entry);
+    }
+    entry.active.add(m);
+    if (monthSet.has(m)) entry.totals[m] += Math.abs(t.AmountNum);
   });
-  return months;
+  return profile;
 }
 
-function isSparseCategory(items, category, visibleMonths, monthRatio) {
+function isSparseCategory(entry, visibleMonths, monthRatio) {
   const currentMonth = visibleMonths[visibleMonths.length - 1];
-  const monthSet = activeMonthsForCategory(items, category);
-  const activeCount = monthSet.size;
+  const activeCount = entry.active.size;
   if (activeCount === 0) return false;
 
   const ratio = activeCount / visibleMonths.length;
-  const onlyInCurrentMonth = activeCount === 1 && monthSet.has(currentMonth);
+  const onlyInCurrentMonth = activeCount === 1 && entry.active.has(currentMonth);
   return onlyInCurrentMonth || ratio < monthRatio;
 }
 
-function categoryMonthlyTotals(items, category, months) {
-  const totals = Object.fromEntries(months.map((m) => [m, 0]));
-  items.forEach((t) => {
-    const m = getPayMonth(t);
-    if (categoryName(t) !== category || !months.includes(m)) return;
-    totals[m] += Math.abs(t.AmountNum);
-  });
-  return totals;
-}
-
-function isOutlierTransaction(transaction, items, category, months) {
-  const priorMonths = months.slice(0, -1);
-  const monthlyTotals = categoryMonthlyTotals(items, category, months);
-  const priorValues = priorMonths.map((m) => monthlyTotals[m]).filter((v) => v > 0.001);
-  const baseline = priorValues.length > 0 ? median(priorValues) : 0;
-  const amount = Math.abs(transaction.AmountNum);
-
-  if (baseline < 0.001) {
-    return amount >= OUTLIER_MIN_AMOUNT * OUTLIER_MULTIPLIER;
-  }
-
-  return amount >= OUTLIER_MULTIPLIER * baseline && amount >= OUTLIER_MIN_AMOUNT;
-}
-
-function buildSparseCategorySet(items, months, monthRatio) {
-  const categories = new Set(items.map(categoryName));
+function buildSparseCategorySet(profile, months, monthRatio) {
   const sparse = new Set();
-  categories.forEach((category) => {
-    if (isSparseCategory(items, category, months, monthRatio)) sparse.add(category);
+  profile.forEach((entry, category) => {
+    if (isSparseCategory(entry, months, monthRatio)) sparse.add(category);
   });
   return sparse;
+}
+
+/** Median of the category's prior-month totals, ignoring months it was absent from; 0 with no history. */
+function outlierBaseline(entry, months) {
+  const priorValues = months
+    .slice(0, -1)
+    .map((m) => entry.totals[m])
+    .filter((v) => v > 0.001);
+  return priorValues.length > 0 ? median(priorValues) : 0;
+}
+
+function isOutlierAmount(amount, baseline) {
+  if (baseline < 0.001) return amount >= OUTLIER_MIN_AMOUNT * OUTLIER_MULTIPLIER;
+  return amount >= OUTLIER_MULTIPLIER * baseline && amount >= OUTLIER_MIN_AMOUNT;
 }
 
 function activeMonthsForItems(items) {
@@ -106,16 +116,22 @@ function keepStableDescriptionIncomeRegular(incomeItems, sparseCategories) {
   });
 }
 
-function buildOutlierTransactionIds(items, months, recurringCategories) {
+/**
+ * Current-month rows of a recurring category whose amount dwarfs the category's usual month.
+ * The baseline is read once per category from the profile; the rows are walked once.
+ */
+function buildOutlierTransactionIds(items, months, recurringCategories, profile) {
   const outlierIds = new Set();
   const currentMonth = months[months.length - 1];
+  const baselines = new Map(
+    recurringCategories.map((category) => [category, outlierBaseline(profile.get(category), months)]),
+  );
 
-  recurringCategories.forEach((category) => {
-    items
-      .filter((t) => categoryName(t) === category && getPayMonth(t) === currentMonth)
-      .forEach((t) => {
-        if (isOutlierTransaction(t, items, category, months)) outlierIds.add(t.id);
-      });
+  items.forEach((t) => {
+    if (getPayMonth(t) !== currentMonth) return;
+    const baseline = baselines.get(categoryName(t));
+    if (baseline === undefined) return;
+    if (isOutlierAmount(Math.abs(t.AmountNum), baseline)) outlierIds.add(t.id);
   });
 
   return outlierIds;
@@ -151,14 +167,16 @@ export function buildExceptionClusters(items, months, transferIds) {
   );
   const incomeItems = scoped.filter((t) => t.AmountNum > 0);
   const expenseItems = scoped.filter((t) => t.AmountNum < 0);
+  const incomeProfile = profileCategories(incomeItems, months);
+  const expenseProfile = profileCategories(expenseItems, months);
 
   const incomeSparseCategories = buildSparseCategorySet(
-    incomeItems,
+    incomeProfile,
     months,
     INCOME_EXCEPTION_MONTH_RATIO,
   );
   const expenseSparseCategories = buildSparseCategorySet(
-    expenseItems,
+    expenseProfile,
     months,
     EXCEPTION_MONTH_RATIO,
   );
@@ -170,23 +188,33 @@ export function buildExceptionClusters(items, months, transferIds) {
     if (isUncategorizedCategory(t)) incomeSparseCategories.add(categoryName(t));
   });
 
-  const incomeCategories = new Set(incomeItems.map(categoryName));
-  const expenseCategories = new Set(expenseItems.map(categoryName));
-  const recurringIncome = [...incomeCategories].filter((c) => !incomeSparseCategories.has(c));
-  const recurringExpense = [...expenseCategories].filter((c) => !expenseSparseCategories.has(c));
+  const recurringIncome = [...incomeProfile.keys()].filter((c) => !incomeSparseCategories.has(c));
+  const recurringExpense = [...expenseProfile.keys()].filter((c) => !expenseSparseCategories.has(c));
 
   const outlierTransactionIds = new Set([
-    ...buildOutlierTransactionIds(incomeItems, months, recurringIncome),
-    ...buildOutlierTransactionIds(expenseItems, months, recurringExpense),
+    ...buildOutlierTransactionIds(incomeItems, months, recurringIncome, incomeProfile),
+    ...buildOutlierTransactionIds(expenseItems, months, recurringExpense, expenseProfile),
   ]);
 
-  return {
+  const state = {
     incomeSparseCategories,
     expenseSparseCategories,
     outlierTransactionIds,
-    descToCluster: buildDisplayDescriptionClusters(scoped),
     currentMonth: months[months.length - 1],
   };
+  // Display clustering is the one genuinely expensive step left (≈ 18 ms of Levenshtein work at a
+  // 26-cycle range) and nothing in the pipeline reads it, so it runs the first time something asks
+  // for it and is remembered after. Spreading this object still triggers it — callers that only
+  // need the sets should read them by name.
+  let clusters = null;
+  Object.defineProperty(state, 'descToCluster', {
+    enumerable: true,
+    get() {
+      if (!clusters) clusters = buildDisplayDescriptionClusters(scoped);
+      return clusters;
+    },
+  });
+  return state;
 }
 
 export function resolveMainGroup(transaction, state) {

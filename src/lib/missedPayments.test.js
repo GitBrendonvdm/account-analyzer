@@ -85,3 +85,17 @@ describe('isMissedThisCycle', () => {
     expect(isMissedThisCycle(bill(), [], CURRENT, STARTS, 27)).toBe(false);
   });
 });
+
+describe('isMissedThisCycle — monthOf', () => {
+  it('buckets by the caller\'s month when asked, so a shifted row counts where its total lands', () => {
+    // The export filed this cycle's payment in the previous pay month; the app moved it forward.
+    const shifted = { ...tx('2026-07', '2026-07-24', -4991), effectivePayMonth: CURRENT };
+    const items = [...bill(), shifted];
+    const byRaw = isMissedThisCycle(items, PRIOR, CURRENT, STARTS, 27);
+    const byEffective = isMissedThisCycle(items, PRIOR, CURRENT, STARTS, 27, {
+      monthOf: (t) => t.effectivePayMonth ?? t['Pay Month'],
+    });
+    expect(byRaw).toBe(true);
+    expect(byEffective).toBe(false);
+  });
+});

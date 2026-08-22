@@ -3,8 +3,10 @@ import {
   DISCRETE_MAX_TXN_PER_CYCLE,
   PACE_BLEND,
   WEEKDAY_CURVE_MIN_MASS,
+  WINSOR_MIN_OBSERVATIONS,
 } from '../constants';
 import { parseTransactionDate } from '../utils/date';
+import { winsorise } from './stats';
 
 /**
  * Weekly-envelope projection.
@@ -32,10 +34,22 @@ import { parseTransactionDate } from '../utils/date';
  * depending on which weekday the 23rd falls on, so indexing by week number folded a 6-week cycle's
  * tail into the 5th column and counted a 4-week cycle's missing 5th column as an observed zero.
  * Day-of-cycle is stable across cycles (rent on the 1st is always ~day 9) and conserves the total.
+ *
+ * WHICH MONTH A ROW BELONGS TO is a parameter (`monthOf`), defaulting to the raw `Pay Month`. The
+ * pipeline passes `getPayMonth` so that a salary the export filed in one pay month but the app has
+ * moved to the next (a doubled month) is averaged in the same bucket its total lands in; every
+ * other caller keeps the raw key and nothing changes for it.
+ *
+ * STALE EXPORTS. A completed week is locked at its actuals only when the data actually covers it.
+ * With a ten-day-old export, the weeks between the last row and today have not been observed at
+ * all — locking them at zero wrote off a third of the cycle's spend. An elapsed week the data
+ * never reached carries its average; the week the data ends inside carries the unobserved share.
  */
 
 const DAY_MS = 86400000;
 const WEEK_MS = 7 * DAY_MS;
+
+const defaultMonthOf = (t) => t['Pay Month'];
 
 function itemDate(t) {
   return t.DateObj ?? parseTransactionDate(t.Date);
@@ -90,14 +104,24 @@ function recencyWeights(count) {
 
 /**
  * Recency-weighted average spend per week column, across prior cycles.
- * Only cycles in which the category was actually present contribute to the level; see
- * `expected.js` for the presence factor applied on top.
+ *
+ * Each column is winsorised across the cycles the category was present in before averaging
+ * (`winsor`, on by default), so one abnormal cycle — the month the plumber came — sets the level
+ * of no week. Below WINSOR_MIN_OBSERVATIONS present cycles the percentiles are meaningless and the
+ * values are averaged as they are. Cycles the category was absent from still contribute their
+ * zeros to the average; see `expected.js` for the presence factor applied on top.
  */
-export function buildWeeklyAvg(items, priorMonths, starts, dayRanges) {
+export function buildWeeklyAvg(
+  items,
+  priorMonths,
+  starts,
+  dayRanges,
+  { monthOf = defaultMonthOf, winsor = true } = {},
+) {
   const weekCount = dayRanges.length;
   const byMonth = new Map();
   items.forEach((t) => {
-    const m = t['Pay Month'];
+    const m = monthOf(t);
     if (!starts[m]) return;
     if (!byMonth.has(m)) byMonth.set(m, []);
     byMonth.get(m).push(t);
@@ -118,6 +142,18 @@ export function buildWeeklyAvg(items, priorMonths, starts, dayRanges) {
     return wk;
   });
 
+  if (winsor) {
+    const presentIdx = priorMonths.map((m, i) => (byMonth.has(m) ? i : -1)).filter((i) => i >= 0);
+    if (presentIdx.length >= WINSOR_MIN_OBSERVATIONS) {
+      for (let w = 0; w < weekCount; w++) {
+        const clamped = winsorise(presentIdx.map((i) => perCycle[i][w]));
+        presentIdx.forEach((i, k) => {
+          perCycle[i][w] = clamped[k];
+        });
+      }
+    }
+  }
+
   const weights = recencyWeights(perCycle.length);
   const weekAvg = new Array(weekCount).fill(0);
   for (let w = 0; w < weekCount; w++) {
@@ -137,12 +173,12 @@ export function buildWeeklyAvg(items, priorMonths, starts, dayRanges) {
  * Built once per flow — a per-category weekday profile would be noise at ~25 observations.
  * Falls back to a flat curve when there isn't enough mass to say anything.
  */
-export function buildWeekdayCurve(items, priorMonths) {
+export function buildWeekdayCurve(items, priorMonths, { monthOf = defaultMonthOf } = {}) {
   const months = new Set(priorMonths);
   const mass = new Array(7).fill(0);
   let total = 0;
   items.forEach((t) => {
-    if (!months.has(t['Pay Month'])) return;
+    if (!months.has(monthOf(t))) return;
     const d = itemDate(t);
     if (!d) return;
     const m = Math.abs(t.AmountNum);
@@ -167,11 +203,11 @@ export function buildWeekdayCurve(items, priorMonths) {
  * Does this category arrive as a handful of discrete events (a debit order) or as a stream of
  * small purchases? Median transactions per cycle in the cycles where it appeared at all.
  */
-export function isDiscreteCadence(items, priorMonths) {
+export function isDiscreteCadence(items, priorMonths, { monthOf = defaultMonthOf } = {}) {
   const months = new Set(priorMonths);
   const counts = new Map();
   items.forEach((t) => {
-    const m = t['Pay Month'];
+    const m = monthOf(t);
     if (!months.has(m)) return;
     counts.set(m, (counts.get(m) ?? 0) + 1);
   });
@@ -218,9 +254,25 @@ function currentWeekRemaining({ actual, avg, sign, curve, asOf, dataThrough, wee
 }
 
 /**
+ * What an ELAPSED week the data ends inside still owes: the share of its expectation past the last
+ * observed weekday. A bill keeps whatever of it has not landed.
+ */
+function unobservedRemaining({ actual, avg, sign, curve, dataThrough, discrete }) {
+  const E = Math.max(0, avg * sign);
+  const A = Math.max(0, actual * sign);
+  if (E <= 0) return 0;
+  if (discrete) return Math.max(0, E - A) * sign;
+  const observedShare = curve[Math.min(6, mondayIndexOfDay(dataThrough))];
+  return E * (1 - observedShare) * sign;
+}
+
+/**
  * Remaining spend per week column under the envelope model. Weeks before the current one are 0
- * (locked at actuals); the current week is time-aware; future weeks carry their averages.
- * Indexed 0..weekCount-1; the sum is the total remaining for the cycle.
+ * (locked at actuals) when the data reached them; an elapsed week the data never reached carries
+ * its average and the week the data ends inside carries its unobserved share (`observedDay`, the
+ * cycle day the data reaches — omit it and every elapsed week is taken as observed). The current
+ * week is time-aware; future weeks carry their averages. Indexed 0..weekCount-1; the sum is the
+ * total remaining for the cycle.
  */
 export function weeklyRemainingByWeek(
   items,
@@ -228,39 +280,61 @@ export function weeklyRemainingByWeek(
   starts,
   currentWeek,
   weekAvg,
-  { sign = -1, weekdayCurve, asOf, dataThrough, dayRanges, discrete = false } = {},
+  {
+    sign = -1,
+    weekdayCurve,
+    asOf,
+    dataThrough,
+    dayRanges,
+    discrete = false,
+    observedDay = null,
+    monthOf = defaultMonthOf,
+  } = {},
 ) {
   const start = starts[currentMonth];
   const ranges = dayRanges ?? [];
+  const curve = weekdayCurve ?? Array.from({ length: 7 }, (_, i) => (i + 1) / 7);
 
-  let currentWeekActual = 0;
+  const actualByWeek = new Array(weekAvg.length).fill(0);
   items.forEach((t) => {
-    if (t['Pay Month'] !== currentMonth) return;
+    if (monthOf(t) !== currentMonth) return;
     const d = itemDate(t);
     if (!d || !start) return;
     const day = dayOfCycle(d, start);
-    const range = ranges[currentWeek];
-    if (range ? day >= range.lo && day <= range.hi : mondayWeekIndex(d, start) === currentWeek) {
-      currentWeekActual += t.AmountNum;
-    }
+    const w = ranges.length
+      ? ranges.findIndex((r) => day >= r.lo && day <= r.hi)
+      : mondayWeekIndex(d, start);
+    if (w != null && w >= 0 && w < actualByWeek.length) actualByWeek[w] += t.AmountNum;
   });
 
-  const weekStart =
-    start && ranges[currentWeek]
-      ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + ranges[currentWeek].lo - 1)
+  const weekStartOf = (w) =>
+    start && ranges[w]
+      ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + ranges[w].lo - 1)
       : start;
 
   return weekAvg.map((avg, w) => {
-    if (w < currentWeek) return 0; // elapsed — locked at actuals
-    if (w === currentWeek) {
-      return currentWeekRemaining({
-        actual: currentWeekActual,
+    if (w < currentWeek) {
+      const range = ranges[w];
+      if (observedDay == null || !range || range.hi <= observedDay) return 0; // observed — locked
+      if (range.lo > observedDay) return avg; // the data never reached this week
+      return unobservedRemaining({
+        actual: actualByWeek[w],
         avg,
         sign,
-        curve: weekdayCurve ?? Array.from({ length: 7 }, (_, i) => (i + 1) / 7),
+        curve,
+        dataThrough: dataThrough ?? asOf,
+        discrete,
+      });
+    }
+    if (w === currentWeek) {
+      return currentWeekRemaining({
+        actual: actualByWeek[w],
+        avg,
+        sign,
+        curve,
         asOf,
         dataThrough,
-        weekStart,
+        weekStart: weekStartOf(w),
         discrete,
       });
     }

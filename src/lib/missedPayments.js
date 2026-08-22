@@ -20,6 +20,12 @@ import { parseTransactionDate } from '../utils/date';
  * Dispersion is median-absolute-deviation over the median rather than a standard deviation, so a
  * single doubled instalment (5140 / 5140 / 10420 / 5340 / 5140) doesn't disqualify a payment that
  * is otherwise perfectly regular.
+ *
+ * This rule keys on the category, and a category is not a payment: when the export relabelled its
+ * spending groups in 2026-06 three categories "went missing" that had simply moved. The headline
+ * now reads overdue lines from the recurring engine (recurring.js, upcoming.js), which follows the
+ * merchant rather than the label; `isMissedThisCycle` stays for the pipeline's `missed` flag and
+ * the CycleSummary count, and `isRegularAmount` is the amount test every module shares.
  */
 
 const DAY_MS = 86400000;
@@ -28,6 +34,8 @@ const MIN_OBSERVATIONS = 3;
 // Flag only once we're past the week by which the payment has *usually* landed (75th percentile),
 // so normal week-to-week drift isn't mistaken for a miss.
 const LATE_PERCENTILE = 0.75;
+
+const defaultMonthOf = (t) => t['Pay Month'];
 
 function median(sorted) {
   if (sorted.length === 0) return 0;
@@ -49,7 +57,7 @@ export function amountDispersion(values) {
 }
 
 function itemDate(t) {
-  return parseTransactionDate(t.Date);
+  return t.DateObj ?? parseTransactionDate(t.Date);
 }
 
 // Which cycle-week (0-indexed: week 1 = days 0-6) a date falls in, relative to its cycle start.
@@ -95,9 +103,18 @@ export function isRegularAmount(values) {
  * @param observedDay how many days into the current cycle the DATA reaches — not the wall clock.
  *                    A payment can only be seen to have landed up to the export's last date, so
  *                    measuring lateness against today would call every unexported bill overdue.
+ * @param options.monthOf which month a row belongs to (default the raw `Pay Month`; the pipeline
+ *                    passes `getPayMonth` so income is bucketed the way its totals are)
  * @returns true when the payment's usual week has passed with nothing landed this cycle
  */
-export function isMissedThisCycle(items, priorMonths, currentMonth, starts, observedDay) {
+export function isMissedThisCycle(
+  items,
+  priorMonths,
+  currentMonth,
+  starts,
+  observedDay,
+  { monthOf = defaultMonthOf } = {},
+) {
   if (!priorMonths.length) return false;
 
   // earliest cycle-week the category landed in, and what it charged, per prior cycle
@@ -105,7 +122,7 @@ export function isMissedThisCycle(items, priorMonths, currentMonth, starts, obse
   const cycleTotals = [];
   priorMonths.forEach((m) => {
     const start = starts[m];
-    const inMonth = items.filter((t) => t['Pay Month'] === m);
+    const inMonth = items.filter((t) => monthOf(t) === m);
     const earliest = inMonth
       .map((t) => cycleWeekIndex(itemDate(t), start))
       .filter((w) => w != null)
@@ -122,7 +139,7 @@ export function isMissedThisCycle(items, priorMonths, currentMonth, starts, obse
   if (!isRegularAmount(cycleTotals)) return false;
 
   // already landed this cycle → not missed
-  if (items.some((t) => t['Pay Month'] === currentMonth)) return false;
+  if (items.some((t) => monthOf(t) === currentMonth)) return false;
 
   const sorted = [...occurrenceWeeks].sort((a, b) => a - b);
   const usualLatestWeek = sorted[Math.floor((sorted.length - 1) * LATE_PERCENTILE)];

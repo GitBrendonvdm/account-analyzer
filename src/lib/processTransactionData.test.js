@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { processTransactionData } from './processTransactionData';
 import { groupTransactionsByDescription } from './groupTransactions';
+import { buildExceptionClusters } from './exceptions';
+import { buildDescriptionClusters } from './descriptionClustering';
+import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
+import { parseAccount } from './accounts';
+import {
+  EXCEPTION_MONTH_RATIO,
+  INCOME_EXCEPTION_MONTH_RATIO,
+  OUTLIER_MIN_AMOUNT,
+  OUTLIER_MULTIPLIER,
+  UNCATEGORIZED_CATEGORY_LABELS,
+} from '../constants';
 import { loadRealExport } from '../test/realData';
 
 const real = loadRealExport();
@@ -206,5 +217,163 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
         const childSum = (row.sub ?? []).reduce((s, x) => s + (x.expected ?? 0), 0);
         expect(childSum).toBeCloseTo(row.expected ?? 0, 6);
       });
+  });
+
+  it('exposes the calendar, the cycle lengths and the loan-instalment legs', () => {
+    expect(processed.calendar.starts['2026-08']).toBeInstanceOf(Date);
+    expect(processed.calendar.boundaryDom).toBe(23);
+    expect(processed.cycleLengths['2026-08']).toBe(31);
+    expect(processed.cycleLengths).toBe(processed.calendar.lengths);
+    expect(processed.loanInstalmentIds.size).toBeGreaterThan(0);
+    // The paying legs are spend, never transfers.
+    [...processed.loanInstalmentIds].forEach((id) => expect(processed.transferIds.has(id)).toBe(false));
+  });
+
+  it('gives every category row its cadence verdict and weekly averages', () => {
+    const categories = processed.rows
+      .filter((r) => !r.isTransfer && !r.isException)
+      .flatMap((g) => g.sub.flatMap((s) => (s.isSpendingGroup ? s.sub : [s])));
+    expect(categories.length).toBeGreaterThan(10);
+    categories.forEach((c) => {
+      expect(typeof c.discrete).toBe('boolean');
+      expect(c.weeklyAvg).toHaveLength(c.weeklyRemaining.length);
+      expect(typeof c.nextCycleAvg).toBe('number');
+    });
+    expect(categories.some((c) => c.discrete)).toBe(true);
+    expect(categories.some((c) => !c.discrete)).toBe(true);
+  });
+
+  it('describes the next cycle: 23 Aug – 22 Sep 2026, 31 days, with its expected flows', () => {
+    expect(iso(processed.nextCycle.start)).toBe('2026-08-23');
+    expect(iso(processed.nextCycle.end)).toBe('2026-09-22');
+    expect(processed.nextCycle.length).toBe(31);
+    expect(processed.nextCycle.dayRanges[0].lo).toBe(1);
+    expect(processed.nextCycle.dayRanges.at(-1).hi).toBe(31);
+    expect(processed.nextCycleExpected.expense).toBeLessThan(0);
+    expect(processed.nextCycleExpected.income).toBeGreaterThan(0);
+    expect(processed.nextCycleExpected.net).toBeCloseTo(
+      processed.nextCycleExpected.income + processed.nextCycleExpected.expense,
+      6,
+    );
+  });
+});
+
+/* ---- reference: the exception rules as they stood before the one-pass precompute (§3.3.7) ----
+ * Kept verbatim so the precomputed profile can be checked against them on the real export. */
+const refCategoryName = (t) => t.Category || 'Uncategorized';
+function refIsUncategorized(t) {
+  const raw = t.Category;
+  if (!raw || raw.trim() === '') return true;
+  return UNCATEGORIZED_CATEGORY_LABELS.some((label) => label.toLowerCase() === raw.trim().toLowerCase());
+}
+function refMedian(values) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+function refActiveMonths(items, category) {
+  const months = new Set();
+  items.forEach((t) => {
+    if (refCategoryName(t) === category) months.add(getPayMonth(t));
+  });
+  return months;
+}
+function refIsSparse(items, category, visibleMonths, monthRatio) {
+  const currentMonth = visibleMonths[visibleMonths.length - 1];
+  const monthSet = refActiveMonths(items, category);
+  const activeCount = monthSet.size;
+  if (activeCount === 0) return false;
+  const ratio = activeCount / visibleMonths.length;
+  const onlyInCurrentMonth = activeCount === 1 && monthSet.has(currentMonth);
+  return onlyInCurrentMonth || ratio < monthRatio;
+}
+function refMonthlyTotals(items, category, months) {
+  const totals = Object.fromEntries(months.map((m) => [m, 0]));
+  items.forEach((t) => {
+    const m = getPayMonth(t);
+    if (refCategoryName(t) !== category || !months.includes(m)) return;
+    totals[m] += Math.abs(t.AmountNum);
+  });
+  return totals;
+}
+function refIsOutlier(t, items, category, months) {
+  const priorMonths = months.slice(0, -1);
+  const monthlyTotals = refMonthlyTotals(items, category, months);
+  const priorValues = priorMonths.map((m) => monthlyTotals[m]).filter((v) => v > 0.001);
+  const baseline = priorValues.length > 0 ? refMedian(priorValues) : 0;
+  const amount = Math.abs(t.AmountNum);
+  if (baseline < 0.001) return amount >= OUTLIER_MIN_AMOUNT * OUTLIER_MULTIPLIER;
+  return amount >= OUTLIER_MULTIPLIER * baseline && amount >= OUTLIER_MIN_AMOUNT;
+}
+function refSparseSet(items, months, monthRatio) {
+  const sparse = new Set();
+  new Set(items.map(refCategoryName)).forEach((category) => {
+    if (refIsSparse(items, category, months, monthRatio)) sparse.add(category);
+  });
+  return sparse;
+}
+function refHasStableDescription(items) {
+  if (items.length < 2) return false;
+  const { clusterInfo } = buildDescriptionClusters(items.map((t) => t.Description));
+  return [...clusterInfo.values()].some((info) => {
+    const clusterItems = items.filter((t) => info.variants.includes(t.Description));
+    const clusterMonths = new Set(clusterItems.map(getPayMonth));
+    return clusterItems.length / items.length >= 0.8 && clusterMonths.size >= 2;
+  });
+}
+function refOutliers(items, months, recurringCategories) {
+  const out = new Set();
+  const currentMonth = months[months.length - 1];
+  recurringCategories.forEach((category) => {
+    items
+      .filter((t) => refCategoryName(t) === category && getPayMonth(t) === currentMonth)
+      .forEach((t) => {
+        if (refIsOutlier(t, items, category, months)) out.add(t.id);
+      });
+  });
+  return out;
+}
+function refExceptionSets(items, months, transferIds) {
+  const scoped = items.filter((t) => months.includes(getPayMonth(t)) && !transferIds.has(t.id));
+  const incomeItems = scoped.filter((t) => t.AmountNum > 0);
+  const expenseItems = scoped.filter((t) => t.AmountNum < 0);
+  const incomeSparse = refSparseSet(incomeItems, months, INCOME_EXCEPTION_MONTH_RATIO);
+  const expenseSparse = refSparseSet(expenseItems, months, EXCEPTION_MONTH_RATIO);
+  incomeSparse.forEach((category) => {
+    if (refHasStableDescription(incomeItems.filter((t) => refCategoryName(t) === category))) incomeSparse.delete(category);
+  });
+  incomeItems.forEach((t) => {
+    if (refIsUncategorized(t)) incomeSparse.add(refCategoryName(t));
+  });
+  const recurringIncome = [...new Set(incomeItems.map(refCategoryName))].filter((c) => !incomeSparse.has(c));
+  const recurringExpense = [...new Set(expenseItems.map(refCategoryName))].filter((c) => !expenseSparse.has(c));
+  const outliers = new Set([...refOutliers(incomeItems, months, recurringIncome), ...refOutliers(expenseItems, months, recurringExpense)]);
+  return { incomeSparse, expenseSparse, outliers };
+}
+
+describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches the old rules', () => {
+  const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
+  const allMonths = [...new Set(real?.map((t) => t['Pay Month']) ?? [])].sort();
+  const loans = new Set(accounts.filter((a) => parseAccount(a).type === 'Loan'));
+  const asOf = new Date(2026, 7, 22);
+  const sorted = (set) => [...set].sort();
+
+  [26, 6].forEach((range) => {
+    it(`returns the same sparse categories and outliers at range ${range}`, () => {
+      const months = allMonths.slice(-range);
+      const processed = processTransactionData(real, accounts, range, asOf);
+      const scoped = enrichWithEffectivePayMonths(real, months).filter((t) => !loans.has(t.Account));
+      const fast = buildExceptionClusters(scoped, months, processed.transferIds);
+      const ref = refExceptionSets(scoped, months, processed.transferIds);
+      expect(sorted(fast.incomeSparseCategories)).toEqual(sorted(ref.incomeSparse));
+      expect(sorted(fast.expenseSparseCategories)).toEqual(sorted(ref.expenseSparse));
+      expect(sorted(fast.outlierTransactionIds)).toEqual(sorted(ref.outliers));
+      expect(fast.expenseSparseCategories.size).toBeGreaterThan(0);
+      expect(fast.currentMonth).toBe(months.at(-1));
+      // The display clustering is still there for anyone who asks for it.
+      expect(fast.descToCluster).toBeInstanceOf(Map);
+      expect(fast.descToCluster.size).toBeGreaterThan(0);
+    });
   });
 });
