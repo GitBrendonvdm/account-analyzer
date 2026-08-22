@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Check, Loader2, Upload } from 'lucide-react';
+import { Check, Download, Loader2, LogOut, Upload } from 'lucide-react';
 import { accountLabel } from '../db/accountIdentity';
 
 const VIEWS = [
@@ -31,6 +31,9 @@ export function TopBar({
   availableMonthCount,
   dataThrough,
   staleLevel,
+  exportUrl,
+  onSignOut,
+  extraControls = null,
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftRange, setDraftRange] = useState(monthRange);
@@ -93,6 +96,21 @@ export function TopBar({
             {allOn ? 'All accounts' : `${selectedIds.length} of ${accounts.length}`}
           </button>
 
+          {extraControls}
+
+          {/* The whole transaction set as one CSV — the backup that no browser profile can lose. */}
+          {exportUrl && (
+            <a
+              href={exportUrl}
+              download="transactions-export.csv"
+              title="Download every transaction as CSV"
+              className="glass-chip press flex items-center gap-2 px-3.5 py-2 text-[12.5px] text-label-2 hover:text-label"
+            >
+              <Download size={14} />
+              Export
+            </a>
+          )}
+
           <label className="press flex cursor-pointer items-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110">
             {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
             {importing ? 'Importing' : 'Import'}
@@ -104,6 +122,18 @@ export function TopBar({
               disabled={importing}
             />
           </label>
+
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              title="Sign out"
+              aria-label="Sign out"
+              className="glass-chip press flex items-center p-2 text-label-3 hover:text-label"
+            >
+              <LogOut size={14} />
+            </button>
+          )}
         </div>
       </div>
 

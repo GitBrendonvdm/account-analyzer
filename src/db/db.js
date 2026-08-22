@@ -12,7 +12,10 @@ import Dexie from 'dexie';
  * corrections — has to outlive the next import. In the old model there was nowhere to put it that
  * an upload wouldn't overwrite.
  *
- * Everything stays on the device. No server, no sync, no account.
+ * SINCE THE SERVER DATABASE ARRIVED this store is the one-time migration source and nothing else:
+ * the app reads and writes through src/api/client.js, and the rows held here are offered up to the
+ * server once (see MigrateBanner) and never consulted again. It stays so that a browser that
+ * imported before the server existed can hand its history over without re-importing every CSV.
  */
 export const db = new Dexie('money-visualizer');
 

@@ -43,5 +43,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), fixtureServer()],
   server: {
     port: 3000,
+    // The API is a separate process in development (`npm run server` on 8080). Proxying keeps the
+    // app same-origin, which the session cookie (SameSite=Strict) depends on.
+    proxy: {
+      '/api': 'http://127.0.0.1:8080',
+    },
   },
 })

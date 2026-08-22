@@ -23,4 +23,13 @@ export default defineConfig([
     files: ['**/*.test.{js,jsx}', 'src/test/**/*.js', 'scripts/**/*.mjs', 'vite.config.js'],
     languageOptions: { globals: globals.node },
   },
+  {
+    // The server is plain Node ESM: no JSX, no React, no browser globals.
+    files: ['server/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+    },
+  },
 ])

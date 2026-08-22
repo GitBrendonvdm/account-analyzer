@@ -26,6 +26,8 @@ import { buildGapClosers, buildTrajectory } from './lib/trajectory';
 import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
 import { LedgerView } from './components/LedgerView';
+import { Login } from './components/Login';
+import { MigrateBanner } from './components/MigrateBanner';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -48,6 +50,16 @@ export default function App() {
     lastImport,
     dismissLastImport,
     importing,
+    importError,
+    dismissImportError,
+    auth,
+    signIn,
+    signOut,
+    localDump,
+    migrateLocal,
+    migrating,
+    dismissLocalDump,
+    exportUrl,
   } = useAnalyzerState();
 
   const processed = useTransactionData(data, selectedAccounts, monthRange);
@@ -162,6 +174,17 @@ export default function App() {
     );
   }
 
+  // The data lives on the server now, behind one passphrase. Nothing renders until it has been
+  // given — not even the empty state, which would otherwise reveal whether any data exists.
+  if (!auth.authenticated) {
+    return (
+      <div className="relative min-h-screen">
+        <Aurora />
+        <Login configured={auth.configured} onSubmit={signIn} error={auth.error} busy={auth.busy} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen">
       <Aurora />
@@ -179,8 +202,26 @@ export default function App() {
           availableMonthCount={availableMonthCount}
           dataThrough={processed?.dataThrough}
           staleLevel={summary?.staleLevel}
+          exportUrl={exportUrl}
+          onSignOut={signOut}
         />
         <div className="flex min-h-[calc(100vh-9.5rem)] flex-col gap-5 pt-2">
+          {localDump && (
+            <MigrateBanner
+              dump={localDump}
+              onMigrate={migrateLocal}
+              busy={migrating}
+              onDismiss={dismissLocalDump}
+            />
+          )}
+          {importError && (
+            <div className="glass-tile flex items-center justify-between gap-4 px-5 py-3 text-[13px] text-bad">
+              <span>Import failed: {importError}</span>
+              <button type="button" onClick={dismissImportError} className="press text-label-2 hover:text-label">
+                Dismiss
+              </button>
+            </div>
+          )}
           <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
           {processed ? (
             <>

@@ -11,11 +11,21 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "backtest": "vite-node scripts/backtest.mjs",
-    "ingest": "vite-node scripts/ingest.mjs"
+    "ingest": "vite-node scripts/ingest.mjs",
+    "server": "node --import ./server/resolve.mjs server/index.mjs",
+    "test:server": "vitest run server"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.6",
+    "@fastify/compress": "^9.2.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.3",
+    "@tesseract.js-data/eng": "^1.0.0",
     "dexie": "^4.4.5",
+    "fastify": "^5.12.1",
     "lucide-react": "^1.17.0",
+    "pg": "^8.23.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1"

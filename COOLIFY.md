@@ -4,7 +4,15 @@ Coolify watches `main` and deploys itself. There is no CI step in this repo — 
 
 - App: https://accountAnalyzer.upshft.app
 - Coolify: https://coolify.upshft.app → project `upshft` → environment `production`
-- Build: Dockerfile, exposes port 80. Health check: `GET /` on port 80.
+- Build: Dockerfile, exposes port **8080** (one Node process serving the app and `/api`).
+  Health check: `GET /api/health` on port 8080 — returns `{ ok, db, backend }`, 503 if the database
+  query fails.
+- Database: the `analyzer` Postgres 16 service in the same project. The app needs
+  `DATABASE_URL=postgres://analyzer:…@<internal host>:5432/analyzer` in its environment; without it
+  the container falls back to PGlite inside the container and **data does not survive a redeploy**
+  (the health check says `backend: "pglite"` when that has happened).
+- First visit after a fresh database asks for a passphrase. To reset a lost one, add
+  `RESET_PASSPHRASE=1` to the environment, redeploy once, then remove it.
 
 ## How the trigger is wired
 
