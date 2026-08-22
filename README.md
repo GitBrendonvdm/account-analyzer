@@ -19,24 +19,42 @@ balances and unlocks net worth, the debt trajectory and payoff dates.
 
 ## What it shows
 
-**Headlines** — the three to five biggest facts in your data, as sentences, each carrying the
-arithmetic behind it. The deficit and what's funding it, what the debt costs, which card is running
-out of room.
+**Today** — safe to spend before payday, six vitals (savings rate, debt-service ratio, interest
+burden, runway, card utilisation, the deficit) pooled over the last three and twelve cycles with a
+direction arrow each, what is coming up in the next 30 days with a status per bill, a day-by-day
+cash path to payday (labelled an estimate until its backtest gate is met), and the two overlaid
+cycle charts.
 
-**Table** — income and spend per pay cycle, nested under the export's own Spending Group, with a
+**Headlines** — the three to five biggest facts in your data, as sentences, each carrying the
+arithmetic behind it: which payoff order clears everything by when and what it saves, what the
+deficit costs in card interest, debt service as a share of income, what is genuinely overdue.
+
+**Ledger** — income and spend per pay cycle, nested under the export's own Spending Group, with a
 forecast to payday. Columns left of the divider are what happened; everything right of it is a
 projection, and the header says so.
 
-**Charts** — running net total and per-period net, projected to the next payday.
+**Trends** — running net total and per-period net, projected to the next payday.
 
-**Habits** — who you actually pay. Merchants rather than categories, standing commitments with
-their annual cost, which categories are rising or falling, and the weekday shape of a typical cycle.
+**Habits** — where money can be found. The Savings Finder (cancellable spend separated from
+behavioural potential; card interest reported, never counted as found), standing charges with
+cadence and annual cost, price increases as steps, what changed (median + MAD drift), new and
+lapsed charges, trips versus tickets, then the merchants and the weekday shape.
 
-**Plan** — safe to spend today, per-category targets judged against where the cycle is *heading*,
-a twelve-cycle trajectory with debt crossing dates, a ranked way to close the gap, and goals with
-honest arrival dates.
+**Plan** — safe to spend, a direction table (three cycles against twelve), "what would it take" to
+be debt-free by a date, per-category targets judged against where the cycle is *heading*, a
+twelve-cycle trajectory, a ranked way to close the gap, every standing charge, and goals.
 
-**Accounts** — balances, per-cycle positions, what the debt costs, and per-account movement.
+**Debt** — each liability's rate, instalment, fees and remaining term read off its own ledger
+(typed values win and are labelled), the deficit and what it costs, payoff strategies — minimum,
+avalanche, snowball, lifetime, short-term effect, custom — with the cascade of freed instalments,
+the balance chart, the freed-cash timeline, what R1 000 extra is worth on each debt, a lump-sum
+what-if, the cards, and rate sensitivity.
+
+**Accounts** — balances with their as-of date and where they came from, external accounts the
+export never sees, per-cycle positions, what the debt costs with the fees audit, and per-account
+movement.
+
+Every chart is interactive: drag to zoom, hover for the readout, click a legend entry to hide it.
 
 ## Importing
 
@@ -55,6 +73,13 @@ silently destroyed history. Instead:
   import.
 
 Import order doesn't matter. Any sequence of the same files converges on the same data.
+
+**Account-summary PDFs.** The *Account summary* button takes the "account overview" PDF that FNB
+and Nedbank online banking print. FNB's has a text layer; Nedbank's is an image and is read by OCR
+in your browser (nothing leaves it). Each account is matched to a known account by the last four
+digits of its number, a preview shows what would change, and on confirm balances, as-of dates and
+derived card/overdraft limits are written; balances the export never sees (a retirement annuity,
+an emergency fund) become external accounts so net worth is complete.
 
 ## Server & database
 
