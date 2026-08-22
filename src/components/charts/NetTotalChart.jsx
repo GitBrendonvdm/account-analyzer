@@ -3,61 +3,67 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
+import {
+  ChartFrame,
+  ChartLegend,
+  ChartTooltip,
+  INFO,
+  LABEL,
+  ZoomHint,
+  axisStyle,
+  compactNumber,
+  cursorStyle,
+  gridStyle,
+  selectionStyle,
+  useReducedMotion,
+  useSeriesToggle,
+  useZoomDomain,
+  yAxisStyle,
+} from './interactive';
 
-function ChartTooltip({ active, payload, label, chartData }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload;
-  return (
-    <div className="glass-tile p-3 text-sm shadow-md">
-      <p className="mb-2 font-medium text-label-2">{label}</p>
-      {row?.actual != null && (
-        <p className="text-label">
-          Running total: <span className="font-semibold">{formatCurrency(row.actual)}</span>
-        </p>
-      )}
-      {row?.expectedProjected != null && row.isFuture && (
-        <p className="text-info">
-          Projected: <span className="font-semibold">{formatCurrency(row.expectedProjected)}</span>
-        </p>
-      )}
-      {row?.isToday && chartData && (
-        <div className="mt-2 space-y-1 border-t pt-2 text-xs text-label-2">
-          <p>Prior months: {formatCurrency(chartData.priorRunning)}</p>
-          <p>This month (table): {formatCurrency(chartData.tableMonthNet)}</p>
-          <p>Running today: {formatCurrency(chartData.todayRunning)}</p>
-          <p>
-            This month projected: {formatCurrency(chartData.tableMonthNet)} + remaining{' '}
-            {formatCurrency(chartData.signedRemaining)} ={' '}
-            {formatCurrency(chartData.currentMonthProjected)}
-          </p>
-          <p>
-            Next-pay target: {formatCurrency(chartData.priorRunning)} + this cycle projected ={' '}
-            {formatCurrency(chartData.monthEndProjectedRunning)}
-          </p>
-          <p>
-            Table remaining: income {formatCurrency(chartData.incomeRemaining)} + expense{' '}
-            {formatCurrency(chartData.expenseRemaining)} = {formatCurrency(chartData.netExpected)}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
+/**
+ * The running net total, bucketed, with the projection to next pay drawn on after today.
+ *
+ * Two lines, two colours: the history in the label white, the projection in blue and DASHED, so
+ * what has happened and what is expected to happen never read as one line. The projection starts
+ * at the today point so the two meet rather than overlap.
+ *
+ * Hovering reads both lines plus the change since the first visible point, which is the figure the
+ * chart exists to give: zoom to a stretch and the delta is the net for that stretch. The today
+ * point carries the reconciliation underneath — prior cycles, this cycle, the remaining estimate —
+ * because that is the join where the chart and the table have to agree.
+ */
+
+const EMPTY = [];
+const SERIES = ['actual', 'expectedProjected'];
+/** The legend swatch for the projection is dashed like the line it names. */
+const DASHED_SWATCH = `repeating-linear-gradient(90deg, ${INFO} 0 4px, transparent 4px 7px)`;
 
 const granularityLabel = {
   day: 'daily',
   week: 'weekly',
   month: 'monthly',
 };
+const granularityUnit = {
+  day: 'days',
+  week: 'weeks',
+  month: 'months',
+};
 
 export function NetTotalChart({ chartData }) {
-  if (!chartData?.points.length) {
+  const points = chartData?.points ?? EMPTY;
+  const zoom = useZoomDomain(points, 'label');
+  const toggles = useSeriesToggle(SERIES);
+  const reduced = useReducedMotion();
+
+  if (!points.length) {
     return (
       <div className="flex h-80 items-center justify-center text-sm text-label-2">
         No chart data for the selected range.
@@ -67,15 +73,38 @@ export function NetTotalChart({ chartData }) {
 
   const {
     granularity,
-    points,
     netAvg,
     netExpected,
     incomeRemaining,
     expenseRemaining,
     tableMonthNet,
+    signedRemaining,
+    priorRunning,
     monthEndProjectedRunning,
     todayRunning,
   } = chartData;
+
+  const { visibleData } = zoom;
+  const first = visibleData[0];
+  const last = visibleData[visibleData.length - 1];
+  const summary = `Net total over time, ${granularityLabel[granularity]} buckets. Running total ${formatCurrency(
+    todayRunning,
+  )} today, projected ${formatCurrency(monthEndProjectedRunning)} at next pay.${
+    zoom.zoomed ? ` Zoomed to ${first.label} – ${last.label}.` : ''
+  }`;
+
+  // The today point is where the chart and the table meet; show the sum that gets from one to the
+  // other so a disagreement is visible at the join rather than discovered later.
+  const todayFooter = (row) =>
+    row?.isToday ? (
+      <div className="space-y-0.5">
+        <p>Prior cycles: {formatCurrency(priorRunning)}</p>
+        <p>
+          This cycle: {formatCurrency(tableMonthNet)} + remaining {formatCurrency(signedRemaining)}
+        </p>
+        <p className="text-label">Next pay: {formatCurrency(monthEndProjectedRunning)}</p>
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-4">
@@ -92,56 +121,80 @@ export function NetTotalChart({ chartData }) {
         </p>
       </div>
 
-      <div className="h-96 w-full">
+      <ChartFrame label={summary} zoom={zoom} unit={granularityUnit[granularity]} className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+          <LineChart
+            data={visibleData}
+            margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+            {...zoom.chartProps}
+          >
+            <CartesianGrid {...gridStyle} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }}
+              {...axisStyle}
               interval="preserveStartEnd"
               angle={granularity === 'day' ? -35 : 0}
               textAnchor={granularity === 'day' ? 'end' : 'middle'}
               height={granularity === 'day' ? 60 : 30}
             />
-            <YAxis
-              tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }}
-              tickFormatter={(v) =>
-                new Intl.NumberFormat('en-ZA', {
-                  notation: 'compact',
-                  maximumFractionDigits: 1,
-                }).format(v)
+            <YAxis {...yAxisStyle} tickFormatter={compactNumber} />
+            <Tooltip
+              cursor={cursorStyle}
+              isAnimationActive={false}
+              active={zoom.dragging ? false : undefined}
+              content={<ChartTooltip deltaFrom={first} footer={todayFooter} />}
+            />
+            <Legend
+              content={
+                <ChartLegend
+                  toggle={toggles.toggle}
+                  isHidden={toggles.isHidden}
+                  swatch={{ expectedProjected: DASHED_SWATCH }}
+                />
               }
             />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 12, background: '#16161c', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7' }} itemStyle={{ color: '#f5f5f7' }} labelStyle={{ color: 'rgba(235,235,245,0.6)' }} content={<ChartTooltip chartData={chartData} />} />
-            <Legend />
             <Line
               type="monotone"
               dataKey="actual"
               name="Running total"
-              stroke="#f5f5f7"
+              stroke={LABEL}
               strokeWidth={2.5}
-              dot={{ r: 3 }}
+              dot={{ r: 2.5, fill: LABEL, strokeWidth: 0 }}
+              activeDot={{ r: 5, stroke: '#08080a', strokeWidth: 2 }}
               connectNulls={false}
+              hide={toggles.isHidden('actual')}
+              isAnimationActive={!reduced}
             />
             <Line
               type="monotone"
               dataKey="expectedProjected"
-              name="Remaining projection"
-              stroke="#0a84ff"
+              name="Projected"
+              stroke={INFO}
               strokeWidth={2}
               strokeDasharray="6 4"
-              dot={{ r: 3, fill: '#0a84ff' }}
+              dot={{ r: 2.5, fill: INFO, strokeWidth: 0 }}
+              activeDot={{ r: 5, stroke: '#08080a', strokeWidth: 2 }}
               connectNulls
+              hide={toggles.isHidden('expectedProjected')}
+              isAnimationActive={!reduced}
             />
+            {zoom.selection && (
+              <ReferenceArea x1={zoom.selection.x1} x2={zoom.selection.x2} {...selectionStyle} />
+            )}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </ChartFrame>
+
+      <ZoomHint
+        zoomed={zoom.zoomed}
+        onReset={zoom.reset}
+        label={zoom.zoomed ? `${first.label} – ${last.label}` : null}
+      />
 
       <div className="space-y-1 text-xs text-label-2">
         <p>
-          Running total uses base transactions through each bucket. The blue line projects from today
-          ({formatCurrency(todayRunning)}) to next pay ({formatCurrency(monthEndProjectedRunning)}
+          Running total uses base transactions through each bucket. The dashed line projects from
+          today ({formatCurrency(todayRunning)}) to next pay ({formatCurrency(monthEndProjectedRunning)}
           ): current cycle ({formatCurrency(tableMonthNet)}) + remaining ({formatCurrency(netExpected)}
           ).
         </p>

@@ -23,6 +23,11 @@ import { formatCurrency } from '../../utils/format';
  * The selection tracks the pointer 1:1 and is drawn from the moment the button goes down rather
  * than on release, so the gesture is visible while it happens instead of resolving afterwards.
  * Double-click, Escape or the reset chip puts it back.
+ *
+ * LEGEND TOGGLES. Clicking a cycle in the legend takes its line off the plot, and the y-range is
+ * recomputed from what is left, so hiding the outlier cycle is how you zoom the others into
+ * focus. The hidden set is owned by the chart that renders the legend and passed down to both,
+ * because the legend and the plot are separate children of the card's header and body.
  */
 
 const W = 1000;
@@ -52,11 +57,18 @@ export function CycleOverlay({
    *             you feel.
    */
   deltaMode = 'start',
+  /** Ids of cycles the legend has switched off; they keep their legend entry and lose their line. */
+  hidden,
 }) {
   const svgRef = useRef(null);
   const [range, setRange] = useState(null); // {from,to} in days; null = the whole cycle
   const [drag, setDrag] = useState(null); // {from,to} while the pointer is down
   const [hover, setHover] = useState(null); // day index under the pointer
+
+  const shown = useMemo(
+    () => (hidden?.size ? series?.filter((s) => !hidden.has(s.id)) : series),
+    [series, hidden],
+  );
 
   const from = range?.from ?? 0;
   const to = range?.to ?? length - 1;
@@ -117,9 +129,10 @@ export function CycleOverlay({
     if (!series?.length || !length) return null;
     const span = Math.max(1, to - from);
 
-    // Rescale y to what is actually visible. Holding the full-range scale while zoomed in would
-    // keep a wider window's extremes and leave the selected stretch as flat as it looked before.
-    const visible = series.flatMap((s) => s.points.slice(from, to + 1).filter((v) => v != null));
+    // Rescale y to what is actually visible — the zoomed span of the cycles that are switched on.
+    // Holding the full-range scale would keep a wider window's extremes, or a hidden cycle's, and
+    // leave the selected stretch as flat as it looked before.
+    const visible = shown.flatMap((s) => s.points.slice(from, to + 1).filter((v) => v != null));
     const lo = visible.length ? Math.min(...visible) : min;
     const hi = visible.length ? Math.max(...visible) : max;
     const pad = (hi - lo || 1) * 0.08;
@@ -144,7 +157,7 @@ export function CycleOverlay({
       return d.trim();
     };
 
-    const shapes = series.map((s) => {
+    const shapes = shown.map((s) => {
       const solidTo = s.throughDay == null ? s.points.length - 1 : s.throughDay;
       return {
         ...s,
@@ -165,7 +178,7 @@ export function CycleOverlay({
       gridYs: [0.25, 0.5, 0.75].map((f) => PAD + f * (H - PAD * 2)),
       ticks: [...new Set([0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(from + f * span)))],
     };
-  }, [series, length, min, max, from, to]);
+  }, [series, shown, length, min, max, from, to]);
 
   if (!geometry) return null;
 
@@ -183,7 +196,7 @@ export function CycleOverlay({
           day: hover,
           x: geometry.xOf(hover),
           baselineLabel: deltaMode === 'peak' ? 'from peak' : `since ${dayLabel(from)}`,
-          rows: series
+          rows: shown
             .map((s) => {
               const here = s.points[hover];
               if (here == null) return null;
@@ -238,7 +251,7 @@ export function CycleOverlay({
           }}
           onDoubleClick={reset}
           role="img"
-          aria-label={series.map((s) => `${s.label}: ${formatCurrency(s.total)}`).join('. ')}
+          aria-label={shown.map((s) => `${s.label}: ${formatCurrency(s.total)}`).join('. ')}
         >
           {geometry.gridYs.map((y) => (
             <line
@@ -419,27 +432,53 @@ export function CycleOverlay({
   );
 }
 
-/** One entry per cycle: its colour, its name and where it ended up. */
-export function CycleLegend({ series, tone }) {
+/**
+ * One entry per cycle: its colour, its name and where it ended up. Given `onToggle`, each entry
+ * is a button that switches its line off and on; a switched-off cycle stays in the legend at 35%,
+ * so the way back is where the way in was.
+ */
+export function CycleLegend({ series, tone, hidden, onToggle }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-      {series.map((s) => (
-        <span key={s.id} className="flex items-center gap-2 text-[12.5px]">
-          <span
-            className="block h-[3px] w-4 rounded-full"
-            style={{ background: s.colour, opacity: at(DEPTH_OPACITY, s.depth) }}
-          />
-          <span
-            className={s.isCurrent ? 'font-medium text-label' : 'text-label-2'}
-            style={{ opacity: s.isCurrent ? 1 : 0.82 }}
+      {series.map((s) => {
+        const off = hidden?.has(s.id) ?? false;
+        const body = (
+          <>
+            <span
+              className="block h-[3px] w-4 rounded-full"
+              style={{ background: s.colour, opacity: at(DEPTH_OPACITY, s.depth) }}
+            />
+            <span
+              className={s.isCurrent ? 'font-medium text-label' : 'text-label-2'}
+              style={{ opacity: s.isCurrent ? 1 : 0.82 }}
+            >
+              {s.label}
+            </span>
+            <span className={`num font-semibold ${tone ? tone(s) : 'text-label'}`}>
+              {formatCurrency(s.total)}
+            </span>
+          </>
+        );
+        if (!onToggle) {
+          return (
+            <span key={s.id} className="flex items-center gap-2 text-[12.5px]">
+              {body}
+            </span>
+          );
+        }
+        return (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={!off}
+            onClick={() => onToggle(s.id)}
+            className="press flex items-center gap-2 rounded-full px-1.5 py-0.5 text-[12.5px] hover:bg-fill"
+            style={{ opacity: off ? 0.35 : 1 }}
           >
-            {s.label}
-          </span>
-          <span className={`num font-semibold ${tone ? tone(s) : 'text-label'}`}>
-            {formatCurrency(s.total)}
-          </span>
-        </span>
-      ))}
+            {body}
+          </button>
+        );
+      })}
     </div>
   );
 }

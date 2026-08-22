@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -11,44 +12,63 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
+import {
+  BAD,
+  ChartFrame,
+  ChartLegend,
+  ChartTooltip,
+  DEEP,
+  GOOD,
+  INFO,
+  ZoomHint,
+  axisStyle,
+  compactNumber,
+  cursorStyle,
+  gridStyle,
+  selectionStyle,
+  useReducedMotion,
+  useSeriesToggle,
+  useZoomDomain,
+  yAxisStyle,
+} from './interactive';
 
-const REMAINING_COLOR = '#0a84ff';
+/**
+ * Net per pay month, one bar each, the current month stacked with what is still expected.
+ *
+ * Completed months are coloured by sign — a good month green, a bad one red — because the question
+ * a bar chart of nets answers is "which months went wrong", and sign is faster to read than height
+ * against a zero line. The current month's remaining estimate stacks on in blue, the projection
+ * colour everywhere else in the app, and the legend swatch for the actuals is split the same way
+ * the bars are.
+ */
+
+const EMPTY = [];
+const SERIES = ['actual', 'remaining'];
+const SPLIT_SWATCH = `linear-gradient(90deg, ${GOOD} 0 50%, ${BAD} 50% 100%)`;
 
 function actualBarColor(value) {
-  if (value > 0.01) return '#30d158';
-  if (value < -0.01) return '#ff453a';
+  if (value > 0.01) return GOOD;
+  if (value < -0.01) return BAD;
   return 'rgba(235,235,245,0.4)';
 }
 
-function PeriodTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload;
-  return (
-    <div className="glass-tile p-3 text-sm shadow-md">
-      <p className="mb-2 font-medium text-label-2">{label}</p>
-      {row.isCurrentMonth ? (
-        <>
-          <p className="text-label">
-            Actual: <span className="font-semibold">{formatCurrency(row.actual)}</span>
-          </p>
-          <p className="text-info">
-            Remaining: <span className="font-semibold">{formatCurrency(row.remaining)}</span>
-          </p>
-          <p className="mt-1 border-t pt-1 text-label">
-            Projected: <span className="font-semibold">{formatCurrency(row.display)}</span>
-          </p>
-        </>
-      ) : (
-        <p className="text-label">
-          Net: <span className="font-semibold">{formatCurrency(row.actual)}</span>
-        </p>
-      )}
-    </div>
-  );
-}
+/** The remaining estimate is only a thing for the current month; past months carry a zero. */
+const onlyCurrentRemaining = (entry, row) => entry.dataKey !== 'remaining' || row?.isCurrentMonth;
+const barColour = (entry, row) => (entry.dataKey === 'actual' ? actualBarColor(row?.actual) : entry.color);
+const projectedFooter = (row) =>
+  row?.isCurrentMonth ? (
+    <p>
+      Projected month-end: <span className="font-semibold text-label">{formatCurrency(row.display)}</span>
+    </p>
+  ) : null;
 
 export function PeriodNetChart({ chartData }) {
-  if (!chartData?.points.length) {
+  const points = chartData?.points ?? EMPTY;
+  const zoom = useZoomDomain(points, 'label');
+  const toggles = useSeriesToggle(SERIES);
+  const reduced = useReducedMotion();
+
+  if (!points.length) {
     return (
       <div className="flex h-80 items-center justify-center text-sm text-label-2">
         No chart data for the selected range.
@@ -56,7 +76,14 @@ export function PeriodNetChart({ chartData }) {
     );
   }
 
-  const { points, netAvg } = chartData;
+  const { netAvg } = chartData;
+  const { visibleData } = zoom;
+  const first = visibleData[0];
+  const last = visibleData[visibleData.length - 1];
+  const current = points.find((p) => p.isCurrentMonth);
+  const summary = `Net per month, ${points.length} pay months. Weighted average ${formatCurrency(netAvg)}.${
+    current ? ` Current month ${formatCurrency(current.actual)} so far, projected ${formatCurrency(current.display)}.` : ''
+  }${zoom.zoomed ? ` Zoomed to ${first.label} – ${last.label}.` : ''}`;
 
   return (
     <div className="space-y-4">
@@ -73,35 +100,48 @@ export function PeriodNetChart({ chartData }) {
         </p>
       </div>
 
-      <div className="h-80 w-full">
+      <ChartFrame label={summary} zoom={zoom} unit="months" className="h-80 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }} />
-            <YAxis
-              tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.46)' }}
-              tickFormatter={(v) =>
-                new Intl.NumberFormat('en-ZA', {
-                  notation: 'compact',
-                  maximumFractionDigits: 1,
-                }).format(v)
+          <BarChart
+            data={visibleData}
+            margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+            {...zoom.chartProps}
+          >
+            <CartesianGrid {...gridStyle} />
+            <XAxis dataKey="label" {...axisStyle} />
+            <YAxis {...yAxisStyle} tickFormatter={compactNumber} />
+            <Tooltip
+              cursor={cursorStyle}
+              isAnimationActive={false}
+              active={zoom.dragging ? false : undefined}
+              content={
+                <ChartTooltip filterEntry={onlyCurrentRemaining} colorOf={barColour} footer={projectedFooter} />
               }
             />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 12, background: '#16161c', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7' }} itemStyle={{ color: '#f5f5f7' }} labelStyle={{ color: 'rgba(235,235,245,0.6)' }} content={<PeriodTooltip />} />
-            <Legend />
+            <Legend
+              content={
+                <ChartLegend
+                  toggle={toggles.toggle}
+                  isHidden={toggles.isHidden}
+                  swatch={{ actual: SPLIT_SWATCH }}
+                />
+              }
+            />
             <ReferenceLine
               y={netAvg}
-              stroke="#6366f1"
+              stroke={DEEP}
               strokeDasharray="4 4"
-              label={{
-                value: 'Avg',
-                position: 'insideTopRight',
-                fill: '#6366f1',
-                fontSize: 11,
-              }}
+              label={{ value: 'Avg', position: 'insideTopRight', fill: DEEP, fontSize: 11 }}
             />
-            <Bar dataKey="actual" name="Actual" stackId="month" radius={[0, 0, 0, 0]}>
-              {points.map((point) => (
+            <Bar
+              dataKey="actual"
+              name="Actual"
+              stackId="month"
+              fill={GOOD}
+              hide={toggles.isHidden('actual')}
+              isAnimationActive={!reduced}
+            >
+              {visibleData.map((point) => (
                 <Cell key={`actual-${point.label}`} fill={actualBarColor(point.actual)} />
               ))}
             </Bar>
@@ -109,12 +149,23 @@ export function PeriodNetChart({ chartData }) {
               dataKey="remaining"
               name="Remaining"
               stackId="month"
-              fill={REMAINING_COLOR}
+              fill={INFO}
               radius={[4, 4, 0, 0]}
+              hide={toggles.isHidden('remaining')}
+              isAnimationActive={!reduced}
             />
+            {zoom.selection && (
+              <ReferenceArea x1={zoom.selection.x1} x2={zoom.selection.x2} {...selectionStyle} />
+            )}
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </ChartFrame>
+
+      <ZoomHint
+        zoomed={zoom.zoomed}
+        onReset={zoom.reset}
+        label={zoom.zoomed ? `${first.label} – ${last.label}` : null}
+      />
 
       <p className="t-label">
         Each bar is that month&apos;s net only (not cumulative). The current month stacks actual

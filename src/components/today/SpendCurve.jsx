@@ -1,4 +1,5 @@
 import { CycleLegend, CycleOverlay } from './CycleOverlay';
+import { useSeriesToggle } from '../charts/interactive';
 
 /**
  * Cumulative spend, three cycles overlaid.
@@ -9,6 +10,7 @@ import { CycleLegend, CycleOverlay } from './CycleOverlay';
  * answer exactly that.
  */
 export function SpendCurve({ curve }) {
+  const { hidden, toggle } = useSeriesToggle();
   if (!curve?.series?.length) return null;
 
   const paceLabel =
@@ -27,7 +29,7 @@ export function SpendCurve({ curve }) {
           <h2 className="t-head">Spend through the cycle</h2>
           <p className="t-label mt-1.5">{paceLabel}</p>
         </div>
-        <CycleLegend series={curve.series} />
+        <CycleLegend series={curve.series} hidden={hidden} onToggle={toggle} />
       </div>
 
       <div className="mt-5 flex min-h-0 flex-grow flex-col">
@@ -37,6 +39,7 @@ export function SpendCurve({ curve }) {
           min={0}
           max={curve.max}
           idPrefix="spend"
+          hidden={hidden}
         />
       </div>
     </div>

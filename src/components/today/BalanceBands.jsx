@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { CycleLegend, CycleOverlay } from './CycleOverlay';
+import { useSeriesToggle } from '../charts/interactive';
 
 /**
  * What the accounts did, three cycles overlaid, each starting at zero.
@@ -28,6 +29,7 @@ export function BalanceBands({ series }) {
       })) ?? null,
     [series],
   );
+  const { hidden, toggle } = useSeriesToggle();
 
   if (!shown?.length) return null;
 
@@ -42,7 +44,12 @@ export function BalanceBands({ series }) {
               : `Each cycle from zero at its opening. ${series.anchoredCount} of ${series.accountCount} accounts have a balance entered, so the movement is exact even where the level is not.`}
           </p>
         </div>
-        <CycleLegend series={shown} tone={(s) => (s.total < 0 ? 'text-bad' : 'text-good')} />
+        <CycleLegend
+          series={shown}
+          tone={(s) => (s.total < 0 ? 'text-bad' : 'text-good')}
+          hidden={hidden}
+          onToggle={toggle}
+        />
       </div>
 
       <div className="mt-5 flex min-h-0 flex-grow flex-col">
@@ -54,6 +61,7 @@ export function BalanceBands({ series }) {
           idPrefix="bal"
           deltaMode="peak"
           dayLabel={(d) => (d === 0 ? 'Start' : `Day ${d}`)}
+          hidden={hidden}
         />
       </div>
 
