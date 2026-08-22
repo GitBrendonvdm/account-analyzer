@@ -41,6 +41,34 @@ const without = (props, keys) => {
   return out;
 };
 
+/**
+ * The subscriptions fixture padded to 61 lines. Every pad costs less than the smallest real line so
+ * the list keeps the engine's perCycle order; the aggregates (byKind, optionalPerYear) are left as
+ * they are, because they are the engine's figures over every line and the folded cards must show
+ * those rather than a sum over the rows on screen.
+ */
+const padLines = (subscriptions, n = 51) => ({
+  ...subscriptions,
+  lines: [
+    ...subscriptions.lines,
+    ...Array.from({ length: n }, (_, i) => {
+      const amount = 60 - i;
+      return {
+        ...lineStream,
+        id: `pad ${i}|example|1234|0`,
+        label: `Pad line ${i}`,
+        amount,
+        perCycle: amount,
+        perYearAmount: amount * 12,
+        range: [amount, amount],
+        regimes: [{ ...lineStream.regimes[1], amount }],
+        perCycleAmounts: Array.from({ length: 12 }, () => amount),
+        priceChange: null,
+      };
+    }),
+  ],
+});
+
 const VIEWS = [
   { name: 'TodayView', View: TodayView, props: todayProps, keys: NEW_PROPS.today, keep: ['Safe to spend before payday', 'Came in', 'Went out', 'Where it goes'] },
   { name: 'HabitsView', View: HabitsView, props: habitsProps, keys: NEW_PROPS.habits, keep: ['Where the money goes', 'When you spend'] },
@@ -152,6 +180,21 @@ describe('HabitsView blocks', () => {
     expect(html).toContain('Instalments and repayments — debt, not subscriptions');
   });
 
+  it('folds to the top 12 standing charges, with the totals still over every line', () => {
+    const html = render(HabitsView, habitsProps({ subscriptions: padLines(habitsProps().subscriptions) }));
+    expect(html).toContain('Show all 61 standing charges');
+    expect(html).toContain('12 of 61 shown · totals cover all');
+    expect(html).not.toContain('Show fewer');
+    expect(html.match(/minmax\(0,14rem\)_auto_auto/g)).toHaveLength(12);
+    expect(html).toContain('Override for Pad line 1"');
+    expect(html).not.toContain('Pad line 2');
+    // The header and per-kind figures are the engine's aggregates, not a sum over the shown rows.
+    expect(html).toContain('4 optional services cost R 2 946 a cycle — R 35 352 a year.');
+    expect(html).toContain('Instalments and repayments — debt, not subscriptions');
+    expectClean(html);
+    expect(render(HabitsView, habitsProps())).not.toMatch(/Show all \d+ standing charges/);
+  });
+
   it('renders price creep, drift, wins and basket with their sentences', () => {
     const html = render(HabitsView, habitsProps());
     expect(html).toContain('The same things cost R 260 more a cycle than when you started — R 3 120 a year.');
@@ -221,6 +264,20 @@ describe('PlanView blocks', () => {
     expect(html).toContain("engine's call");
     expect(html).toContain('Override for Example Stream');
     expect(html).toContain('+29% since May 26');
+  });
+
+  it('folds the standing charges table to the top 12, with the total over every line', () => {
+    const html = render(PlanView, planProps({ subscriptions: padLines(planProps().subscriptions) }));
+    expect(html).toContain('R 40 245');
+    expect(html).toContain('a cycle across 61 lines');
+    expect(html).toContain('Show all 61 standing charges');
+    expect(html).toContain('12 of 61 shown · totals cover all');
+    expect(html).not.toContain('Show fewer');
+    expect(html.match(/max-w-\[16rem\] truncate/g)).toHaveLength(12);
+    expect(html).toContain('Override for Pad line 1"');
+    expect(html).not.toContain('Pad line 2');
+    expectClean(html);
+    expect(render(PlanView, planProps())).not.toMatch(/Show all \d+ standing charges/);
   });
 });
 

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardHead } from '../ui/Surface';
 import { StepChart } from './StepChart';
 import { formatCurrencyAbs } from '../../utils/format';
@@ -16,7 +17,16 @@ import { formatCurrencyAbs } from '../../utils/format';
  * altogether (the engine mistook a habit for a contract), "cancelled" moves it to the wins as of
  * today so that the saving is counted before the bank has stopped charging. They persist through
  * settings.lineOverrides, so a decision survives the next import.
+ *
+ * Sixty lines with a step chart each made the page twelve thousand pixels tall, so the card opens on
+ * the top STANDING_CHARGES_SHOWN lines by per-cycle cost (the engine's order) and a "Show all" strip
+ * expands it. The header figure and the per-kind totals come from the engine's aggregates, so they
+ * cover every line whether or not it is shown, and a caption says so. Nothing is persisted: every
+ * load starts folded.
  */
+
+/** Lines shown before "Show all"; the Plan table uses the same cut. */
+export const STANDING_CHARGES_SHOWN = 12;
 
 const DAY_MS = 86400000;
 const KIND_ORDER = ['optional', 'insurance', 'utility', 'fee', 'person', 'other', 'instalment', 'repayment'];
@@ -119,13 +129,18 @@ function LineRow({ line, override, onSet, asOf }) {
 }
 
 export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverride, asOf, className = '' }) {
+  const [showAll, setShowAll] = useState(false);
   if (!subscriptions) return null;
   const today = toDate(asOf) ?? new Date();
   const lines = subscriptions.lines ?? [];
   const overrideOf = (line) => lineOverrides?.[line.id] ?? line.override ?? null;
   const kinds = KIND_ORDER.map((k) => ({ kind: k, ...(subscriptions.byKind?.[k] ?? {}) })).filter((k) => k.count > 0);
-  const services = lines.filter((l) => !DEBT_KINDS.has(l.kind));
-  const debt = lines.filter((l) => DEBT_KINDS.has(l.kind));
+  // recurring.js sorts lines by perCycle descending, so the first N are the biggest.
+  const collapsible = lines.length > STANDING_CHARGES_SHOWN;
+  const shown = collapsible && !showAll ? lines.slice(0, STANDING_CHARGES_SHOWN) : lines;
+  const services = shown.filter((l) => !DEBT_KINDS.has(l.kind));
+  const debt = shown.filter((l) => DEBT_KINDS.has(l.kind));
+  const anyServices = lines.some((l) => !DEBT_KINDS.has(l.kind));
   const optionalCount = subscriptions.byKind?.optional?.count ?? 0;
   const sentence =
     subscriptions.sentence ??
@@ -165,9 +180,11 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
         </div>
       )}
 
-      {services.length === 0 ? (
+      {!anyServices && (
         <p className="t-caption px-6 py-5">No standing charges found yet — the engine needs a few complete cycles.</p>
-      ) : (
+      )}
+
+      {services.length > 0 && (
         <ol className="flex flex-col">
           {services.map((line) => (
             <LineRow key={line.id} line={line} override={overrideOf(line)} onSet={onSetLineOverride} asOf={today} />
@@ -185,6 +202,21 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
               <LineRow key={line.id} line={line} override={null} onSet={null} asOf={today} />
             ))}
           </ol>
+        </>
+      )}
+
+      {collapsible && (
+        <>
+          {!showAll && (
+            <p className="t-caption px-6 py-2.5 text-center">{`${shown.length} of ${lines.length} shown · totals cover all`}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowAll((s) => !s)}
+            className="press w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label"
+          >
+            {showAll ? 'Show fewer' : `Show all ${lines.length} standing charges`}
+          </button>
         </>
       )}
 

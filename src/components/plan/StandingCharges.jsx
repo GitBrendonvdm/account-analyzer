@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { StepChart } from '../habits/StepChart';
+import { STANDING_CHARGES_SHOWN } from '../habits/SubscriptionsCard';
 import { formatCurrencyAbs } from '../../utils/format';
 
 /**
@@ -12,6 +14,10 @@ import { formatCurrencyAbs } from '../../utils/format';
  *
  * The override menu writes the same settings.lineOverrides key the Habits chips do, so a decision
  * made here shows there and survives the next import.
+ *
+ * It opens on the top STANDING_CHARGES_SHOWN lines by per-cycle cost, the engine's order, with a
+ * "Show all" strip under the table; the header total is over every line regardless, and a caption
+ * says so while the table is folded. Every load starts folded.
  */
 
 const DAY_MS = 86400000;
@@ -48,11 +54,14 @@ const monthLabel = (key) => {
 };
 
 export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLineOverride, asOf, className = '' }) {
+  const [showAll, setShowAll] = useState(false);
   const list = lines ?? subscriptions?.lines ?? null;
   if (!list) return null;
   const today = toDate(asOf) ?? new Date();
   const total = list.reduce((s, l) => s + (l.perCycle ?? 0), 0);
   const overrideOf = (line) => lineOverrides?.[line.id] ?? line.override ?? '';
+  const collapsible = list.length > STANDING_CHARGES_SHOWN;
+  const shown = collapsible && !showAll ? list.slice(0, STANDING_CHARGES_SHOWN) : list;
 
   return (
     <section className={`glass overflow-hidden ${className}`}>
@@ -89,7 +98,7 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
               </tr>
             </thead>
             <tbody>
-              {list.map((line) => (
+              {shown.map((line) => (
                 <tr key={line.id} className="border-b last:border-0">
                   <td className="px-6 py-2">
                     <div className="max-w-[16rem] truncate text-sm text-label">{line.label}</div>
@@ -143,6 +152,20 @@ export function StandingCharges({ lines, subscriptions, lineOverrides, onSetLine
             </tbody>
           </table>
         </div>
+      )}
+      {collapsible && (
+        <>
+          {!showAll && (
+            <p className="t-caption px-6 py-2.5 text-center">{`${shown.length} of ${list.length} shown · totals cover all`}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowAll((s) => !s)}
+            className="press w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label"
+          >
+            {showAll ? 'Show fewer' : `Show all ${list.length} standing charges`}
+          </button>
+        </>
       )}
       {subscriptions?.assumptions?.length > 0 && <p className="t-caption border-t px-6 py-4">{subscriptions.assumptions.join(' ')}</p>}
     </section>

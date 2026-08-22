@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -41,6 +42,10 @@ function fixtureServer() {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), fixtureServer()],
+  test: {
+    // Agent worktrees live under .claude/, and the OCR/pglite artefacts under public/ocr and data/.
+    exclude: [...configDefaults.exclude, '.claude/**', 'data/**', 'public/ocr/**'],
+  },
   server: {
     port: 3000,
     // The API is a separate process in development (`npm run server` on 8080). Proxying keeps the
