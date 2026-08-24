@@ -173,6 +173,14 @@ be revised by a later export), `Type`.
   always lands Friday isn't written off on Thursday.
 - **Averages** are recency-weighted with outlier cycles capped, so one abnormal month can't set the
   level.
+- **Exceptions are split, not moved.** A category that usually costs R10 000 and cost R15 000 this
+  cycle is still a R10 000 category: the usual stays where it is and only the R5 000 goes to
+  Exceptions, so the averages and the forecast keep describing an ordinary cycle while the surprise
+  stays visible and still counted. The surplus comes off the largest transactions of that cycle, so
+  it can always be pointed at. A category seen in only one cycle is exceptional in full. A raised
+  cycle sitting next to another raised one is left alone — a bill that has gone up is a new level,
+  not the same surprise twice — and pay is never split, because two salary runs in one cycle are a
+  matter of timing rather than of earning more.
 - **Loan accounts are excluded from the flows.** The interest, fees and credit insurance charged
   inside a loan are already contained in the instalment leaving your bank; counting both would bill
   the same money twice. The **Accounts** tab shows that cost separately, as analysis.

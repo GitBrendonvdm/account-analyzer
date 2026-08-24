@@ -90,6 +90,9 @@ function hasMonthTotals(totalsByMonth) {
 /** Sentinel used when there is no spending-group level to build. */
 const FLAT_LEVEL = '\u0000flat';
 
+/** Surplus rows are numbered from here, far past any position in a file. */
+const EXCESS_ID_OFFSET = 1e9;
+
 function skipsSpendingGroup(groupName) {
   return groupName === 'Transfers' || groupName.includes('Exceptions');
 }
@@ -169,13 +172,48 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const clusters = buildExceptionClusters(scopedData, calcMonths, transferIds);
   // Read by name, not spread: `descToCluster` is a lazy, display-only getter and spreading the
   // object would compute it for nothing.
+  /**
+   * A cycle that ran above its usual is two things at once, so it becomes two rows.
+   *
+   * The usual part keeps the original row's identity and stays in its category; the surplus becomes
+   * a row of its own that lands in Exceptions. Splitting here rather than inside the grouping loop
+   * means every total, average, forecast and drill-down below sees an ordinary list of rows and
+   * needs to know nothing about any of this — and the two halves still add up to the transaction
+   * that happened, so nothing is invented and nothing is lost.
+   *
+   * The surplus row's id is offset well past any real one (ids are positions in the file) so the
+   * sets keyed on id — transfers, reversals — cannot collide with it.
+   */
+  const excessIds = new Set();
+  const rowsToGroup = [];
+  scopedData.forEach((t) => {
+    const excess = clusters.splitAmounts.get(t.id);
+    if (!excess) {
+      rowsToGroup.push(t);
+      return;
+    }
+    const sign = t.AmountNum < 0 ? -1 : 1;
+    const usual = Math.abs(t.AmountNum) - excess;
+    if (usual > 0.005) rowsToGroup.push({ ...t, AmountNum: sign * usual, splitFrom: t.id });
+    const id = EXCESS_ID_OFFSET + t.id;
+    excessIds.add(id);
+    rowsToGroup.push({
+      ...t,
+      id,
+      AmountNum: sign * excess,
+      splitFrom: t.id,
+      isExcess: true,
+      Description: `${t.Description} · above usual`,
+    });
+  });
+
   const exceptionState = {
     incomeSparseCategories: clusters.incomeSparseCategories,
     expenseSparseCategories: clusters.expenseSparseCategories,
-    outlierTransactionIds: clusters.outlierTransactionIds,
+    excessIds,
     transferIds,
   };
-  scopedData.forEach((t) => {
+  rowsToGroup.forEach((t) => {
     const mainGroup = resolveMainGroup(t, exceptionState);
     const m = mainGroup === 'Transfers' ? t['Pay Month'] : getPayMonth(t);
     if (!calcMonths.includes(m)) return;

@@ -3,13 +3,18 @@ import { monthKeyFromDate, parseMonthKey, parseTransactionDate } from '../utils/
 /** Categories where duplicate same-month credits are treated as staggered pay (e.g. two salary runs). */
 const SALARY_CATEGORY_RE = /salaries?|wages?/i;
 
+/** Pay, by the category's own name. */
+export function isSalaryCategory(category) {
+  return SALARY_CATEGORY_RE.test(category || '');
+}
+
 export function getPayMonth(transaction) {
   return transaction.effectivePayMonth ?? transaction['Pay Month'];
 }
 
 export function isSalaryLikeIncome(transaction) {
   if (transaction.AmountNum <= 0) return false;
-  return SALARY_CATEGORY_RE.test(transaction.Category || '');
+  return isSalaryCategory(transaction.Category);
 }
 
 /** Null for a key that is not a key — see parseMonthKey. */

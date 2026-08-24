@@ -5,10 +5,20 @@ export const DESCRIPTION_SIMILARITY_THRESHOLD = 0.68;
 export const EXCEPTION_MONTH_RATIO = 0.35;
 /** Income categories must appear in at least this share of visible months to stay regular. */
 export const INCOME_EXCEPTION_MONTH_RATIO = 0.7;
-/** Flag a transaction when its amount exceeds this multiple of the category's median monthly spend. */
-export const OUTLIER_MULTIPLIER = 2.5;
-/** Minimum absolute amount before outlier detection applies. */
-export const OUTLIER_MIN_AMOUNT = 1000;
+/**
+ * Splitting a cycle that ran above its usual.
+ *
+ * A category that normally costs R10 000 and cost R15 000 this cycle has not become a R15 000
+ * category: R10 000 of it is the usual and R5 000 is the event. The usual stays where it is and
+ * only the surplus is treated as an exception, so the averages, the forecast and safe-to-spend
+ * keep describing the ordinary month while the surprise is still visible and still counted.
+ */
+/** A category needs this many cycles of its own history before "usual" means anything. */
+export const SPLIT_MIN_ACTIVE_CYCLES = 3;
+/** How far above its usual a cycle has to run before the surplus is called an event. */
+export const SPLIT_TOLERANCE = 0.25;
+/** And by at least this many rand, so an ordinary wobble is not one. */
+export const SPLIT_MIN_EXCESS = 1000;
 /** Income without a reliable category label is treated as exception income. */
 export const UNCATEGORIZED_CATEGORY_LABELS = ['Uncategorized', 'Uncategorised'];
 /**

@@ -8,8 +8,6 @@ import { parseAccount } from './accounts';
 import {
   EXCEPTION_MONTH_RATIO,
   INCOME_EXCEPTION_MONTH_RATIO,
-  OUTLIER_MIN_AMOUNT,
-  OUTLIER_MULTIPLIER,
   UNCATEGORIZED_CATEGORY_LABELS,
 } from '../constants';
 import { loadRealExport } from '../test/realData';
@@ -268,18 +266,8 @@ function refIsUncategorized(t) {
   if (!raw || raw.trim() === '') return true;
   return UNCATEGORIZED_CATEGORY_LABELS.some((label) => label.toLowerCase() === raw.trim().toLowerCase());
 }
-function refMedian(values) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
 function refActiveMonths(items, category) {
-  const months = new Set();
-  items.forEach((t) => {
-    if (refCategoryName(t) === category) months.add(getPayMonth(t));
-  });
-  return months;
+  return new Set(items.filter((t) => refCategoryName(t) === category).map(getPayMonth));
 }
 function refIsSparse(items, category, visibleMonths, monthRatio) {
   const currentMonth = visibleMonths[visibleMonths.length - 1];
@@ -289,24 +277,6 @@ function refIsSparse(items, category, visibleMonths, monthRatio) {
   const ratio = activeCount / visibleMonths.length;
   const onlyInCurrentMonth = activeCount === 1 && monthSet.has(currentMonth);
   return onlyInCurrentMonth || ratio < monthRatio;
-}
-function refMonthlyTotals(items, category, months) {
-  const totals = Object.fromEntries(months.map((m) => [m, 0]));
-  items.forEach((t) => {
-    const m = getPayMonth(t);
-    if (refCategoryName(t) !== category || !months.includes(m)) return;
-    totals[m] += Math.abs(t.AmountNum);
-  });
-  return totals;
-}
-function refIsOutlier(t, items, category, months) {
-  const priorMonths = months.slice(0, -1);
-  const monthlyTotals = refMonthlyTotals(items, category, months);
-  const priorValues = priorMonths.map((m) => monthlyTotals[m]).filter((v) => v > 0.001);
-  const baseline = priorValues.length > 0 ? refMedian(priorValues) : 0;
-  const amount = Math.abs(t.AmountNum);
-  if (baseline < 0.001) return amount >= OUTLIER_MIN_AMOUNT * OUTLIER_MULTIPLIER;
-  return amount >= OUTLIER_MULTIPLIER * baseline && amount >= OUTLIER_MIN_AMOUNT;
 }
 function refSparseSet(items, months, monthRatio) {
   const sparse = new Set();
@@ -324,18 +294,6 @@ function refHasStableDescription(items) {
     return clusterItems.length / items.length >= 0.8 && clusterMonths.size >= 2;
   });
 }
-function refOutliers(items, months, recurringCategories) {
-  const out = new Set();
-  const currentMonth = months[months.length - 1];
-  recurringCategories.forEach((category) => {
-    items
-      .filter((t) => refCategoryName(t) === category && getPayMonth(t) === currentMonth)
-      .forEach((t) => {
-        if (refIsOutlier(t, items, category, months)) out.add(t.id);
-      });
-  });
-  return out;
-}
 function refExceptionSets(items, months, transferIds) {
   const scoped = items.filter((t) => months.includes(getPayMonth(t)) && !transferIds.has(t.id));
   const incomeItems = scoped.filter((t) => t.AmountNum > 0);
@@ -348,10 +306,7 @@ function refExceptionSets(items, months, transferIds) {
   incomeItems.forEach((t) => {
     if (refIsUncategorized(t)) incomeSparse.add(refCategoryName(t));
   });
-  const recurringIncome = [...new Set(incomeItems.map(refCategoryName))].filter((c) => !incomeSparse.has(c));
-  const recurringExpense = [...new Set(expenseItems.map(refCategoryName))].filter((c) => !expenseSparse.has(c));
-  const outliers = new Set([...refOutliers(incomeItems, months, recurringIncome), ...refOutliers(expenseItems, months, recurringExpense)]);
-  return { incomeSparse, expenseSparse, outliers };
+  return { incomeSparse, expenseSparse };
 }
 
 describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches the old rules', () => {
@@ -364,7 +319,7 @@ describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches 
   const sorted = (set) => [...set].sort();
 
   [26, 6].forEach((range) => {
-    it(`returns the same sparse categories and outliers at range ${range}`, () => {
+    it(`returns the same sparse categories at range ${range}`, () => {
       const months = allMonths.slice(-range);
       const processed = processTransactionData(real, accounts, range, asOf);
       const scoped = enrichWithEffectivePayMonths(real, months).filter((t) => !loans.has(t.Account));
@@ -372,7 +327,8 @@ describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches 
       const ref = refExceptionSets(scoped, months, processed.transferIds);
       expect(sorted(fast.incomeSparseCategories)).toEqual(sorted(ref.incomeSparse));
       expect(sorted(fast.expenseSparseCategories)).toEqual(sorted(ref.expenseSparse));
-      expect(sorted(fast.outlierTransactionIds)).toEqual(sorted(ref.outliers));
+      // Surplus splitting replaced the old whole-transaction outlier rule; see exceptions.test.js.
+      expect(fast.splitAmounts).toBeInstanceOf(Map);
       expect(fast.expenseSparseCategories.size).toBeGreaterThan(0);
       expect(fast.currentMonth).toBe(months.at(-1));
       // The display clustering is still there for anyone who asks for it.
