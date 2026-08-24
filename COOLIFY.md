@@ -25,6 +25,22 @@ Coolify watches `main` and deploys itself. There is no CI step in this repo — 
    502 while the container was healthy on 8080. If the port ever changes again, check the labels
    (Settings → Advanced → Container Labels in the UI) and fix the two `server.port` lines.
 
+## Never let git remove a worktree that has junctions in it
+
+Agent worktrees and release checks link `node_modules` and `test-data` in with
+`cmd /c mklink /J`. `git worktree remove --force` follows those junctions and deletes the files
+they point at — the real `node_modules` and the real, gitignored bank exports, from the main tree.
+It has happened twice. Unlink first, verify the link is gone, and only then remove the worktree:
+
+```bash
+cmd //c "rmdir C:\path\to\worktree\node_modules"    # unlink, do not rm -rf
+ls worktree/node_modules >/dev/null 2>&1 && echo ABORT || git worktree remove --force worktree
+```
+
+Quoting matters: a `cmd //c` whose path is wrapped in escaped quotes inside a bash string fails
+silently with "The filename, directory name, or volume label syntax is incorrect", and the removal
+then eats the originals. Check the exit status, not just the absence of a crash.
+
 ## How the trigger is wired
 
 In the Coolify application, under **Settings**:
