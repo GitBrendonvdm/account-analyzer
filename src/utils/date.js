@@ -26,8 +26,13 @@ export function endOfMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
 }
 
+/**
+ * A pay-month key as numbers. A row that carries no key at all is not a crash: an export whose
+ * columns had been renamed once wrote thousands of rows without one, and the whole app went blank
+ * on the first of them. Unusable in, NaN out, and the callers decide what that means.
+ */
 export function parseMonthKey(monthKey) {
-  const [year, month] = monthKey.split('-').map(Number);
+  const [year, month] = String(monthKey ?? '').split('-').map(Number);
   return { year, monthIndex: month - 1 };
 }
 

@@ -47,6 +47,29 @@ export function isoDate(value) {
   return null;
 }
 
+/**
+ * A row belongs to a pay cycle or it belongs nowhere.
+ *
+ * This used to fall back to an empty string, which is how an export whose columns had been renamed
+ * wrote four thousand rows that no view could draw: the app builds its cycles from the pay months
+ * in the data, and rows with no pay month are invisible to every one of them while still counting
+ * as imported. Refusing the row makes that failure loud and, because the whole import is one
+ * transaction, harmless — nothing is written and the file can be imported again once the reader
+ * understands its shape.
+ */
+function payMonthOf(row) {
+  const value = String(row.payMonth ?? row['Pay Month'] ?? '').trim();
+  if (value) return value;
+  throw Object.assign(
+    new Error(
+      'This file has no Pay Month column that the app recognises, so its rows belong to no pay ' +
+        'cycle. Nothing was imported. If the export format has changed, the app needs to be ' +
+        'taught the new one.',
+    ),
+    { statusCode: 400 },
+  );
+}
+
 function columnsOf(row, importId) {
   const date = isoDate(row.date ?? row.Date);
   if (!date) throw Object.assign(new Error(`Row has no usable date: ${JSON.stringify(row.Date)}`), { statusCode: 400 });
@@ -54,7 +77,7 @@ function columnsOf(row, importId) {
     row.key,
     row.accountId,
     date,
-    row.payMonth ?? row['Pay Month'] ?? '',
+    payMonthOf(row),
     row.Category ?? null,
     Math.round((Number(row.AmountNum ?? row.Amount) || 0) * 100),
     JSON.stringify(row),

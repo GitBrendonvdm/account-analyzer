@@ -54,7 +54,20 @@ export function assignKeys(rows) {
  */
 export const MUTABLE_FIELDS = ['Status', 'Category', 'Spending Group', 'Tags', 'Notes', 'Type'];
 
+/**
+ * The export's ways of writing "nothing here". The old file wrote "No Notes" in every note field
+ * and the 2026 one writes an empty string; without this, one import would mark three thousand
+ * unchanged rows as revised and the summary would be a lie.
+ */
+const BLANK = new Set(['', 'no notes', 'none', 'n/a', '-']);
+const sameValue = (a, b) => {
+  const x = String(a ?? '').trim();
+  const y = String(b ?? '').trim();
+  if (x === y) return true;
+  return BLANK.has(x.toLowerCase()) && BLANK.has(y.toLowerCase());
+};
+
 /** Which mutable fields differ between a stored row and an incoming one. */
 export function changedFields(stored, incoming) {
-  return MUTABLE_FIELDS.filter((f) => (stored[f] ?? '') !== (incoming[f] ?? ''));
+  return MUTABLE_FIELDS.filter((f) => !sameValue(stored[f], incoming[f]));
 }

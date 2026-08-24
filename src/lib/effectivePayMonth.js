@@ -12,14 +12,17 @@ export function isSalaryLikeIncome(transaction) {
   return SALARY_CATEGORY_RE.test(transaction.Category || '');
 }
 
+/** Null for a key that is not a key — see parseMonthKey. */
 export function addMonthsToKey(monthKey, offset) {
   const { year, monthIndex } = parseMonthKey(monthKey);
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) return null;
   return monthKeyFromDate(new Date(year, monthIndex + offset, 1));
 }
 
 /** Prefer calendar next month when it is already in the visible window; otherwise use the next bucket in range. */
 function resolveShiftedMonth(originalMonth, offset, visibleMonths) {
   const calendarTarget = addMonthsToKey(originalMonth, offset);
+  if (!calendarTarget) return originalMonth;
   if (visibleMonths.includes(calendarTarget)) return calendarTarget;
 
   const idx = visibleMonths.indexOf(originalMonth);
@@ -39,7 +42,8 @@ export function enrichWithEffectivePayMonths(transactions, visibleMonths) {
   const byCategoryMonth = new Map();
 
   transactions.forEach((t) => {
-    if (!isSalaryLikeIncome(t)) return;
+    // A row with no pay month belongs to no cycle, so there is no cycle to move it into.
+    if (!isSalaryLikeIncome(t) || !t['Pay Month']) return;
     const key = `${t.Category}\u0000${t['Pay Month']}`;
     if (!byCategoryMonth.has(key)) byCategoryMonth.set(key, []);
     byCategoryMonth.get(key).push(t);

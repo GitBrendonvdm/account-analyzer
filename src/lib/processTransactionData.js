@@ -99,7 +99,11 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
 
   const selected = new Set(selectedAccounts);
   const useSpendingGroups = hasSpendingGroups(data);
-  const allMonths = [...new Set(data.map((t) => t['Pay Month']))].sort();
+  // Rows with no pay month are dropped from the cycle list rather than allowed to become a cycle
+  // of their own. An export whose columns had been renamed once wrote thousands of such rows; the
+  // nameless cycle they created had no length, every array sized from it was invalid, and the whole
+  // app went blank. A row that belongs to no cycle simply appears in none of them.
+  const allMonths = [...new Set(data.map((t) => t['Pay Month']))].filter(Boolean).sort();
   // One window, used for both display and every average. These used to differ — `calcMonths` was
   // the whole file — so dragging the month slider changed the columns but not the Avg or the
   // forecast, which is exactly the kind of control that makes a tool feel untrustworthy.

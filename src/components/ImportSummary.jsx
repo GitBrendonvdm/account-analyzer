@@ -11,6 +11,8 @@ import { X, FilePlus2, RefreshCw, CircleCheck } from 'lucide-react';
 export function ImportSummary({ summary, onDismiss }) {
   if (!summary) return null;
   const { fileName, rowsTotal, added, updated, unchanged, dateFrom, dateTo } = summary;
+  const ignored = summary.duplicatesIgnored ?? 0;
+  const repeats = summary.repeatsCollapsed ?? 0;
   const renamed = summary.accountsRenamed ?? [];
   const created = summary.accountsNew ?? [];
   const examples = summary.updatedExamples ?? [];
@@ -43,6 +45,28 @@ export function ImportSummary({ summary, onDismiss }) {
                 <b className="font-semibold">{unchanged.toLocaleString('en-ZA')}</b> already held
               </li>
             </ul>
+
+            {/* A file that turns 4 060 lines into 3 206 transactions has to say so. The 2026 export
+                shadows most settled transactions with a stale pending copy and repeats some rows
+                outright; both are removed on the way in, and both are counted here. */}
+            {(ignored > 0 || repeats > 0) && (
+              <p className="mt-2 text-xs text-good">
+                {ignored > 0 && (
+                  <>
+                    <b className="font-semibold">{ignored.toLocaleString('en-ZA')}</b> pending{' '}
+                    {ignored === 1 ? 'copy' : 'copies'} of transactions that have already settled
+                  </>
+                )}
+                {ignored > 0 && repeats > 0 && ', and '}
+                {repeats > 0 && (
+                  <>
+                    <b className="font-semibold">{repeats.toLocaleString('en-ZA')}</b>{' '}
+                    {repeats === 1 ? 'row the file repeated' : 'rows the file repeated'} word for word
+                  </>
+                )}
+                {' '}— left out, so nothing is counted twice.
+              </p>
+            )}
 
             {examples.length > 0 && (
               <ul className="mt-2 space-y-0.5 text-xs text-good">

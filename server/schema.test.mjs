@@ -1,6 +1,14 @@
+import { readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStore } from './db/adapter.mjs';
 import { migrate } from './db/migrate.mjs';
+
+/** Whatever is in the migrations directory, in the order the runner will take them. */
+const EXPECTED = readdirSync(join(dirname(fileURLToPath(import.meta.url)), 'db/migrations'))
+  .filter((f) => f.endsWith('.sql'))
+  .sort();
 
 /**
  * The schema comes up from nothing and, crucially, comes up again on a database that already has
@@ -16,7 +24,8 @@ describe('migrations', () => {
 
   it('apply once, and a second boot applies nothing', async () => {
     const first = await migrate(store);
-    expect(first).toEqual(['001_init.sql']);
+    expect(first).toEqual(EXPECTED);
+    expect(EXPECTED[0]).toBe('001_init.sql');
     const second = await migrate(store);
     expect(second).toEqual([]);
 

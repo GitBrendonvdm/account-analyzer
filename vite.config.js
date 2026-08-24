@@ -51,7 +51,9 @@ export default defineConfig({
     // The API is a separate process in development (`npm run server` on 8080). Proxying keeps the
     // app same-origin, which the session cookie (SameSite=Strict) depends on.
     proxy: {
-      '/api': 'http://127.0.0.1:8080',
+      // MV_API points the dev server at another API — a scratch database, or a copy of what
+      // production holds, when a bug only shows itself on real data.
+      '/api': process.env.MV_API ?? 'http://127.0.0.1:8080',
     },
   },
 })

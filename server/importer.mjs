@@ -27,9 +27,12 @@ import {
  * @param store    a connection from adapter.mjs (the transaction is opened here)
  * @param rows     parsed CSV rows (utils/csv.js), unsaved
  * @param fileName the file they came from, for the import log
+ * @param meta     what the parser had to do to the file to produce those rows (format, duplicates
+ *                 paired off) — carried into the summary so the app can say so rather than quietly
+ *                 turning 4 060 lines into 3 254 transactions
  * @returns the same summary the browser's importer produced
  */
-export async function importRows(store, rows, fileName) {
+export async function importRows(store, rows, fileName, meta = {}) {
   if (!rows?.length) {
     return { rowsTotal: 0, added: 0, updated: 0, unchanged: 0, accountsNew: [], accountsRenamed: [] };
   }
@@ -47,6 +50,9 @@ export async function importRows(store, rows, fileName) {
   const summary = {
     fileName,
     importedAt: new Date().toISOString(),
+    format: meta.format ?? 'legacy',
+    duplicatesIgnored: meta.duplicatesIgnored ?? 0,
+    repeatsCollapsed: meta.repeatsCollapsed ?? 0,
     rowsTotal: prepared.length,
     added: 0,
     updated: 0,

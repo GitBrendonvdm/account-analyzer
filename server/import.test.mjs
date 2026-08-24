@@ -124,7 +124,7 @@ describe('importRows', () => {
   it('returns the same summary shape the browser produced', async () => {
     const summary = await importRows(h.store, clone(OLDER), 'older.csv');
     expect(Object.keys(summary).sort()).toEqual(
-      ['accountsNew', 'accountsRenamed', 'added', 'dateFrom', 'dateTo', 'fileName', 'importedAt', 'rowsTotal', 'superseded', 'unchanged', 'updated', 'updatedExamples', 'vintage'],
+      ['accountsNew', 'accountsRenamed', 'added', 'dateFrom', 'dateTo', 'duplicatesIgnored', 'fileName', 'format', 'importedAt', 'repeatsCollapsed', 'rowsTotal', 'superseded', 'unchanged', 'updated', 'updatedExamples', 'vintage'],
     );
     expect(summary).toMatchObject({ fileName: 'older.csv', rowsTotal: 3, added: 3, dateFrom: '2026-06-01', dateTo: '2026-07-02', vintage: '2026-07-02' });
     expect(summary.accountsNew.sort()).toEqual(['FNB Bank *9986', 'FNB Savings *9547']);
