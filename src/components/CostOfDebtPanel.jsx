@@ -26,9 +26,10 @@ export function CostOfDebtPanel({ cost, fees }) {
         <div>
           <h2 className="t-head">What the debt costs</h2>
           <p className="t-label mt-1.5 max-w-prose">
-            Interest, fees and credit insurance across every account, including the loans. Kept out
-            of the spending table because it is already inside the instalments — counting it there
-            would bill the same money twice.
+            What's actually been charged, read off the ledger itself — every account, including the
+            loans. Kept out of the spending table because it is already inside the instalments —
+            counting it there would bill the same money twice. Debt shows what today's rate and
+            balance imply, which can differ from what actually posted.
           </p>
         </div>
         {hasCost && (

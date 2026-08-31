@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
 import { Card, CardHead } from '../ui/Surface';
 import { SCENARIO_HORIZONS, compareScenarios, kindWord, payoffScenario } from '../../lib/scenario';
 import { formatCurrencyAbs } from '../../utils/format';
@@ -13,6 +13,13 @@ import { formatCurrencyAbs } from '../../utils/format';
  * where everything ends up, and what it does to the share of income going to debt. A small table
  * under it runs the same horizon on every debt so the "greatest short-term effect" is a ranking
  * you can read, not a claim.
+ *
+ * `extraNeeded` from the engine is on top of whatever the plan is already committing — which, while
+ * the deficit stands, is nothing. Showing that number alone reads as "R800 clears the card", not
+ * "R800 clears the card once the R3 500 shortfall is also found" — the exact complaint that landed
+ * here. So every figure a person could act on (the headline, the per-cycle ask, the ranked table)
+ * adds the deficit back in rather than footnoting it once and hoping it's still remembered by the
+ * time someone reaches the table.
  */
 
 const MONTH_YEAR = { month: 'short', year: 'numeric' };
@@ -82,6 +89,17 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
         }
       />
 
+      {deficit > 0 && (
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-bad/10 px-3.5 py-3 text-[13px] leading-relaxed text-label-2">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-bad" />
+          <span>
+            You're <b className="font-semibold text-bad">{formatCurrencyAbs(deficit)}</b> short a cycle before
+            any of this. Every rand figure below already has that added back in — it's the real ask, not what's
+            on top of what you're managing today.
+          </span>
+        </div>
+      )}
+
       <div className="mt-5 flex flex-wrap gap-2">
         {list.map((d) => (
           <Chip key={d.id} active={d.id === chosenId} onClick={() => setTargetId(d.id)}>
@@ -104,6 +122,12 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
       <p className="t-title mt-6">
         {s.alreadyOnTrack ? (
           <>The {s.label} ({kindWord(list.find((d) => d.id === s.targetId))}) clears by <span className="text-good">{fmtDate(s.scenario.clearedDate)}</span> on its own.</>
+        ) : deficit > 0 ? (
+          <>
+            The {kindWord(list.find((d) => d.id === s.targetId))} — {s.label} — could be gone by{' '}
+            <span className="text-good">{fmtDate(s.scenario.clearedDate)}</span>, once{' '}
+            <span className="text-warn">{formatCurrencyAbs(deficit + s.extraNeeded)}</span> a cycle is found.
+          </>
         ) : (
           <>The {kindWord(list.find((d) => d.id === s.targetId))} — {s.label} — gone by <span className="text-good">{fmtDate(s.scenario.clearedDate)}</span>.</>
         )}
@@ -112,9 +136,13 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
       <ul className="mt-4 flex flex-col gap-2.5">
         {!s.alreadyOnTrack && (
           <Line>
-            It takes <B>{formatCurrencyAbs(s.extraNeeded)} a cycle</B> on top of the {formatCurrencyAbs(s.instalment)} instalment — <B>{formatCurrencyAbs(s.totalExtra)}</B> over {plural(s.months, 'cycle')}.
-            {deficit > 0 && (
-              <> You are {formatCurrencyAbs(deficit)} a cycle short today, so in real terms that is <B tone="text-warn">{formatCurrencyAbs(deficit + s.extraNeeded)}</B> a cycle to find.</>
+            {deficit > 0 ? (
+              <>
+                That's <B tone="text-warn">{formatCurrencyAbs(deficit + s.extraNeeded)} a cycle</B> to find —{' '}
+                {formatCurrencyAbs(deficit)} of it just to stop today's shortfall, {formatCurrencyAbs(s.extraNeeded)} more on top of the {formatCurrencyAbs(s.instalment)} instalment to clear it in {plural(s.months, 'cycle')}.
+              </>
+            ) : (
+              <>It takes <B>{formatCurrencyAbs(s.extraNeeded)} a cycle</B> on top of the {formatCurrencyAbs(s.instalment)} instalment — <B>{formatCurrencyAbs(s.totalExtra)}</B> over {plural(s.months, 'cycle')}.</>
             )}
           </Line>
         )}
@@ -151,12 +179,18 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
       {ranked.length > 1 && (
         <div className="mt-6 border-t pt-5">
           <p className="t-label">The same {plural(months, 'cycle')} on each debt — cheapest first</p>
+          {deficit > 0 && (
+            <p className="t-caption mt-1">
+              "To find" already includes closing the {formatCurrencyAbs(deficit)} shortfall — it's the real
+              amount, not what's on top of what you're managing today.
+            </p>
+          )}
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
                 <tr className="text-[11px] font-semibold tracking-wide text-label-2 uppercase">
                   <th className="sticky-col py-2 pr-3">Debt</th>
-                  <th className="py-2 pr-3 text-right">Extra a cycle</th>
+                  <th className="py-2 pr-3 text-right">{deficit > 0 ? 'To find a cycle' : 'Extra a cycle'}</th>
                   <th className="py-2 pr-3 text-right">Freed a cycle</th>
                   <th className="py-2 pr-3">From</th>
                   <th className="py-2 pr-3">Everything by</th>
@@ -174,7 +208,9 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
                     onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setTargetId(r.targetId)}
                   >
                     <td className="sticky-col py-2.5 pr-3 font-medium">{r.label}</td>
-                    <td className="num py-2.5 pr-3 text-right">{r.alreadyOnTrack ? 'on track' : formatCurrencyAbs(r.extraNeeded)}</td>
+                    <td className="num py-2.5 pr-3 text-right">
+                      {r.alreadyOnTrack ? 'on track' : formatCurrencyAbs(deficit + r.extraNeeded)}
+                    </td>
                     <td className="num py-2.5 pr-3 text-right text-good">{formatCurrencyAbs(r.freed.perCycle)}</td>
                     <td className="py-2.5 pr-3 text-label-2">{fmtDate(r.freed.fromDate)}</td>
                     <td className="py-2.5 pr-3 text-label-2">

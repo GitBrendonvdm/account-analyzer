@@ -686,9 +686,10 @@ export function LiabilityTable({
 
       <div className="flex flex-col gap-3 border-t px-5 py-5 sm:px-6">
         <p className="text-[14.5px] text-label">
-          Your debt costs <b className="num font-semibold">{formatCurrencyAbs(interest + fees)}</b> a cycle:{' '}
-          <span className="num">{formatCurrencyAbs(interest)}</span> interest,{' '}
-          <span className="num">{formatCurrencyAbs(fees)}</span> fees.
+          Your debt costs <b className="num font-semibold">{formatCurrencyAbs(interest + fees)}</b> a cycle at
+          today's rate and balance: <span className="num">{formatCurrencyAbs(interest)}</span> interest,{' '}
+          <span className="num">{formatCurrencyAbs(fees)}</span> fees.{' '}
+          <span className="text-label-2">Accounts shows what's actually been charged, which can differ.</span>
         </p>
 
         {cardsMissing.length > 0 && (

@@ -465,7 +465,11 @@ export function buildDirection(options) {
         deltaPct,
         tone,
         series: values,
-        note: shifted ? 'A salary landed outside its cycle in this window, so the short figure is not comparable.' : null,
+        note: shifted
+          ? 'A salary landed outside its cycle in this window, so the short figure is not comparable.'
+          : id === 'standingCharges'
+            ? 'The trend only — the line-by-line list is on Habits.'
+            : null,
       };
     });
 

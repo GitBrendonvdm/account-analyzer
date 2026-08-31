@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  Area,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ReferenceArea,
   ReferenceLine,
@@ -19,11 +17,8 @@ import { Field } from './ui/Field';
 import { DirectionTable } from './plan/DirectionTable';
 import { STICKY_CELL, TableScroller } from './plan/TableScroller';
 import {
-  BAD,
   ChartFrame,
-  ChartLegend,
   ChartTooltip,
-  GOOD,
   LABEL,
   ZoomHint,
   axisStyle,
@@ -32,7 +27,6 @@ import {
   gridStyle,
   selectionStyle,
   useReducedMotion,
-  useSeriesToggle,
   useZoomDomain,
   yAxisStyle,
 } from './charts/interactive';
@@ -132,13 +126,15 @@ function TargetRow({ row, onSet }) {
 /* ------------------------------------------------------------------ trajectory */
 
 const EMPTY = [];
-const TRAJECTORY_SERIES = ['assets', 'debt', 'net'];
 
 /**
- * Net worth, assets and debt projected forward, with the interaction kit: drag to zoom, hover for
- * the three figures and their change since the first visible cycle, click the legend to hide a
- * series. Tones are the Aurora good/bad fills — the pastel light-theme hexes this chart shipped
- * with were the one place the app still looked like a different product.
+ * Net worth projected forward, with the interaction kit: drag to zoom, hover for the figure and
+ * its change since the first visible cycle. Tone is the Aurora label tone.
+ *
+ * This used to plot assets and debt as their own stacked areas alongside net worth — but debt
+ * balance over time is exactly the chart Debt already owns (BalanceChart, under whatever strategy
+ * is selected there), and account balances over time are Accounts' job. Net worth is the one figure
+ * that is genuinely this tab's own: what everything adds up to if nothing changes.
  */
 function TrajectoryChart({ trajectory }) {
   const data = useMemo(
@@ -147,13 +143,10 @@ function TrajectoryChart({ trajectory }) {
         cycle: p.cycle,
         label: p.date ? p.date.toLocaleDateString('en-ZA', MONTH_YEAR) : `+${p.cycle}`,
         net: Math.round(p.net),
-        debt: Math.round(-p.debt),
-        assets: Math.round(p.assets),
       })),
     [trajectory],
   );
   const zoom = useZoomDomain(data, 'label');
-  const toggles = useSeriesToggle(TRAJECTORY_SERIES);
   const reduced = useReducedMotion();
   if (!data.length) return null;
 
@@ -178,28 +171,7 @@ function TrajectoryChart({ trajectory }) {
               {...zoom.tooltipProps}
               content={<ChartTooltip deltaFrom={first} />}
             />
-            <Legend content={<ChartLegend toggle={toggles.toggle} isHidden={toggles.isHidden} />} />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.22)" />
-            <Area
-              type="monotone"
-              dataKey="assets"
-              name="Held"
-              stroke={GOOD}
-              fill="rgba(48,209,88,0.18)"
-              strokeWidth={1.5}
-              hide={toggles.isHidden('assets')}
-              isAnimationActive={!reduced}
-            />
-            <Area
-              type="monotone"
-              dataKey="debt"
-              name="Owed"
-              stroke={BAD}
-              fill="rgba(255,69,58,0.18)"
-              strokeWidth={1.5}
-              hide={toggles.isHidden('debt')}
-              isAnimationActive={!reduced}
-            />
             <Line
               type="monotone"
               dataKey="net"
@@ -208,7 +180,6 @@ function TrajectoryChart({ trajectory }) {
               strokeWidth={2.5}
               dot={false}
               activeDot={{ r: 5, stroke: '#08080a', strokeWidth: 2 }}
-              hide={toggles.isHidden('net')}
               isAnimationActive={!reduced}
             />
             {zoom.selection && (

@@ -87,11 +87,9 @@ const TILES = [
     format: (v) => formatCurrencyAbs(v),
     // The library grades amber by share of income; without that figure any shortfall reads red.
     tone: (v) => (v <= 0 ? 'good' : 'bad'),
-    note: (v) => {
-      if (!(v.value > 0)) return 'no shortfall a cycle';
-      const funder = v.fundedBy?.[0]?.account;
-      return funder ? `short a cycle · lands on the ${funder}` : 'short a cycle';
-    },
+    // Which account absorbs it is Debt's story to tell (DeficitBanner); this tile only needs to
+    // say there is one.
+    note: (v) => (v.value > 0 ? 'short a cycle' : 'no shortfall a cycle'),
   },
 ];
 
