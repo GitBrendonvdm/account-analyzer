@@ -48,7 +48,6 @@ function subscriptionItems(subscriptions) {
         kind: 'subscription',
         label: line.label,
         perCycle: line.perCycle,
-        category: line.category,
         sentence: `${line.label}: ${R(line.perCycle)} a cycle`,
         action: 'cancel or downgrade',
       });
@@ -94,37 +93,48 @@ function subscriptionItems(subscriptions) {
       kind: 'new-charge',
       label: line.label,
       perCycle: line.perCycle,
-      category: line.category,
       sentence: line.sentence,
       action: 'check that you meant to keep it',
     });
   });
 
-  // Small or unproven lines don't each deserve their own row: three R30–R100 guesses read as three
-  // chores, when "Banking: R125 a cycle across 2 lines" is one glance. Grouped by category, since
-  // that's the useful signal once the amount or the confidence is too thin to carry a line alone —
-  // every underlying line is still named in the evidence, so nothing is hidden, only folded.
-  const byCategory = new Map();
-  minor.forEach((m) => {
-    const key = m.category || 'Uncategorized';
-    if (!byCategory.has(key)) byCategory.set(key, []);
-    byCategory.get(key).push(m);
-  });
-  byCategory.forEach((lines, category) => {
-    const single = lines.length === 1 ? lines[0] : null;
+  // Small or unproven lines don't each deserve their own row: three R30-R100 guesses read as three
+  // chores, when "3 smaller or unproven charges — R225 a cycle" is one glance. Tried grouping these
+  // by category first; it didn't help — on real data "Credit Card" and "Credit Facility" are two
+  // different categories, so every minor line still stood alone in its own group of one. Collapsed
+  // to a single row instead, regardless of category: every name still appears, in the row itself
+  // when there are few enough to read at a glance and in full in the evidence either way, so nothing
+  // about what's inside it is hidden, only folded.
+  if (minor.length === 1) {
+    const m = minor[0];
     out.push(
       item({
-        id: `minor|${category}`,
-        kind: single ? single.kind : 'minor',
+        id: `minor|${m.label}`,
+        kind: m.kind,
         bucket: 'cancellable',
-        label: single ? single.label : `${category} — ${lines.length} small or unproven lines`,
-        perCycle: lines.reduce((s, l) => s + l.perCycle, 0),
+        label: m.label,
+        perCycle: m.perCycle,
         confidence: 'low',
-        action: single ? single.action : 'worth a glance together',
-        evidence: lines.map((l) => l.sentence),
+        action: m.action,
+        evidence: [m.sentence],
       }),
     );
-  });
+  } else if (minor.length > 1) {
+    const names = minor.map((m) => m.label);
+    const shown = names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+    out.push(
+      item({
+        id: 'minor',
+        kind: 'minor',
+        bucket: 'cancellable',
+        label: `${minor.length} smaller or unproven charges — ${shown}`,
+        perCycle: minor.reduce((s, m) => s + m.perCycle, 0),
+        confidence: 'low',
+        action: 'worth a glance together',
+        evidence: minor.map((m) => m.sentence),
+      }),
+    );
+  }
 
   return out;
 }

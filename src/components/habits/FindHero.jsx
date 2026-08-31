@@ -120,10 +120,11 @@ export function FindHero({ finder, className = '' }) {
           )}
           {finder.informational?.length > 0 && (
             <div className="mt-4 border-t pt-3">
+              {/* `sentence` already carries the action (see `item()` in savingsFinder.js) — every
+                  informational item's own action IS the explanation, so there's nothing to append. */}
               {finder.informational.map((it) => (
                 <p key={it.id ?? it.label} className="t-caption">
-                  {it.sentence ?? `${it.label}: ${formatCurrencyAbs(it.perCycle)} a cycle`}
-                  {it.note ? ` — ${it.note}` : ' — becomes a saving only once the balance is paid down; see Debt.'}
+                  {it.sentence ?? `${it.label}: ${formatCurrencyAbs(it.perCycle)} a cycle — ${it.action}`}
                 </p>
               ))}
             </div>

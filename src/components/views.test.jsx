@@ -167,6 +167,9 @@ describe('HabitsView blocks', () => {
     expect(html).toContain('Already saved R 89 a cycle');
     expect(html).toContain('query or renegotiate');
     expect(html).toContain('becomes a saving only once the balance is paid down');
+    // `sentence` already carries the informational item's own action; the explanation must not
+    // print twice ("...— see Debt — becomes a saving only once...— see Debt.").
+    expect(html.match(/becomes a saving only once the balance is paid down/g)).toHaveLength(1);
   });
 
   it('renders the standing charges with cadence chips, overrides and the sentence', () => {

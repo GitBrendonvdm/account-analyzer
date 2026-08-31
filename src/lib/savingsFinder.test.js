@@ -148,46 +148,48 @@ describe('buildSavingsFinder', () => {
     expect(plain(out.items[1].sentence)).toBe('b: R 80 a cycle — query or renegotiate');
   });
 
-  it('groups small subscriptions and unproven new charges by category instead of listing each', () => {
+  it('collapses small subscriptions and unproven new charges into one row, whatever their categories', () => {
+    // Real data: "Credit Card" and "Credit Facility" turned out to be two different categories, so
+    // grouping by category left every minor line standing alone — this pins the fix, which folds
+    // them together regardless of category.
     const out = buildSavingsFinder({
-      subscriptions: subs(
-        [optional('tubepremium', 4, { category: 'Streaming' }), optional('parking', 15, { category: 'Transport' })],
-        {
-          newLines: [
-            { id: 'fish', label: 'Atlantica Fisheries', perCycle: 100, headline: false, category: 'Dining', sentence: 'Atlantica Fisheries: new', override: null },
-            { id: 'cc', label: 'Credit Card', perCycle: 95, headline: false, category: 'Banking', sentence: 'Credit Card: new', override: null },
-            { id: 'facility', label: 'Credit Facility', perCycle: 30, headline: false, category: 'Banking', sentence: 'Credit Facility: new', override: null },
-            { id: 'gym', label: 'Big Gym', perCycle: 500, headline: true, category: 'Fitness', sentence: 'Big Gym: new', override: null },
-          ],
-        },
-      ),
+      subscriptions: subs([optional('tubepremium', 4, { category: 'Streaming' })], {
+        newLines: [
+          { id: 'fish', label: 'Atlantica Fisheries', perCycle: 100, headline: false, category: 'Dining', sentence: 'Atlantica Fisheries: new', override: null },
+          { id: 'cc', label: 'Credit Card', perCycle: 95, headline: false, category: 'Banking', sentence: 'Credit Card: new', override: null },
+          { id: 'facility', label: 'Credit Facility', perCycle: 30, headline: false, category: 'Loans', sentence: 'Credit Facility: new', override: null },
+          { id: 'gym', label: 'Big Gym', perCycle: 500, headline: true, category: 'Fitness', sentence: 'Big Gym: new', override: null },
+        ],
+      }),
     });
 
-    // The two Banking guesses collapse into one row, not two.
-    const banking = out.items.find((i) => i.id === 'minor|Banking');
-    expect(banking).toBeTruthy();
-    expect(banking.label).toBe('Banking — 2 small or unproven lines');
-    expect(banking.perCycle).toBe(125);
-    expect(banking.confidence).toBe('low');
-    expect(banking.evidence).toHaveLength(2);
+    // Four minor lines (one small subscription, three unproven new charges, three different
+    // categories) become exactly one row, not four and not grouped by category.
+    const minor = out.items.find((i) => i.id === 'minor');
+    expect(minor).toBeTruthy();
+    expect(minor.label).toBe('4 smaller or unproven charges — tubepremium, Atlantica Fisheries and 2 more');
+    expect(minor.perCycle).toBe(4 + 100 + 95 + 30);
+    expect(minor.confidence).toBe('low');
+    expect(minor.evidence).toHaveLength(4);
+    expect(out.items.filter((i) => i.confidence === 'low')).toHaveLength(1);
 
-    // A single small/unproven line in its own category still reads as itself, not "Streaming — 1 line".
-    const streaming = out.items.find((i) => i.id === 'minor|Streaming');
-    expect(streaming.label).toBe('tubepremium');
-    expect(streaming.kind).toBe('subscription');
-    const transport = out.items.find((i) => i.id === 'minor|Transport');
-    expect(transport.label).toBe('parking');
-    const dining = out.items.find((i) => i.id === 'minor|Dining');
-    expect(dining.label).toBe('Atlantica Fisheries');
-    expect(dining.kind).toBe('new-charge');
-
-    // Headline-worthy and above the floor: still their own row, not folded into the pile.
+    // Headline-worthy and above the floor: still its own row, not folded into the pile.
     expect(out.items.find((i) => i.id === 'new-charge|gym')).toEqual(
       expect.objectContaining({ label: 'Big Gym', perCycle: 500, confidence: 'medium' }),
     );
 
-    // None of the grouped low-confidence rands count toward the headline "Found" figure.
+    // None of the folded-in low-confidence rands count toward the headline "Found" figure.
     expect(out.found).toBe(500);
+  });
+
+  it('leaves a single minor line reading as itself rather than "1 smaller charge"', () => {
+    const out = buildSavingsFinder({
+      subscriptions: subs([], {
+        newLines: [{ id: 'fish', label: 'Atlantica Fisheries', perCycle: 100, headline: false, category: 'Dining', sentence: 'Atlantica Fisheries: new charge', override: null }],
+      }),
+    });
+    expect(out.items).toHaveLength(1);
+    expect(out.items[0]).toEqual(expect.objectContaining({ id: 'minor|Atlantica Fisheries', label: 'Atlantica Fisheries', kind: 'new-charge', confidence: 'low' }));
   });
 
   it('is empty, not broken, with nothing to read', () => {

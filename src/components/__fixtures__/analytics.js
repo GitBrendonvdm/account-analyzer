@@ -595,7 +595,16 @@ export const fixtureFinder = {
   foundPerYear: 29844,
   behaviouralPotential: 3800,
   informational: [
-    finderItem({ id: 'card-interest', kind: 'card-interest', bucket: 'informational', label: 'Card interest', perCycle: 1700, confidence: 'high', action: null, note: 'becomes a saving only once the balance is paid down — see Debt' }),
+    finderItem({
+      id: 'card-interest',
+      kind: 'card-interest',
+      bucket: 'informational',
+      label: 'Card interest',
+      perCycle: 1700,
+      confidence: 'high',
+      action: 'becomes a saving only once the balance is paid down — see Debt',
+      sentence: 'Card interest: R 1 700 a cycle — becomes a saving only once the balance is paid down — see Debt',
+    }),
   ],
   deficit: 17000,
   cover: 0.146,
