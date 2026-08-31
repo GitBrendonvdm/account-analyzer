@@ -72,7 +72,7 @@ const padLines = (subscriptions, n = 51) => ({
 const VIEWS = [
   { name: 'TodayView', View: TodayView, props: todayProps, keys: NEW_PROPS.today, keep: ['Safe to spend before payday', 'Came in', 'Went out', 'Where it goes'] },
   { name: 'HabitsView', View: HabitsView, props: habitsProps, keys: NEW_PROPS.habits, keep: ['Where the money goes', 'When you spend'] },
-  { name: 'PlanView', View: PlanView, props: planProps, keys: NEW_PROPS.plan, keep: ['Safe to spend', 'Targets', 'Closing the gap', 'If nothing changes', 'Goals'] },
+  { name: 'PlanView', View: PlanView, props: planProps, keys: NEW_PROPS.plan, keep: ['Targets', "Cut categories to close this cycle's shortfall", 'If nothing changes', 'Goals'] },
   { name: 'AccountsView', View: AccountsView, props: accountsProps, keys: NEW_PROPS.accounts, keep: ['Balances', 'What the debt costs'] },
 ];
 
@@ -195,18 +195,28 @@ describe('HabitsView blocks', () => {
     expect(render(HabitsView, habitsProps())).not.toMatch(/Show all \d+ standing charges/);
   });
 
-  it('renders price creep, drift, wins and basket with their sentences', () => {
+  it('folds the price-trend leftovers into standing charges, and clarifies drift and basket', () => {
     const html = render(HabitsView, habitsProps());
-    expect(html).toContain('The same things cost R 260 more a cycle than when you started — R 3 120 a year.');
-    expect(html).toContain('R 699 → R 899');
+    // Price creep no longer has its own card; only the "too erratic to compare" list, which
+    // SubscriptionsCard's inline step badges don't cover, is folded in.
+    expect(html).toContain('Too erratic to price-trend');
     expect(html).toContain('2 lines vary too much to compare');
+    expect(html).not.toContain('The same things cost R 260 more a cycle than when you started');
+    expect(html).not.toContain('R 699 → R 899');
+    // Drift gets a plain-English line ahead of the stats for its top two flagged categories.
+    expect(html).toContain('Groceries cost about R 1 800 more than usual this cycle.');
     expect(html).toContain('Groceries: R 7 800 a cycle, far outside the usual R 6 000 ± R 450');
+    expect(html).toContain('Pets cost about R 400 more than usual this cycle.');
     expect(html).toContain('Pets: R 1 300 a cycle, well outside the usual R 900 ± R 140');
     expect(html).toContain('New since May 2026');
     expect(html).toContain('Example Cloud: new monthly charge — R 1 299 a cycle');
     expect(html).toContain('You stopped 1 subscription and 0 got cheaper: R 89 a cycle, R 267 saved so far.');
+    // Basket is retitled and scoped to the categories Drift flagged (Groceries); "Eating Out &
+    // Takeaways" has a family in the fixture but was never flagged by drift, so it drops out.
+    expect(html).toContain('More visits, or bigger baskets?');
     expect(html).toContain('Trips or tickets?');
     expect(html).toContain('Groceries: 4 → 8 trips a cycle, basket R 500 → R 500. More trips explain R 2 000 of the R 2 000 change (cycles 12–7 back against the last 6).');
+    expect(html).not.toContain('Eating Out & Takeaways');
   });
 
   it('renders the analytics alone when the legacy habits are missing, and nothing with nothing', () => {
@@ -219,37 +229,19 @@ describe('HabitsView blocks', () => {
 });
 
 describe('PlanView blocks', () => {
-  it('orders the direction table and the solver above the targets', () => {
+  it('orders the direction table, the targets and the shortfall card above the trajectory and goals', () => {
     const html = render(PlanView, planProps());
     const at = (s) => html.indexOf(s);
     expect(at('Direction')).toBeGreaterThan(-1);
-    expect(at('Direction')).toBeLessThan(at('What would it take'));
-    expect(at('What would it take')).toBeLessThan(at('Targets'));
-    // "Standing charges" is also a Direction metric label; the section is found by its heading.
-    expect(at('If nothing changes')).toBeLessThan(at('<h2 class="t-head">Standing charges</h2>'));
-    expect(at('<h2 class="t-head">Standing charges</h2>')).toBeLessThan(at('<h2 class="t-head">Goals</h2>'));
+    expect(at('Direction')).toBeLessThan(at('Targets'));
+    expect(at('Targets')).toBeLessThan(at("Cut categories to close this cycle's shortfall"));
+    expect(at("Cut categories to close this cycle's shortfall")).toBeLessThan(at('If nothing changes'));
+    expect(at('If nothing changes')).toBeLessThan(at('<h2 class="t-head">Goals</h2>'));
   });
 
-  it('writes the widening sentence', () => {
+  it('writes the 3-cycle vs 12-cycle sentence', () => {
     const html = render(PlanView, planProps());
-    expect(html).toMatch(/The gap is widening: -?R 15 000 a cycle over the last 3 cycles against -?R 8 000 over the last 12, and -?R 4 000 the year before\./);
-    expect(html).toContain('Standing charges');
-  });
-
-  it('writes the solver sentence with the break-even clause, the unreachable clause and the flexible line', () => {
-    const html = render(PlanView, planProps());
-    // en-ZA abbreviates September as "Sept", hence 3–4 letters.
-    expect(html).toMatch(/To clear everything by \w{3,4} \d{4} you need R [\d ]+ a cycle more than now — R 17 000 of it just to stop borrowing\./);
-    expect(html).toMatch(/The Example Bond is not reachable by then \(R 410 000 at 9\.5%; it clears in \d{4} on the current instalment\)\./);
-    expect(html).toContain('Your flexible categories can give at most R 9 000');
-    expect(html).toMatch(/With R 3 000 more a cycle, everything clears by \w{3,4} \d{4}\./);
-    expect(html).toContain('type="date"');
-  });
-
-  it('explains when there is nothing to solve', () => {
-    const html = render(PlanView, planProps({ debts: [], solverInputs: null }));
-    expect(html).toContain('Nothing to solve yet');
-    expectClean(html);
+    expect(html).toMatch(/The 3-cycle vs 12-cycle change is widening: -?R 15 000 a cycle over the last 3 cycles against -?R 8 000 over the last 12, and -?R 4 000 the year before\./);
   });
 
   it('uses the Aurora tones and the interaction kit on the trajectory', () => {
@@ -259,25 +251,16 @@ describe('PlanView blocks', () => {
     expect(html).toContain('Drag across the chart to zoom in');
   });
 
-  it('renders the standing charges table with the override menu', () => {
+  it('does not duplicate Today\'s safe-to-spend card or Debt\'s solver', () => {
     const html = render(PlanView, planProps());
-    expect(html).toContain("engine's call");
-    expect(html).toContain('Override for Example Stream');
-    expect(html).toContain('+29% since May 26');
+    expect(html).not.toContain('Safe to spend');
+    expect(html).not.toContain('What would it take');
   });
 
-  it('folds the standing charges table to the top 12, with the total over every line', () => {
-    const html = render(PlanView, planProps({ subscriptions: padLines(planProps().subscriptions) }));
-    expect(html).toContain('R 40 245');
-    expect(html).toContain('a cycle across 61 lines');
-    expect(html).toContain('Show all 61 standing charges');
-    expect(html).toContain('12 of 61 shown · totals cover all');
-    expect(html).not.toContain('Show fewer');
-    expect(html.match(/truncate text-sm text-label md:max-w-\[16rem\]/g)).toHaveLength(12);
-    expect(html).toContain('Override for Pad line 1"');
-    expect(html).not.toContain('Pad line 2');
-    expectClean(html);
-    expect(render(PlanView, planProps())).not.toMatch(/Show all \d+ standing charges/);
+  it('does not duplicate the Habits standing-charges table', () => {
+    const html = render(PlanView, planProps());
+    // "Standing charges" is also a Direction metric label; the table is found by its own heading.
+    expect(html).not.toContain('<h2 class="t-head">Standing charges</h2>');
   });
 });
 

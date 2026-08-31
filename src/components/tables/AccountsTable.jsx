@@ -25,7 +25,7 @@ export function AccountsTable({ summaries, currentMonth, dataThrough }) {
   return (
     <div className="glass overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b p-4">
-        <h2 className="t-head">Accounts</h2>
+        <h2 className="t-head">Cash in and out, by account</h2>
         <p className="t-label">
           This cycle ({currentMonth}) against the typical cycle in range. Transfers included.
         </p>

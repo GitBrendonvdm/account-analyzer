@@ -12,13 +12,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Flag, Scissors, Target, Wallet } from 'lucide-react';
+import { Flag, Scissors, Target } from 'lucide-react';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 import { suggestTarget } from '../lib/budgets';
 import { Field } from './ui/Field';
 import { DirectionTable } from './plan/DirectionTable';
-import { SolverPanel } from './plan/SolverPanel';
-import { StandingCharges } from './plan/StandingCharges';
 import { STICKY_CELL, TableScroller } from './plan/TableScroller';
 import {
   BAD,
@@ -56,96 +54,6 @@ function Panel({ title, subtitle, children, right }) {
       </div>
       {children}
     </section>
-  );
-}
-
-/* ------------------------------------------------------------------ safe to spend */
-
-function SafeToSpend({ safe, summary }) {
-  if (!safe || !summary) return null;
-  const negative = safe.safe <= 0;
-  return (
-    <div className="glass p-5 md:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] text-label-3 uppercase max-md:text-xs">
-            <Wallet size={13} /> Safe to spend
-          </div>
-          {/* The figure scales with the screen and never wraps — a rand amount broken over two
-              lines reads as two numbers. 36px/40px is exactly text-4xl, so desktop is unchanged. */}
-          <div
-            className={`mt-1 text-[clamp(28px,9vw,36px)]/10 font-semibold whitespace-nowrap tabular-nums ${negative ? 'text-bad' : 'text-good'}`}
-          >
-            {formatCurrency(safe.safe)}
-          </div>
-          <p className="mt-1.5 max-w-md text-xs text-label-2">
-            {negative ? (
-              <>
-                The bills still due before payday come to more than what's left. This isn't a budget
-                to spend — it's the size of the hole.
-              </>
-            ) : (
-              <>
-                {formatCurrencyAbs(safe.perDay)} a day across {safe.daysLeft} day
-                {safe.daysLeft === 1 ? '' : 's'} to payday, after every bill still due is set aside.
-              </>
-            )}
-          </p>
-        </div>
-        {/* Two columns on a phone, where the grid takes the whole card width below the figure. */}
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm max-md:w-full max-md:gap-x-4 sm:grid-cols-3">
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">In so far</dt>
-            <dd className="mt-0.5 font-medium text-label tabular-nums">
-              {formatCurrencyAbs(summary.income.received)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Out so far</dt>
-            <dd className="mt-0.5 font-medium text-label tabular-nums">
-              {formatCurrencyAbs(summary.expense.spent)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Still expected in</dt>
-            <dd className="mt-0.5 font-medium text-good tabular-nums">
-              {formatCurrencyAbs(safe.incomeStillExpected)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Bills still due</dt>
-            <dd className="mt-0.5 font-medium text-bad tabular-nums">
-              −{formatCurrencyAbs(safe.committed)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">Forecast to spend</dt>
-            <dd className="mt-0.5 font-medium text-label-2 tabular-nums">
-              {formatCurrencyAbs(safe.discretionaryForecast)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-wide text-label-2 uppercase max-md:text-xs">If you follow it</dt>
-            <dd
-              className={`mt-0.5 font-medium tabular-nums ${safe.forecastGap < 0 ? 'text-bad' : 'text-good'}`}
-            >
-              {formatCurrency(safe.forecastGap)}
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      {safe.bills?.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4 text-xs">
-          <span className="font-medium text-label-2">Set aside for:</span>
-          {safe.bills.slice(0, 8).map((b) => (
-            <span key={b.name} className="rounded bg-fill px-2 py-1 text-label-2">
-              {b.name} · {formatCurrencyAbs(b.amount)}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -322,20 +230,15 @@ function TrajectoryChart({ trajectory }) {
 /* ------------------------------------------------------------------ the view */
 
 /**
- * Plan — this cycle's room, the direction, what it would take, and the levers.
+ * Plan — the direction, the targets, this cycle's shortfall, and the levers.
  *
- * Order is the order of the questions: how much is safe now, which way things are going, what a
- * chosen date would cost, then the targets, the cuts, the projection, the standing charges the
- * plan has to carry, and the goals. The direction table and the solver are new; everything else
- * is the previous view, with the trajectory chart re-toned and given the interaction kit and the
- * inputs moved onto `Field`.
- *
- * The solver is never imported here: App hands in `solve` (the library) together with the
- * `solverInputs` bundle, so the panel stays renderable — and testable — with neither.
+ * Order is the order of the questions: which way things are going, how each category is doing
+ * against where the cycle is heading, what would close the shortfall, what happens if nothing
+ * changes, and the goals. Safe-to-spend lives on Today now and the debt-payoff solver lives on
+ * Debt — both duplicated what those tabs already show, so neither is rendered here. The trajectory
+ * chart is re-toned and given the interaction kit, with the inputs moved onto `Field`.
  */
 export function PlanView({
-  safe,
-  summary,
   budgets,
   onSetTarget,
   trajectory,
@@ -346,15 +249,6 @@ export function PlanView({
   onAddGoal,
   onRemoveGoal,
   direction,
-  debts,
-  debtBudget,
-  solverInputs,
-  solve,
-  onOpenDebt,
-  subscriptions,
-  lineOverrides,
-  onSetLineOverride,
-  asOf,
 }) {
   const [showAll, setShowAll] = useState(false);
   const [goalDraft, setGoalDraft] = useState({ name: '', target: '', saved: '' });
@@ -364,20 +258,7 @@ export function PlanView({
 
   return (
     <div className="flex flex-col gap-5">
-      <SafeToSpend safe={safe} summary={summary} />
-
       <DirectionTable direction={direction} />
-
-      {(solve || solverInputs || debts) && (
-        <SolverPanel
-          debts={debts}
-          debtBudget={debtBudget}
-          solverInputs={solverInputs}
-          solve={solve}
-          monthlySaving={monthlySaving}
-          onOpenDebt={onOpenDebt}
-        />
-      )}
 
       {budgets && (
         <Panel
@@ -435,14 +316,14 @@ export function PlanView({
 
       {gapClosers && (
         <Panel
-          title="Closing the gap"
-          subtitle="Ranked by what a category could plausibly give up, not by size — the bond is the biggest line in the data and suggesting you cut it would be useless."
+          title="Cut categories to close this cycle's shortfall"
+          subtitle="The categories that could close it, ranked by what each could plausibly give up rather than by size — the bond is the biggest line in the data and suggesting you cut it would be useless."
           right={
             <div className="text-right">
               <div className="text-lg font-semibold text-label tabular-nums">
                 {formatCurrencyAbs(gapClosers.gap)}
               </div>
-              <div className="t-label">to find each cycle</div>
+              <div className="t-label">shortfall to find each cycle</div>
             </div>
           }
         >
@@ -490,7 +371,7 @@ export function PlanView({
                       <b className="font-semibold text-bad">
                         {formatCurrencyAbs(gapClosers.shortfall)}
                       </b>{' '}
-                      a cycle unaccounted for — the gap is structural, not discretionary.
+                      a cycle unaccounted for — the shortfall is structural, not discretionary.
                     </>
                   )}
                 </p>
@@ -548,13 +429,6 @@ export function PlanView({
           </div>
         </Panel>
       )}
-
-      <StandingCharges
-        subscriptions={subscriptions}
-        lineOverrides={lineOverrides}
-        onSetLineOverride={onSetLineOverride}
-        asOf={asOf}
-      />
 
       {goals && (
         <Panel

@@ -7,12 +7,8 @@ import { PlanControls } from './debt/PlanControls';
 import { StrategyTiles } from './debt/StrategyTiles';
 import { BalanceChart } from './debt/BalanceChart';
 import { CommittedLine } from './debt/CommittedLine';
-import { MarginalTable } from './debt/MarginalTable';
-import { LumpWhatIf } from './debt/LumpWhatIf';
-import { CardTiles } from './debt/CardTiles';
 import { SensitivityStrip } from './debt/SensitivityStrip';
 import { WhatIfPanel } from './debt/WhatIfPanel';
-import { MARGINAL_AMOUNT_DEFAULT, MARGINAL_HORIZON_MONTHS } from '../constants';
 
 // A card's inset. 28px either side of a 360px phone left 304px for eight columns of figures; 20px
 // gives the content the width back while the card still reads as a surface. Unchanged from `sm` up.
@@ -25,15 +21,24 @@ const CARD = 'materialize p-5 sm:p-8';
  * strategy, how much extra, a lump, a rate shift) because the questions it answers are
  * counterfactuals — "what if I sent R1 000 here instead" — and a slider that round-trips through
  * App to re-run the whole pipeline feels broken. The plan engine is handed in as `engine`
- * (comparePlans / marginalValue / lumpWhatIf / rateSensitivity / cascadeTimeline) rather than
- * imported, so the view renders App's pre-computed `plans` / `marginal` / `sensitivity` on first
- * paint and only recomputes locally once the engine is wired; with no engine the controls still
- * persist through settings and App's next pass picks them up.
+ * (comparePlans / rateSensitivity / cascadeTimeline) rather than imported, so the view renders
+ * App's pre-computed `plans` / `sensitivity` on first paint and only recomputes locally once the
+ * engine is wired; with no engine the controls still persist through settings and App's next pass
+ * picks them up.
  *
  * The extra slider is the one place the deficit is honest about itself: its floor IS the deficit.
  * Nothing reaches a debt until the bleed is stopped, so the first R{deficit} of anything found is
  * spoken for, and the plan only changes once the slider is above that line.
+ *
+ * Balances-to-zero and freed-cash-over-time are two readings of the one schedule, not two separate
+ * questions, so they share a Card behind a small toggle rather than both always rendering — the
+ * pattern StrategyTiles and SensitivityStrip already use for "pick one, see its numbers".
  */
+
+const BALANCE_VIEWS = [
+  { id: 'balances', label: 'Balances' },
+  { id: 'freed', label: 'Freed cash' },
+];
 
 const STRATEGIES = [
   { id: 'minimum', label: 'Minimum', blurb: 'Only the contractual payments' },
@@ -54,14 +59,11 @@ function readSetting(settings, key, fallback) {
   return value == null ? fallback : value;
 }
 
-const isCard = (t) => t?.type === 'Credit Card' || t?.kind === 'card';
-
 export function DebtView({
   terms,
   debts,
   debtBudget,
   plans,
-  marginal,
   sensitivity,
   rateSteps,
   accounts,
@@ -93,9 +95,12 @@ export function DebtView({
 
   // ---- local-only controls -------------------------------------------------------------------
   const [customOrder, setCustomOrder] = useState(null);
-  const [lumpMonth, setLumpMonth] = useState(1);
+  // The lump field (PlanControls) has no month picker since LumpWhatIf's own one was folded into
+  // WhatIfPanel's cycle-count horizon — a lump the user sets always lands next cycle.
+  const lumpMonth = 1;
   const [bpShift, setBpShift] = useState(0);
   const [recast, setRecast] = useState(false);
+  const [balanceView, setBalanceView] = useState('balances');
 
   const setSetting = (key, value) => settings?.set?.(key, value);
 
@@ -147,33 +152,6 @@ export function DebtView({
   );
   const plan = plansShown?.[strategy] ?? plansShown?.avalanche ?? null;
 
-  // Under `minimum` the engine strips every lump, which would make the marginal and lump tables
-  // read as zeros; the same order with no extra and no cascade is the honest baseline there.
-  const marginalOptions = useMemo(
-    () =>
-      strategy === 'minimum'
-        ? { ...runOptions, strategy: 'custom', order: plan?.order ?? order, cascade: false, extraPerMonth: 0, lumps: [] }
-        : { ...runOptions, lumps: [] },
-    [strategy, runOptions, plan, order],
-  );
-  const marginalShown = useMemo(
-    () =>
-      engine?.marginalValue && debtList.length
-        ? engine.marginalValue(debtList, {
-            ...marginalOptions,
-            amount: MARGINAL_AMOUNT_DEFAULT,
-            horizon: MARGINAL_HORIZON_MONTHS,
-          })
-        : marginal,
-    [engine, debtList, marginalOptions, marginal],
-  );
-  const lumpResult = useMemo(
-    () =>
-      engine?.lumpWhatIf && debtList.length && lump > 0
-        ? engine.lumpWhatIf(debtList, { ...marginalOptions, amount: lump, month: lumpMonth })
-        : null,
-    [engine, debtList, marginalOptions, lump, lumpMonth],
-  );
   const sensitivityShown = useMemo(
     () =>
       engine?.rateSensitivity && debtList.length ? engine.rateSensitivity(debtList, runOptions) : sensitivity,
@@ -184,23 +162,11 @@ export function DebtView({
     [engine, plan],
   );
 
-  const cardTerms = termList.filter(isCard);
   const hasPlan = Boolean(plan?.schedule?.length);
 
   return (
     <div className="flex flex-col gap-5">
       <DeficitBanner debtBudget={debtBudget} onOpenPlan={onOpenPlan} />
-
-      {debtList.length > 0 && (
-        <WhatIfPanel
-          debts={debtList}
-          base={runOptions}
-          deficit={deficit}
-          incomePerCycle={incomePerCycle}
-          instalmentsPerCycle={debtList.reduce((sum, d) => sum + (d.instalment ?? 0), 0)}
-          onOpenPlan={onOpenPlan}
-        />
-      )}
 
       <LiabilityTable
         terms={termList}
@@ -237,9 +203,7 @@ export function DebtView({
         <>
           <Card className={CARD}>
             <PlanControls
-              strategies={STRATEGIES}
               strategy={strategy}
-              onStrategy={(id) => setSetting('debtStrategy', id)}
               extra={extra}
               floor={floor}
               available={available}
@@ -274,52 +238,46 @@ export function DebtView({
 
           {hasPlan && (
             <Card className={CARD}>
-              <BalanceChart plan={plan} debts={debtList} labelsById={labelsById} />
+              <div className="glass-chip flex w-fit gap-1 p-1" role="group" aria-label="Chart">
+                {BALANCE_VIEWS.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setBalanceView(v.id)}
+                    aria-pressed={balanceView === v.id}
+                    className={`press rounded-full px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 ${
+                      balanceView === v.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-6">
+                {balanceView === 'balances' ? (
+                  <BalanceChart plan={plan} debts={debtList} labelsById={labelsById} />
+                ) : (
+                  <CommittedLine
+                    plan={plan}
+                    timeline={timeline}
+                    debts={debtList}
+                    labelsById={labelsById}
+                    cascade={cascade}
+                    strategy={strategy}
+                  />
+                )}
+              </div>
             </Card>
           )}
 
-          {hasPlan && (
-            <Card className={CARD}>
-              <CommittedLine
-                plan={plan}
-                timeline={timeline}
-                debts={debtList}
-                labelsById={labelsById}
-                cascade={cascade}
-                strategy={strategy}
-              />
-            </Card>
-          )}
-
-          <Card className="materialize overflow-hidden">
-            <MarginalTable
-              rows={marginalShown ?? EMPTY}
-              plan={plan}
-              labelsById={labelsById}
-              amount={MARGINAL_AMOUNT_DEFAULT}
-            />
-          </Card>
-
-          <Card className={CARD}>
-            <LumpWhatIf
-              result={lumpResult}
-              marginal={marginalShown ?? EMPTY}
-              amount={lump}
-              onAmount={(v) => setSetting('debtLump', v)}
-              month={lumpMonth}
-              onMonth={setLumpMonth}
-              schedule={plan?.schedule ?? EMPTY}
-              labelsById={labelsById}
-              approximate={!engine?.lumpWhatIf}
-            />
-          </Card>
-
-          {cardTerms.length > 0 && (
-            <CardTiles
-              terms={cardTerms}
-              plan={plan}
-              accountsById={accountsById}
-              onOpenAccounts={onOpenAccounts}
+          {debtList.length > 0 && (
+            <WhatIfPanel
+              debts={debtList}
+              base={runOptions}
+              deficit={deficit}
+              incomePerCycle={incomePerCycle}
+              instalmentsPerCycle={debtList.reduce((sum, d) => sum + (d.instalment ?? 0), 0)}
+              onOpenPlan={onOpenPlan}
             />
           )}
 

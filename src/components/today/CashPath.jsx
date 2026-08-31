@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { Search, X } from 'lucide-react';
-import { Card, CardHead } from '../ui/Surface';
+import { CardHead } from '../ui/Surface';
 import { useSeriesToggle } from '../charts/interactive';
 import { READOUT_CLASS, readoutStyle, useSpanDrag } from './useSpanDrag';
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
@@ -96,7 +96,7 @@ function buildModel(cashPath) {
   };
 }
 
-export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = '' }) {
+export function CashPath({ cashPath, incomeProfile, onOpenAccounts }) {
   const svgRef = useRef(null);
   const model = useMemo(() => buildModel(cashPath), [cashPath]);
   const { hidden, toggle } = useSeriesToggle();
@@ -167,9 +167,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
 
   if (!cashPath || !model || !geometry) {
     return cashPath === undefined || cashPath === null ? null : (
-      <Card className={`materialize p-5 sm:p-8 ${className}`}>
-        <CardHead title="Cash to payday" subtitle="Needs a Bank or Savings account with transactions to draw a path." />
-      </Card>
+      <CardHead title="Cash to payday" subtitle="Needs a Bank or Savings account with transactions to draw a path." />
     );
   }
 
@@ -223,7 +221,7 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
       : null;
 
   return (
-    <Card className={`materialize flex flex-col p-5 sm:p-8 ${className}`}>
+    <>
       <CardHead
         title="Cash to payday"
         subtitle={
@@ -473,6 +471,6 @@ export function CashPath({ cashPath, incomeProfile, onOpenAccounts, className = 
       {cashPath.assumptions?.length > 0 && (
         <p className="t-caption mt-4 border-t pt-4">{cashPath.assumptions.join(' ')}</p>
       )}
-    </Card>
+    </>
   );
 }

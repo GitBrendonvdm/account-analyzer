@@ -1,11 +1,9 @@
 import { AlertTriangle, ArrowRight, Clock } from 'lucide-react';
 import { Card, Figure, Tile } from './ui/Surface';
 import { CycleDial } from './today/CycleDial';
-import { SpendCurve } from './today/SpendCurve';
-import { BalanceBands } from './today/BalanceBands';
+import { ChartSwitcher } from './today/ChartSwitcher';
 import { VitalsRow } from './today/VitalsRow';
 import { UpcomingCard } from './today/UpcomingCard';
-import { CashPath } from './today/CashPath';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
@@ -123,9 +121,10 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
  * exactly", which is a question you go looking for, not one you need answered on arrival.
  *
  * Below the hero, in order: the six vitals (the year's health, not the cycle's), then the bills
- * calendar beside the cash path (what lands when, and what that does to the balance), then the
- * two cycle overlays, the three figures and where the money goes. Every new block renders nothing
- * — never a crash — when its data is not there yet, so the page degrades to the old one.
+ * calendar beside a chart switcher — cash path, spend pace, balance change, one at a time rather
+ * than three stacked charts arguing for attention — then the three figures and where the money
+ * goes. Every new block renders nothing — never a crash — when its data is not there yet, so the
+ * page degrades to the old one.
  */
 export function TodayView({
   summary,
@@ -161,7 +160,7 @@ export function TodayView({
     .slice(0, 5)
     .forEach((m) => spendRows.push({ name: m.category, amount: m.perCycle }));
 
-  const showCalendar = Boolean(upcoming || cashPath);
+  const showTimeline = Boolean(upcoming || cashPath || curve?.series?.length || balances?.series?.length);
 
   return (
     /* On an ultrawide a column of full-width bands strands the content in empty space, so past
@@ -190,25 +189,33 @@ export function TodayView({
             <span className="glass-chip px-[15px] py-2.5 text-[13px] text-label-2">
               {summary.daysToPayday} day{summary.daysToPayday === 1 ? '' : 's'} to payday
             </span>
-            {summary.staleLevel !== 'fresh' && (
-              <span
-                className={`glass-chip flex items-center gap-2 px-[15px] py-2.5 text-[13px] ${
-                  summary.staleLevel === 'alarm' ? 'text-bad' : 'text-warn'
-                }`}
-              >
-                <Clock size={13} />
-                {summary.staleDays} days behind
-              </span>
-            )}
           </div>
         </div>
 
         <div className="flex flex-col items-center justify-center gap-3">
           <CycleDial day={summary.cycleDay} length={summary.cycleLength} />
-          <div className="t-caption">
-            {fmt(summary.start)} – {fmt(summary.end)}
-          </div>
-          {caption && <div className="t-caption max-w-[34ch] text-center">{caption}</div>}
+          {/* The dial already shows where the cycle is; the exact dates, the staleness note and
+              the salary's own habits are what you'd go looking for, not what you came here to
+              read, so they sit one tap down rather than at the hero's own weight. */}
+          <details className="mt-1">
+            <summary className="t-caption cursor-pointer select-none">Details</summary>
+            <div className="mt-2 flex flex-col items-center gap-1.5">
+              <div className="t-caption">
+                {fmt(summary.start)} – {fmt(summary.end)}
+              </div>
+              {summary.staleLevel !== 'fresh' && (
+                <div
+                  className={`flex items-center gap-1.5 text-[12px] ${
+                    summary.staleLevel === 'alarm' ? 'text-bad' : 'text-warn'
+                  }`}
+                >
+                  <Clock size={12} />
+                  {summary.staleDays} days behind
+                </div>
+              )}
+              {caption && <div className="t-caption max-w-[34ch] text-center">{caption}</div>}
+            </div>
+          </details>
         </div>
       </Card>
 
@@ -216,28 +223,18 @@ export function TodayView({
         <VitalsRow vitals={vitals} onOpenAccounts={onOpenAccounts} className="3xl:col-span-12" />
       )}
 
-      {showCalendar && (
+      {showTimeline && (
         <div className="grid gap-5 lg:grid-cols-2 3xl:col-span-12">
           <UpcomingCard upcoming={upcoming} dataThrough={summary.dataThrough} />
-          <CashPath
+          <ChartSwitcher
             cashPath={cashPath}
             incomeProfile={incomeProfile}
+            curve={curve}
+            balances={balances}
             onOpenAccounts={onOpenAccounts}
             className={upcoming ? '3xl:col-span-2' : 'lg:col-span-2'}
           />
         </div>
-      )}
-
-      {curve && (
-        <Card className="materialize flex flex-col p-5 sm:p-8 3xl:col-span-6">
-          <SpendCurve curve={curve} />
-        </Card>
-      )}
-
-      {balances && (
-        <Card className="materialize flex flex-col p-5 sm:p-8 3xl:col-span-6">
-          <BalanceBands series={balances} />
-        </Card>
       )}
 
       <div className="grid gap-4 md:grid-cols-3 3xl:col-span-12">

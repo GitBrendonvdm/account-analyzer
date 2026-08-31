@@ -93,7 +93,12 @@ export function TransactionTable({ processed }) {
                     Forecast to {cycleEnd}
                   </th>
                 )}
-                <th className="border-b px-4 pt-3 pb-1" />
+                <th
+                  className="border-b border-l-2 border-l-deep/30 bg-deep/8 px-4 pt-3 pb-1 text-right text-deep"
+                  title={`Recency-weighted average over the ${processed.months.length - 1} completed pay cycles in range, with outlier cycles capped so one abnormal month can't set the level.`}
+                >
+                  Typical
+                </th>
               </tr>
               <tr>
                 <th className={`border-b px-4 pb-3 max-md:pb-0 ${PIN_PLAIN}`}>
@@ -153,7 +158,7 @@ export function TransactionTable({ processed }) {
                   />
                 </th>
                 <th
-                  className="border-b px-4 pb-3 text-right max-md:pb-0"
+                  className="border-b border-l-2 border-l-deep/30 bg-deep/8 px-4 pb-3 text-right max-md:pb-0"
                   title={`Recency-weighted average over the ${processed.months.length - 1} completed pay cycles in range, with outlier cycles capped so one abnormal month can't set the level.`}
                 >
                   <SortHeader
@@ -161,7 +166,7 @@ export function TransactionTable({ processed }) {
                     sortKey="avg"
                     sort={sort}
                     onSort={handleSort}
-                    className="justify-end"
+                    className="justify-end text-deep"
                   />
                 </th>
               </tr>

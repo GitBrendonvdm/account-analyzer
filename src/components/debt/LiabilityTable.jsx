@@ -15,6 +15,14 @@ import { CARD_MINIMUM_FLOOR, CARD_MINIMUM_PCT_DEFAULT } from '../../constants';
  * numbers are missing rather than showing zeros. The pencil opens the terms editor in place, so
  * the typed value and the inferred one sit side by side while it is being typed.
  *
+ * A card is not a loan — there is no instalment to infer, and how full it is matters in a way a
+ * loan's balance does not — so its Owed cell carries a second read: a bar of balance against limit,
+ * green under 60%, amber to 90%, red past it. The "paid in full" toggle lives in the terms editor
+ * for the same reason the bar lives in the Owed cell: both are card-only, and the editor is already
+ * the place a card's numbers get looked at together. It is local — it changes the cost sentence
+ * shown there, not the record — because whether a card revolves this particular month is not a fact
+ * the ledger holds.
+ *
  * Eight columns need 980px, which on a phone meant a 3× sideways scroll inside the card with the
  * debt's name lost off the left edge. Below `md` the same rows are laid out as stacked cards — name
  * and chips, then label/value pairs — and the editor opens INSIDE the card that was tapped rather
@@ -122,6 +130,10 @@ function missingNumbers(term, account) {
   return missing;
 }
 
+function utilisationToneOf(utilisation) {
+  return utilisation == null ? 'bg-fill-2' : utilisation > 0.9 ? 'bg-bad' : utilisation > 0.6 ? 'bg-warn' : 'bg-good';
+}
+
 /** Everything a row's cells rest on, derived once so the table and the stacked card agree. */
 function rowFacts(term, account) {
   const card = isCard(term);
@@ -133,6 +145,8 @@ function rowFacts(term, account) {
       : Number.isFinite(term.remainingMonths)
         ? Math.ceil(term.remainingMonths)
         : null;
+  const limit = card ? (account?.creditLimit ?? term.creditLimit ?? null) : null;
+  const utilisation = card && !noBalance && Number.isFinite(limit) && limit > 0 ? term.balanceOwed / limit : null;
   return {
     card,
     missing,
@@ -147,6 +161,9 @@ function rowFacts(term, account) {
       card && Number.isFinite(term.balanceOwed)
         ? Math.max(CARD_MINIMUM_FLOOR, ((term.minimumPct ?? CARD_MINIMUM_PCT_DEFAULT) / 100) * term.balanceOwed)
         : null,
+    limit,
+    utilisation,
+    utilisationTone: utilisationToneOf(utilisation),
   };
 }
 
@@ -211,6 +228,22 @@ function OwedCell({ term, f }) {
       <div className="mt-1">
         {f.provenance ? <Chip>{f.provenance}</Chip> : <Chip tone="text-warn">no balance — type one</Chip>}
       </div>
+      {f.card && !f.noBalance && (
+        <div className="mt-2">
+          <span className="block h-2 w-full overflow-hidden rounded-full bg-fill">
+            <span
+              className={`block h-full rounded-full ${f.utilisationTone}`}
+              style={{
+                width: `${Math.min(100, Math.max(2, (f.utilisation ?? 0) * 100))}%`,
+                transition: 'width 600ms var(--ease-out)',
+              }}
+            />
+          </span>
+          <div className="t-caption mt-1">
+            {f.utilisation == null ? 'utilisation unknown — add the limit' : `${Math.round(f.utilisation * 100)}% of the limit`}
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -491,6 +524,37 @@ function flattenRateSteps(rateSteps, termsById) {
   return flat.filter((s) => s.accountId && termsById[s.accountId]);
 }
 
+/** The card's cost this month: the observed finance charge when there is one, the rate on the
+ * balance otherwise — the same read CardTiles used before its tile folded into this row. */
+function cardFinance12(term) {
+  if (Number.isFinite(term.financeChargeMonthly)) return term.financeChargeMonthly * 12;
+  if (Number.isFinite(term.balanceOwed) && Number.isFinite(term.rateNominal)) return term.balanceOwed * term.rateNominal;
+  return null;
+}
+
+function PayInFullNote({ term, payInFull, onToggle }) {
+  const finance12 = cardFinance12(term);
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-3 border-b pb-5">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={payInFull}
+        className={`press glass-chip px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 ${payInFull ? 'text-good' : 'text-label-2'}`}
+      >
+        {payInFull ? 'Paid in full each month' : 'Revolving'}
+      </button>
+      <p className="text-[13.5px] text-label-2">
+        {payInFull
+          ? 'Costs nothing in interest while it is paid in full each month.'
+          : finance12 != null
+            ? `Costing ${formatCurrencyAbs(finance12 / 12)} a month while it revolves — ${formatCurrencyAbs(finance12)} a year.`
+            : 'Cost unknown until a rate is typed.'}
+      </p>
+    </div>
+  );
+}
+
 function rateStepSentence(step, term) {
   const when = fmtMonthYear(step.date);
   const months = Number.isFinite(term.remainingMonths) ? Math.ceil(term.remainingMonths) : null;
@@ -514,6 +578,9 @@ export function LiabilityTable({
   asOf,
 }) {
   const [openId, setOpenId] = useState(null);
+  // Local, not the record: whether a card revolves this particular month isn't a fact the ledger
+  // holds, so the toggle only changes the cost sentence beside it in the editor.
+  const [payInFullOverrides, setPayInFullOverrides] = useState({});
   const list = terms ?? [];
 
   if (!list.length) {
@@ -535,16 +602,32 @@ export function LiabilityTable({
   const steps = flattenRateSteps(rateSteps, termsById);
   const assumptions = [...new Set(list.flatMap((t) => t.assumptions ?? []))];
 
-  const editorFor = (id) =>
-    termsById[id] ? (
-      <LiabilityTermsEditor
-        term={termsById[id]}
-        account={accountsById[id]}
-        onPatchAccount={onPatchAccount}
-        asOf={asOf}
-        onClose={() => setOpenId(null)}
-      />
-    ) : null;
+  const payInFullOf = (term) => payInFullOverrides[term.accountId] ?? Boolean(term.payInFull);
+  const togglePayInFull = (id) => {
+    const term = termsById[id];
+    if (!term) return;
+    setPayInFullOverrides((prev) => ({ ...prev, [id]: !payInFullOf(term) }));
+  };
+
+  const editorFor = (id) => {
+    const term = termsById[id];
+    if (!term) return null;
+    const cardWithBalance = isCard(term) && Number.isFinite(term.balanceOwed);
+    return (
+      <>
+        {cardWithBalance && (
+          <PayInFullNote term={term} payInFull={payInFullOf(term)} onToggle={() => togglePayInFull(id)} />
+        )}
+        <LiabilityTermsEditor
+          term={term}
+          account={accountsById[id]}
+          onPatchAccount={onPatchAccount}
+          asOf={asOf}
+          onClose={() => setOpenId(null)}
+        />
+      </>
+    );
+  };
 
   const rowProps = (t) => {
     const paying = t.payingAccountId ? accountsById[t.payingAccountId] : null;

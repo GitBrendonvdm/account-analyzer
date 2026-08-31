@@ -23,6 +23,13 @@ import { formatCurrencyAbs } from '../../utils/format';
  * expands it. The header figure and the per-kind totals come from the engine's aggregates, so they
  * cover every line whether or not it is shown, and a caption says so. Nothing is persisted: every
  * load starts folded.
+ *
+ * A price step already shows inline on its line as the "+29% since Jul 26" badge above, which is
+ * where the price-creep engine's rising and falling lines used to get a second card of their own —
+ * same lines, same numbers, twice. The one thing that card said that this one didn't is the lines
+ * it couldn't call a trend on at all: a pharmacy or a fuel station whose price never repeats, so
+ * there is no "before" to compare a "since" to. That list has no home elsewhere, so it sits here as
+ * a quiet footer rather than vanishing with the card that used to hold it.
  */
 
 /** Lines shown before "Show all"; the Plan table uses the same cut. */
@@ -145,7 +152,7 @@ function LineRow({ line, override, onSet, asOf }) {
   );
 }
 
-export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverride, asOf, className = '' }) {
+export function SubscriptionsCard({ subscriptions, priceCreep, lineOverrides, onSetLineOverride, asOf, className = '' }) {
   const [showAll, setShowAll] = useState(false);
   if (!subscriptions) return null;
   const today = toDate(asOf) ?? new Date();
@@ -249,6 +256,20 @@ export function SubscriptionsCard({ subscriptions, lineOverrides, onSetLineOverr
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {priceCreep?.variable?.length > 0 && (
+        <div className="border-t px-4 py-4 sm:px-6">
+          <div className="t-label">Too erratic to price-trend</div>
+          <p className="mt-2 text-[13px] text-label-2" title={priceCreep.variable.map((v) => v.label).join(', ')}>
+            {priceCreep.variableSentence ?? `${plural(priceCreep.variable.length, 'line')} vary too much to compare`}
+            {' — '}
+            <span className="text-label-3">
+              {priceCreep.variable.slice(0, 4).map((v) => v.label).join(', ')}
+              {priceCreep.variable.length > 4 ? '…' : ''}
+            </span>
+          </p>
         </div>
       )}
 

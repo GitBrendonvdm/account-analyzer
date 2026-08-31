@@ -20,10 +20,11 @@ import {
  * Safe-to-spend answers this cycle; these answer the year. Each tile is one pooled ratio over the
  * last three cycles — savings rate, debt service, interest burden, cash runway, card utilisation,
  * the deficit — graded green / amber / red against the thresholds in `constants.js`, with the last
- * twelve cycles as a bar strip so a bad number can be seen to be new or old. The chip under each
- * reads the three-cycle figure against the twelve-cycle one, because "improving" and "bad" are
- * both true of a 45% debt-service ratio that was 52% a year ago, and only the pair tells you which
- * way to feel.
+ * twelve cycles as a bar strip so a bad number can be seen to be new or old. The headline figure
+ * IS the three-cycle number; the chip under it does not repeat that value at equal weight — it is
+ * muted, and carries only the direction arrow against the twelve-cycle figure, because "improving"
+ * and "bad" are both true of a 45% debt-service ratio that was 52% a year ago, and only the pair
+ * tells you which way to feel.
  *
  * A tile whose number cannot be computed — no balances typed, no card limits — says "Add balances"
  * and opens the Accounts view, rather than printing a zero that would read as good news. Hollow
@@ -135,18 +136,21 @@ function Spark({ series, tone }) {
   );
 }
 
+/**
+ * The three-cycle figure already reads large as the tile's headline, so it does not appear here
+ * again — this chip is the secondary read: which way it is moving, and what it is moving against.
+ */
 function DirectionChip({ vital, format }) {
   if (!isNumber(vital.short) || !isNumber(vital.long)) return null;
   const direction = vital.direction ?? 'flat';
   const Icon = direction === 'improving' ? ArrowUp : direction === 'worsening' ? ArrowDown : Minus;
   return (
-    <span className={`inline-flex flex-wrap items-center gap-x-1.5 text-[12px] ${DIRECTION_CLASS[direction] ?? 'text-label-3'}`}>
-      <span className="num font-medium">{format(vital.short)}</span>
-      <span className="text-label-3">over 3 cycles</span>
-      <Icon size={12} aria-label={direction} />
-      <span className="text-label-3">vs</span>
-      <span className="num font-medium">{format(vital.long)}</span>
-      <span className="text-label-3">over 12</span>
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 text-[11px] text-label-3">
+      <span>over 3 cycles</span>
+      <Icon size={11} aria-label={direction} className={DIRECTION_CLASS[direction] ?? 'text-label-3'} />
+      <span>vs</span>
+      <span className="num">{format(vital.long)}</span>
+      <span>over 12</span>
     </span>
   );
 }

@@ -30,10 +30,7 @@ const HEADINGS = [
   'Plan',
   'Strategies',
   'Balances over the plan',
-  'Freed cash',
-  'What R',
-  'A lump sum',
-  'Cards',
+  'What if I pay off',
   'If rates move',
 ];
 
@@ -99,8 +96,14 @@ describe('DebtView', () => {
     const stacked = html.split('aria-label="Your debts"')[1];
     for (const label of ['Example Bond', 'Example Card', 'Example Store Card']) expect(stacked).toContain(label);
     expect(stacked).toContain('Fee-adjusted');
-    // And the marginal table the same way.
-    expect(html).toMatch(/<ol class="md:hidden" aria-label="Where the rand does the most">/);
+  });
+
+  it('shows the balance chart by default, with a toggle to the freed-cash view', () => {
+    const html = render(fixtureProps({ engine: fixtureEngine, planOptions: fixturePlanOptions }));
+    expect(html).toContain('Balances');
+    expect(html).toContain('Freed cash');
+    expect(html).toContain('Each debt stacked; the first target on top.');
+    expect(html).not.toContain('What the instalments commit each month');
   });
 
   it('lists the rate steps and the debt cost line', () => {
@@ -136,12 +139,12 @@ describe('DebtView', () => {
   it('honours a persisted strategy and extra, and tolerates a missing settings object', () => {
     const settings = fakeSettings({ debtStrategy: 'snowball', debtExtra: 15000 });
     const html = render(fixtureProps({ settings }));
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Snowball</);
+    expect(html).toMatch(/text-info">Snowball</);
     expect(html).toMatch(/type="range"[^>]*value="15000"/);
     expectClean(render(fixtureProps({ settings: undefined })));
   });
 
-  it('prints the strategy narrative and the marginal sentence', () => {
+  it('prints the strategy narrative', () => {
     // With the deficit landing on the card every cycle nothing clears — the narrative must say so.
     const deficit = render(
       fixtureProps({
@@ -151,7 +154,6 @@ describe('DebtView', () => {
       }),
     );
     expect(deficit).toContain('Avalanche: the Example Card does not clear within 50 years');
-    expect(deficit).toContain('Short term, R');
     expect(deficit).toContain('Each 0.25% on your variable-rate debt');
 
     // With a surplus the plan clears, and the sentence names the first two targets and the saving.
@@ -165,17 +167,6 @@ describe('DebtView', () => {
     );
     expect(surplus).toContain('Avalanche: R 3 000 extra a month goes to the Example Card first, then the Example Personal Loan from');
     expect(surplus).toContain('than paying only the minimums');
-    expect(surplus).toMatch(/Example Card cleared, (<[^>]+>)?R 6 000/);
-    expect(surplus).toContain('rolls to the Example Personal Loan');
     expectClean(surplus);
-  });
-
-  it('renders the lump what-if from the engine when an amount is set', () => {
-    const settings = fakeSettings({ debtLump: 20000 });
-    const html = render(fixtureProps({ settings, engine: fixtureEngine, planOptions: fixturePlanOptions }));
-    expect(html).toContain('on the Example');
-    expect(html).toContain('this year and');
-    expect(html).not.toContain('an approximation');
-    expectClean(html);
   });
 });

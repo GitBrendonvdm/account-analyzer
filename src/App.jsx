@@ -491,7 +491,7 @@ export default function App() {
                   onOpenAccounts={() => setActiveTab('accounts')}
                 />
               )}
-              {activeTab !== 'today' && <Headlines headlines={headlines} />}
+              {activeTab !== 'today' && activeTab !== 'accounts' && <Headlines headlines={headlines} />}
               {activeTab === 'table' && <LedgerView processed={processed} positions={balanced} />}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
               {activeTab === 'habits' && (

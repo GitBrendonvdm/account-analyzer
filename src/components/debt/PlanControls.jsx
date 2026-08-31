@@ -4,8 +4,10 @@ import { Field } from '../ui/Field';
 import { formatCurrencyAbs } from '../../utils/format';
 
 /**
- * The plan's dials: which order, how much extra, whether freed instalments roll on, a lump, the
- * prime rate.
+ * The plan's dials: how much extra, whether freed instalments roll on, a lump, the prime rate, and
+ * — under `custom` — the order itself. Which strategy is picked lives in StrategyTiles below, not
+ * here: a tile shows the outcome (debt-free date, interest saved) of the strategy it selects, which
+ * a segmented control naming it cannot, so there is exactly one place to choose one.
  *
  * The extra slider's MINIMUM is the floor — the deficit when there is one, the surplus already
  * available otherwise — rather than zero, because a plan cannot spend money that is not there.
@@ -14,22 +16,18 @@ import { formatCurrencyAbs } from '../../utils/format';
  * the link to Plan is where those cuts are listed. Every control here persists through settings so
  * the choice survives a reload and the next browser.
  *
- * On a phone every control is a thumb tall (44px) and full width: the six-way strategy control
- * wraps under the title, the slider's hit box is as tall as the control, and the lump and prime
- * fields share one row with 16px inputs so iOS does not zoom the page when one is focused. All of
- * it is `max-md:`; from `md` up nothing moves.
+ * On a phone every control is a thumb tall (44px) and full width: the slider's hit box is as tall
+ * as the control, and the lump and prime fields share one row with 16px inputs so iOS does not zoom
+ * the page when one is focused. All of it is `max-md:`; from `md` up nothing moves.
  */
 
-const SEGMENT = 'press rounded-full px-3.5 py-1.5 text-[12.5px] whitespace-nowrap max-md:min-h-11 max-md:flex-1';
 /** An inline link inside a sentence: pad the hit area out to 44px without moving the line. */
 const INLINE_TAP = 'max-md:-my-3 max-md:min-h-11 max-md:min-w-11 max-md:justify-center max-md:py-3';
 /** Make the kit's small numeric inputs phone-sized: full width, 44px, 16px type. */
 const FIELD_TAP = 'max-md:[&_input]:min-h-11 max-md:[&_input]:w-full max-md:[&_input]:text-base max-md:[&_label]:flex';
 
 export function PlanControls({
-  strategies,
   strategy,
-  onStrategy,
   extra,
   floor,
   available,
@@ -68,22 +66,6 @@ export function PlanControls({
       <CardHead
         title="Plan"
         subtitle="Where the extra goes first, and how much of it there is. Every figure below moves with these."
-        right={
-          <div className="glass-chip flex flex-wrap gap-1 p-1 max-md:w-full" role="group" aria-label="Payoff strategy">
-            {strategies.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => onStrategy(s.id)}
-                aria-pressed={strategy === s.id}
-                title={s.blurb}
-                className={`${SEGMENT} ${strategy === s.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'}`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        }
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

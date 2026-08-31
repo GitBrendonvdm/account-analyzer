@@ -73,7 +73,7 @@ export function AccountPositionsTable({
   currentMonth,
   types = ACCOUNT_TYPE_ORDER,
   title = 'Position by pay cycle',
-  subtitle = 'Grouped by type, cards first. Higher is always better.',
+  subtitle = 'Grouped by type, cards first — balance at the end of each pay cycle. See Account movement below for every transaction as it happened.',
 }) {
   if (!positions?.length) return null;
 
@@ -122,8 +122,11 @@ export function AccountPositionsTable({
                 <tr className="bg-fill/70">
                   <td className={`border-t p-2 pl-3 text-xs font-semibold tracking-wide text-label-2 uppercase ${PIN}`}>
                     {type}
-                    {/* The direction blurb is the subtitle's sentence again; a 144px pinned cell has no room for it. */}
-                    <span className="ml-2 text-[10px] font-normal normal-case text-label-3 max-md:hidden">
+                    {/* The direction blurb is the subtitle's sentence again, in per-type language — worth
+                        keeping on mobile since it is the key to reading the biggest numbers on the page.
+                        Below `md` the pinned cell is 144px, so it stacks under the type name; above `md`
+                        the row has room and it sits inline beside it. */}
+                    <span className="mt-0.5 block text-[10px] font-normal normal-case leading-snug text-label-3 md:ml-2 md:mt-0 md:inline md:leading-normal">
                       {TYPE_BLURB[type] ?? ''}
                     </span>
                   </td>

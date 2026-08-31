@@ -4,7 +4,18 @@ import { Card, CardHead } from '../ui/Surface';
 import { formatCurrencyAbs } from '../../utils/format';
 
 /**
- * Trips or tickets? — whether a category grew because you went more often or paid more per visit.
+ * More visits, or bigger baskets? — for the categories Drift already flagged, whether the change
+ * came from going more often or paying more per visit.
+ *
+ * This card used to rank every tracked category on its own window (the last six cycles against
+ * the six before), independently of what DriftCard flagged over ITS window (the last three against
+ * a twelve-cycle baseline). Two windows meant two verdicts could disagree on the same category with
+ * nothing on screen explaining why — Drift says groceries are up, Basket's own ranking says they
+ * are roughly flat. Rather than reconcile the windows, this card now answers a narrower question:
+ * of the categories Drift already called out as changed, which ones changed because of more trips
+ * and which because of a bigger basket. `flaggedCategories` (the category names on DriftCard's
+ * `flagged` rows) is the filter, so the two cards can no longer contradict each other — Basket only
+ * ever drills into what Drift already said moved.
  *
  * "Groceries are up R2 800 a cycle" has two completely different fixes depending on the answer:
  * more trips is a habit (the top-up shop on the way home), a bigger basket is prices or what goes
@@ -105,11 +116,13 @@ function FamilyRow({ family, members, windowNote, lateCount, open, onToggle }) {
   );
 }
 
-export function BasketCard({ basket, className = '' }) {
+export function BasketCard({ basket, flaggedCategories = [], className = '' }) {
   const [open, setOpen] = useState(() => new Set());
   if (!basket) return null;
   const families = basket.families ?? [];
-  const categories = families.filter((f) => !f.merchantFamily);
+  const flaggedSet = new Set(flaggedCategories);
+  const allCategories = families.filter((f) => !f.merchantFamily);
+  const categories = allCategories.filter((f) => flaggedSet.has(f.category));
   const membersOf = (cat) => families.filter((f) => f.merchantFamily && f.category === cat.category);
   const lateCount = basket.late?.cycles?.length ?? 0;
   const toggle = (key) =>
@@ -120,16 +133,23 @@ export function BasketCard({ basket, className = '' }) {
       return next;
     });
 
+  const emptyMessage =
+    allCategories.length === 0
+      ? 'Needs a few more complete cycles before trips and tickets can be told apart.'
+      : flaggedSet.size === 0
+        ? 'Nothing to drill into — What changed above found nothing outside its usual range this cycle.'
+        : 'None of the categories What changed flagged are ones this breakdown tracks (groceries, fuel, eating out, coffee, personal care, pets, alcohol).';
+
   return (
     <Card className={`materialize overflow-hidden ${className}`}>
       <div className="border-b px-4 py-5 sm:px-6">
         <CardHead
-          title="Trips or tickets?"
-          subtitle={`Whether each family of spend changed because of more visits or a bigger basket — ${basket.windowNote ?? 'recent cycles against earlier ones'}. The two parts add exactly to the change.`}
+          title="More visits, or bigger baskets?"
+          subtitle={`Trips or tickets? For the categories What changed flagged above: whether the move was more visits or a bigger basket — ${basket.windowNote ?? 'recent cycles against earlier ones'}. The two parts add exactly to the change.`}
         />
       </div>
       {categories.length === 0 ? (
-        <p className="t-caption px-4 py-5 sm:px-6">Needs a few more complete cycles before trips and tickets can be told apart.</p>
+        <p className="t-caption px-4 py-5 sm:px-6">{emptyMessage}</p>
       ) : (
         <ol className="flex flex-col">
           {categories.map((f) => (

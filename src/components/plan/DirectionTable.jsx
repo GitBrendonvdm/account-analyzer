@@ -72,10 +72,10 @@ function Change({ metric }) {
 export function DirectionTable({ direction, className = '' }) {
   if (!direction) return null;
   const { summary = {}, metrics = [] } = direction;
-  const gap = summary.netShort - summary.netLong;
-  const word = summary.widening ? 'widening' : gap > 500 ? 'narrowing' : 'holding';
+  const delta = summary.netShort - summary.netLong;
+  const word = summary.widening ? 'widening' : delta > 500 ? 'narrowing' : 'holding';
   const headline = Number.isFinite(summary.netShort) && Number.isFinite(summary.netLong)
-    ? `The gap is ${word}: ${money(summary.netShort)} a cycle over the last 3 cycles against ${money(summary.netLong)} over the last 12${Number.isFinite(summary.netPrior) ? `, and ${money(summary.netPrior)} the year before` : ''}.`
+    ? `The 3-cycle vs 12-cycle change is ${word}: ${money(summary.netShort)} a cycle over the last 3 cycles against ${money(summary.netLong)} over the last 12${Number.isFinite(summary.netPrior) ? `, and ${money(summary.netPrior)} the year before` : ''}.`
     : null;
 
   return (

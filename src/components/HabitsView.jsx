@@ -3,7 +3,6 @@ import { formatCurrencyAbs } from '../utils/format';
 import { Card, CardHead } from './ui/Surface';
 import { FindHero } from './habits/FindHero';
 import { SubscriptionsCard } from './habits/SubscriptionsCard';
-import { PriceCreepCard } from './habits/PriceCreepCard';
 import { DriftCard } from './habits/DriftCard';
 import { WinsCard } from './habits/WinsCard';
 import { BasketCard } from './habits/BasketCard';
@@ -77,9 +76,9 @@ function MerchantList({ merchants, months }) {
 }
 
 /**
- * Spending habits: what could be cancelled, what bills you every cycle, what crept up, what
- * changed, what is new and what you stopped, whether it is trips or tickets — then who gets the
- * money and when in the week it goes.
+ * Spending habits: what could be cancelled, what bills you every cycle, what is new and what you
+ * stopped, what changed, and — for what changed — whether it was more visits or a bigger basket;
+ * then who gets the money and when in the week it goes.
  *
  * The order is the order of usefulness. The finder comes first because it is the one block with
  * a figure that can be acted on this week; the merchant ranking and the weekday chart are context
@@ -87,6 +86,13 @@ function MerchantList({ merchants, months }) {
  * replaced by the standing-charges audit and the drift card, which answer the same questions from
  * the recurring engine and a robust statistic rather than from presence counts and half-window
  * means (see SubscriptionsCard and DriftCard for why that mattered).
+ *
+ * Price creep no longer gets a card of its own: every line's price step already shows inline on
+ * the standing-charges audit, so a second card listing the same lines just repeated the same fact
+ * (see SubscriptionsCard for the one thing that card added that the audit didn't). And the basket
+ * card no longer ranks categories on its own window — it now drills into exactly the categories
+ * the drift card flagged on drift's window, so the two can no longer print two different verdicts
+ * for the same category (see BasketCard).
  *
  * Every analytics block is optional: the view renders whichever of its inputs have arrived and
  * leaves the others out, so a missing library never blanks the page.
@@ -112,20 +118,23 @@ export function HabitsView({
     : [];
   const weekday = habits?.weekday ?? [];
   const weekMax = Math.max(...weekday.map((w) => w.perCycle), 1);
+  // Basket's drill-down is scoped to exactly what Drift flagged, so the two cards read as one
+  // explanation instead of two independent — and occasionally contradicting — rankings.
+  const driftFlaggedCategories = drift?.flagged?.map((row) => row.category) ?? [];
 
   return (
     <div className="flex flex-col gap-5">
       <FindHero finder={finder} />
       <SubscriptionsCard
         subscriptions={subscriptions}
+        priceCreep={priceCreep}
         lineOverrides={lineOverrides}
         onSetLineOverride={onSetLineOverride}
         asOf={asOf}
       />
-      <PriceCreepCard priceCreep={priceCreep} />
-      <DriftCard drift={drift} />
       <WinsCard subscriptions={subscriptions} />
-      <BasketCard basket={basket} />
+      <DriftCard drift={drift} />
+      <BasketCard basket={basket} flaggedCategories={driftFlaggedCategories} />
 
       {habits && (
         <Card className="materialize overflow-hidden">

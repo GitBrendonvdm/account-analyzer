@@ -16,6 +16,12 @@ import { formatCurrencyAbs } from '../../utils/format';
  * the usual is a fact about the household, not a saving anyone has agreed to make. The bar strip
  * under each row draws the baseline in the quiet fill and the recent cycles in blue, so the step
  * is visible without reading the z.
+ *
+ * "Well outside the usual R6 000 ± R450" is exact but nobody thinks in spreads, so the top two
+ * flagged rows get a plain sentence first — "Groceries cost about R1 800 more than usual this
+ * cycle" — built from the same recentMedian/baselineMedian this card already computed, not a new
+ * figure. The Basket card below drills into exactly the categories flagged here (see BasketCard),
+ * so a category is never given a different verdict by the two cards.
  */
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -42,11 +48,16 @@ function Strip({ series, recent }) {
   );
 }
 
-function DriftRow({ row, recent }) {
+function DriftRow({ row, recent, plain }) {
   const up = row.direction === 'up';
   const how = Math.abs(row.z ?? 0) >= 4 ? 'far' : 'well';
   return (
     <li className="flex flex-col gap-2 border-t px-4 py-4 first:border-t-0 sm:px-6">
+      {plain && (
+        <p className="text-[15px] font-medium text-label">
+          {row.category} cost about {formatCurrencyAbs(row.delta)} {up ? 'more' : 'less'} than usual this cycle.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <span className={`flex items-center gap-1 text-[13px] font-semibold ${up ? 'text-bad' : 'text-good'}`}>
           {up ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
@@ -97,8 +108,8 @@ export function DriftCard({ drift, className = '' }) {
         <p className="t-caption px-4 py-5 sm:px-6">Nothing has moved outside its usual range over the last {plural(recentN, 'cycle')}.</p>
       ) : (
         <ol className="flex flex-col">
-          {flagged.map((row) => (
-            <DriftRow key={row.category} row={row} recent={drift.recent} />
+          {flagged.map((row, i) => (
+            <DriftRow key={row.category} row={row} recent={drift.recent} plain={i < 2} />
           ))}
         </ol>
       )}

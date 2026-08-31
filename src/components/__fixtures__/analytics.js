@@ -742,32 +742,7 @@ export const fixtureCashPathUnanchored = {
   lateSalary: null,
 };
 
-// ---- §3.1 debts and the fake solver ---------------------------------------------------------
-
-export const fixtureDebts = [
-  { id: 'example|3456', label: 'Example Bond', type: 'Loan', kind: 'home', balance: 600000, rateNominal: 0.095, rateVariable: true, instalment: 6000, feeMonthly: 69, plannedPayment: null, minimumPct: null, creditLimit: null, balloon: null, termMonths: null, remainingMonths: 180, confidence: 'high', source: { balance: 'statement', rate: 'regression', instalment: 'ledger' }, assumptions: [] },
-  { id: 'example|7890', label: 'Example Car', type: 'Loan', kind: 'vehicle', balance: 75000, rateNominal: 0.12, rateVariable: false, instalment: 4990, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null, balloon: null, termMonths: null, remainingMonths: 16, confidence: 'high', source: { balance: 'ledger', rate: 'regression', instalment: 'ledger' }, assumptions: [] },
-  { id: 'example|9012', label: 'Example Card', type: 'Credit Card', kind: 'card', balance: 62000, rateNominal: 0.21, rateVariable: true, instalment: null, feeMonthly: 69, plannedPayment: 6000, minimumPct: 5, creditLimit: 100000, balloon: null, termMonths: null, remainingMonths: null, confidence: 'medium', source: { balance: 'user', rate: 'user', instalment: 'default' }, assumptions: [] },
-];
-
-export const fixtureDebtBudget = {
-  surplus: -17000,
-  surplusExcl: -17000,
-  surplusIncl: 31000,
-  adjusted: -17000,
-  extraSchedule: new Array(600).fill(0),
-  deficitPerCycle: 17000,
-  breakEvenExtra: 17000,
-  absorberId: 'example|9012',
-  absorberLabel: 'Example Card',
-  absorberRate: 0.21,
-  inflows: { 'example|9012': 17000 },
-  deficitCost12: 18000,
-  limitMonth: 3,
-  limitDate: D(2026, 11, 23),
-  message: 'You are R 17 000 a cycle short.',
-  assumptions: ['Deficit of R 17 000 a cycle lands on the Example Card at 21.0%'],
-};
+// ---- §3.1 the shortfall-closing categories --------------------------------------------------
 
 export const fixtureGapClosers = {
   gap: 17000,
@@ -784,63 +759,6 @@ export const fixtureGapClosers = {
   totalAvailable: 9000,
 };
 
-export const fixtureProcessedForSolver = { currentMonth: '2026-08', nextPayDate: NEXT_PAY, incomeAvg: 72000, netAvg: -15000, dataThrough: DATA_THROUGH };
-
-export const fixtureSolverInputs = { debts: fixtureDebts, debtBudget: fixtureDebtBudget, gapClosers: fixtureGapClosers, processed: fixtureProcessedForSolver };
-
-const wholeMonths = (from, to) => (from && to ? Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth())) : 0);
-
-/** A deterministic stand-in for src/lib/solver.js, returning the §3.1.3 Solution shape. */
-export const fixtureSolve = {
-  solveExtraForDate(debts, options = {}) {
-    const { targetDate, fromDate = TODAY, strategy = 'avalanche', breakEvenExtra = 0, scope = 'all', flexibleAvailable = null, incomePerCycle = null } = options;
-    const cycles = wholeMonths(fromDate, targetDate);
-    const inScope = scope === 'all' ? debts : debts.filter((d) => d.id === scope);
-    const ordered = inScope.slice().sort((a, b) => (strategy === 'snowball' ? a.balance - b.balance : b.rateNominal - a.rateNominal));
-    const infeasible = cycles < 1 || !inScope.length;
-    const reachable = ordered.filter((d) => d.balance < 100000 || cycles >= 120);
-    const unreachable = ordered.filter((d) => !reachable.includes(d)).map((d) => ({ id: d.id, label: d.label, balanceAtTarget: 410000 }));
-    const extraPerCycle = infeasible ? null : Math.round(reachable.reduce((s, d) => s + d.balance, 0) / Math.max(1, cycles) / 10) * 10;
-    const totalPerCycle = extraPerCycle == null ? null : extraPerCycle + breakEvenExtra;
-    return {
-      target: { date: targetDate ?? null, cycles },
-      scope,
-      strategy,
-      breakEvenExtra,
-      extraPerCycle,
-      totalPerCycle,
-      asShareOfIncome: totalPerCycle != null && incomePerCycle ? totalPerCycle / incomePerCycle : null,
-      clearedOrder: reachable.map((d, i) => {
-        const clearedCycle = Math.max(1, Math.round((cycles * (i + 1)) / (reachable.length + 1)));
-        return { id: d.id, label: d.label, clearedCycle, clearedDate: addMonths(fromDate, clearedCycle), interestPaid: Math.round(d.balance * d.rateNominal) };
-      }),
-      unreachable,
-      interestSaved: 48000,
-      baselineCleared: debts.map((d) => ({ id: d.id, clearedCycle: d.remainingMonths ?? 48 })),
-      feasible: totalPerCycle == null ? false : flexibleAvailable == null ? null : totalPerCycle <= flexibleAvailable,
-      flexibleAvailable,
-      shortfall: totalPerCycle == null ? null : flexibleAvailable == null ? 0 : Math.max(0, totalPerCycle - flexibleAvailable),
-      infeasible,
-      plan: null,
-      evaluations: 12,
-      assumptions: [`Target counted as ${cycles} whole pay cycles`, ...(breakEvenExtra > 0 ? [`The first R${Math.round(breakEvenExtra)} a cycle only stops the deficit`] : [])],
-    };
-  },
-  solveDateForExtra(debts, { extraPerMonth = 0, scope = 'all' } = {}) {
-    const inScope = scope === 'all' ? debts : debts.filter((d) => d.id === scope);
-    const total = inScope.reduce((s, d) => s + d.balance, 0);
-    const cycles = Math.max(1, Math.round(total / (extraPerMonth + 9000)));
-    return { clearedDate: addMonths(TODAY, cycles), cycles, plan: null };
-  },
-  solveExtraForGoal({ target = 0, saved = 0, targetDate, fromDate = TODAY, surplusPerCycle = 0, breakEvenExtra = 0, flexibleAvailable = null, incomePerCycle = null } = {}) {
-    const cycles = wholeMonths(fromDate, targetDate);
-    const gap = Math.max(0, target - saved);
-    const infeasible = gap > 0 && cycles === 0;
-    const extraPerCycle = infeasible ? null : Math.max(0, gap / Math.max(1, cycles) - Math.max(0, surplusPerCycle));
-    const totalPerCycle = extraPerCycle == null ? null : extraPerCycle + breakEvenExtra;
-    return { target: { date: targetDate ?? null, cycles }, scope: 'goal', strategy: null, breakEvenExtra, extraPerCycle, totalPerCycle, asShareOfIncome: totalPerCycle != null && incomePerCycle ? totalPerCycle / incomePerCycle : null, clearedOrder: [], unreachable: [], interestSaved: 0, baselineCleared: [], feasible: null, flexibleAvailable, shortfall: 0, infeasible, plan: null, evaluations: 0, assumptions: [`${cycles} whole pay cycles to the target date`] };
-  },
-};
 
 // ---- the existing views' props ----------------------------------------------------------------
 
@@ -966,8 +884,6 @@ export const habitsProps = (over = {}) => ({
 });
 
 export const planProps = (over = {}) => ({
-  safe: fixtureSafe,
-  summary: fixtureSummary,
   budgets: fixtureBudgets,
   onSetTarget: () => {},
   trajectory: fixtureTrajectory,
@@ -978,15 +894,6 @@ export const planProps = (over = {}) => ({
   onAddGoal: () => {},
   onRemoveGoal: () => {},
   direction: fixtureDirection,
-  debts: fixtureDebts,
-  debtBudget: fixtureDebtBudget,
-  solverInputs: fixtureSolverInputs,
-  solve: fixtureSolve,
-  onOpenDebt: () => {},
-  subscriptions: fixtureSubscriptions,
-  lineOverrides: {},
-  onSetLineOverride: () => {},
-  asOf: TODAY,
   ...over,
 });
 
@@ -1008,7 +915,7 @@ export const accountsProps = (over = {}) => ({
 export const NEW_PROPS = {
   today: ['vitals', 'upcoming', 'cashPath', 'incomeProfile', 'onOpenAccounts'],
   habits: ['finder', 'subscriptions', 'priceCreep', 'drift', 'basket', 'lineOverrides', 'onSetLineOverride'],
-  plan: ['direction', 'debts', 'debtBudget', 'solverInputs', 'solve', 'onOpenDebt', 'subscriptions', 'lineOverrides', 'onSetLineOverride'],
+  plan: ['direction'],
   accounts: ['fees', 'onDeleteAccount', 'dataThrough'],
 };
 

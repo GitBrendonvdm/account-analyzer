@@ -57,7 +57,6 @@ function runWith(debts, base, targetId, boost, months, keepPaying) {
     ...base,
     strategy: 'custom',
     order: orderWithFirst(base.order, targetId, debts),
-    cascade: true,
     extraPerMonth: extraSchedule(base.extraPerMonth ?? 0, boost, months, keepPaying, 600),
   };
   return simulatePlan(debts, options);
