@@ -229,14 +229,22 @@ describe('HabitsView blocks', () => {
 });
 
 describe('PlanView blocks', () => {
-  it('orders the direction table, the targets and the shortfall card above the trajectory and goals', () => {
+  it('leads with targets — the main point — ahead of direction, the shortfall card, the trajectory and goals', () => {
     const html = render(PlanView, planProps());
     const at = (s) => html.indexOf(s);
-    expect(at('Direction')).toBeGreaterThan(-1);
-    expect(at('Direction')).toBeLessThan(at('Targets'));
-    expect(at('Targets')).toBeLessThan(at("Cut categories to close this cycle's shortfall"));
+    expect(at('Targets')).toBeGreaterThan(-1);
+    expect(at('Targets')).toBeLessThan(at('Direction'));
+    expect(at('Direction')).toBeLessThan(at("Cut categories to close this cycle's shortfall"));
     expect(at("Cut categories to close this cycle's shortfall")).toBeLessThan(at('If nothing changes'));
     expect(at('If nothing changes')).toBeLessThan(at('<h2 class="t-head">Goals</h2>'));
+  });
+
+  it('resolves the targets to what is left over for debt or saving', () => {
+    const html = render(PlanView, planProps());
+    expect(html).toMatch(/At these targets,.*R 64 150.*is left at cycle end/s);
+    expect(html).toContain('R 75 000 income minus R 10 850 planned across every category (1 of 3 with a target set, the rest at typical)');
+    // Still renders, just without the banner, when the figure isn't available yet.
+    expect(render(PlanView, planProps({ categoryPlan: null }))).toContain('Targets');
   });
 
   it('writes the 3-cycle vs 12-cycle sentence', () => {

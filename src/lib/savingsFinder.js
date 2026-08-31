@@ -34,10 +34,26 @@ const item = (fields) => ({
   sentence: `${fields.label}: ${R(fields.perCycle)} a cycle — ${fields.action}`,
 });
 
+/** Below this, a single line isn't worth its own decision — matches the fees floor below. */
+const MIN_INDIVIDUAL_PER_CYCLE = AVOIDABLE_MIN_PER_CYCLE;
+
 function subscriptionItems(subscriptions) {
   const out = [];
+  const minor = [];
+
   (subscriptions?.lines ?? []).forEach((line) => {
     if (line.kind !== 'optional' || line.override) return;
+    if (line.perCycle < MIN_INDIVIDUAL_PER_CYCLE) {
+      minor.push({
+        kind: 'subscription',
+        label: line.label,
+        perCycle: line.perCycle,
+        category: line.category,
+        sentence: `${line.label}: ${R(line.perCycle)} a cycle`,
+        action: 'cancel or downgrade',
+      });
+      return;
+    }
     out.push(
       item({
         id: `subscription|${line.id}`,
@@ -52,22 +68,64 @@ function subscriptionItems(subscriptions) {
       }),
     );
   });
+
   (subscriptions?.newLines ?? []).forEach((line) => {
     if (line.override) return;
+    // `headline` already means established and material enough (subscriptions.js's own gate);
+    // anything short of that is a two-observation guess and belongs with the rest of the minor
+    // pile below, not its own row demanding its own decision.
+    if (line.headline) {
+      out.push(
+        item({
+          id: `new-charge|${line.id}`,
+          kind: 'new-charge',
+          bucket: 'cancellable',
+          label: line.label,
+          perCycle: line.perCycle,
+          confidence: 'medium',
+          action: 'check that you meant to keep it',
+          evidence: [line.sentence, line.trialConverted ? 'a trial that converted' : null].filter(Boolean),
+          lineId: line.id,
+        }),
+      );
+      return;
+    }
+    minor.push({
+      kind: 'new-charge',
+      label: line.label,
+      perCycle: line.perCycle,
+      category: line.category,
+      sentence: line.sentence,
+      action: 'check that you meant to keep it',
+    });
+  });
+
+  // Small or unproven lines don't each deserve their own row: three R30–R100 guesses read as three
+  // chores, when "Banking: R125 a cycle across 2 lines" is one glance. Grouped by category, since
+  // that's the useful signal once the amount or the confidence is too thin to carry a line alone —
+  // every underlying line is still named in the evidence, so nothing is hidden, only folded.
+  const byCategory = new Map();
+  minor.forEach((m) => {
+    const key = m.category || 'Uncategorized';
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key).push(m);
+  });
+  byCategory.forEach((lines, category) => {
+    const single = lines.length === 1 ? lines[0] : null;
     out.push(
       item({
-        id: `new-charge|${line.id}`,
-        kind: 'new-charge',
+        id: `minor|${category}`,
+        kind: single ? single.kind : 'minor',
         bucket: 'cancellable',
-        label: line.label,
-        perCycle: line.perCycle,
-        confidence: line.headline ? 'medium' : 'low',
-        action: 'check that you meant to keep it',
-        evidence: [line.sentence, line.trialConverted ? 'a trial that converted' : null].filter(Boolean),
-        lineId: line.id,
+        label: single ? single.label : `${category} — ${lines.length} small or unproven lines`,
+        perCycle: lines.reduce((s, l) => s + l.perCycle, 0),
+        confidence: 'low',
+        action: single ? single.action : 'worth a glance together',
+        evidence: lines.map((l) => l.sentence),
       }),
     );
   });
+
   return out;
 }
 

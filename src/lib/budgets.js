@@ -80,3 +80,26 @@ export function suggestTarget(typical) {
   const step = typical >= 5000 ? 500 : typical >= 1000 ? 100 : 50;
   return Math.round(typical / step) * step;
 }
+
+/**
+ * What the targets leave over once income is accounted for — the number the whole Targets table
+ * exists to produce. A target on its own only says whether one category is on pace; it doesn't say
+ * what a typed set of them, followed for the cycle, actually buys. This resolves every category to
+ * what it's set to cost — the typed target where there is one, what the category is projected to
+ * cost this cycle where there isn't — and subtracts the lot from income, so the answer is one figure:
+ * what's left at cycle end, for paying debt down faster or for saving.
+ *
+ * @param budgets  buildBudgetProgress output
+ * @param income   the cycle's income, projected to its end (summary.income.projected)
+ */
+export function buildCategoryPlan(budgets, income) {
+  if (!budgets || !Number.isFinite(income)) return null;
+  const planned = budgets.rows.reduce((s, r) => s + (r.target ?? r.projected), 0);
+  return {
+    income,
+    planned,
+    leftover: income - planned,
+    targetedCount: budgets.withTargets.length,
+    totalCount: budgets.rows.length,
+  };
+}

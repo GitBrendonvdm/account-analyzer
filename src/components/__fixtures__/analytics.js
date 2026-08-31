@@ -837,6 +837,14 @@ export const fixtureBudgets = {
   overBy: 1300,
 };
 
+export const fixtureCategoryPlan = {
+  income: 75000,
+  planned: 10850,
+  leftover: 64150,
+  targetedCount: 1,
+  totalCount: 3,
+};
+
 export const fixtureTrajectory = {
   points: Array.from({ length: 12 }, (_, i) => ({ cycle: i, date: addMonths(NEXT_PAY, i), net: -700000 - i * 12000, debt: 737000 + i * 13000, assets: 37000 + i * 1000 })),
   horizon: 12,
@@ -885,6 +893,7 @@ export const habitsProps = (over = {}) => ({
 
 export const planProps = (over = {}) => ({
   budgets: fixtureBudgets,
+  categoryPlan: fixtureCategoryPlan,
   onSetTarget: () => {},
   trajectory: fixtureTrajectory,
   monthlySaving: 3000,
@@ -915,7 +924,7 @@ export const accountsProps = (over = {}) => ({
 export const NEW_PROPS = {
   today: ['vitals', 'upcoming', 'cashPath', 'incomeProfile', 'onOpenAccounts'],
   habits: ['finder', 'subscriptions', 'priceCreep', 'drift', 'basket', 'lineOverrides', 'onSetLineOverride'],
-  plan: ['direction'],
+  plan: ['direction', 'categoryPlan'],
   accounts: ['fees', 'onDeleteAccount', 'dataThrough'],
 };
 

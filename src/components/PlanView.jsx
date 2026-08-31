@@ -201,16 +201,20 @@ function TrajectoryChart({ trajectory }) {
 /* ------------------------------------------------------------------ the view */
 
 /**
- * Plan — the direction, the targets, this cycle's shortfall, and the levers.
+ * Plan — the categories, what they're set to cost, and what that leaves over.
  *
- * Order is the order of the questions: which way things are going, how each category is doing
- * against where the cycle is heading, what would close the shortfall, what happens if nothing
- * changes, and the goals. Safe-to-spend lives on Today now and the debt-payoff solver lives on
- * Debt — both duplicated what those tabs already show, so neither is rendered here. The trajectory
- * chart is re-toned and given the interaction kit, with the inputs moved onto `Field`.
+ * The main point of this tab is the Targets table: an average per category, a place to type what
+ * you actually want it to cost, and — because a target on its own doesn't say what a whole set of
+ * them buys — one number that resolves all of them against income: what's left at cycle end for
+ * paying debt down faster or for saving. Everything else answers a question that number raises —
+ * which way things are trending, what closes this cycle's shortfall, where the household ends up if
+ * nothing changes, the goals — so it stays below the thing it's in service of. Safe-to-spend lives
+ * on Today and the debt-payoff solver lives on Debt — both duplicated what those tabs already show,
+ * so neither is rendered here.
  */
 export function PlanView({
   budgets,
+  categoryPlan,
   onSetTarget,
   trajectory,
   monthlySaving = 0,
@@ -229,12 +233,10 @@ export function PlanView({
 
   return (
     <div className="flex flex-col gap-5">
-      <DirectionTable direction={direction} />
-
       {budgets && (
         <Panel
           title="Targets"
-          subtitle="Judged against where the cycle is heading — spend so far plus what's still forecast — rather than against spend so far, which is meaningless on day three."
+          subtitle="An average per category, and a place to type what you actually want it to cost — judged against where the cycle is heading, spend so far plus what's still forecast, rather than against spend so far, which is meaningless on day three."
           right={
             budgets.withTargets?.length > 0 && (
               <div className="text-right">
@@ -254,6 +256,23 @@ export function PlanView({
             )
           }
         >
+          {categoryPlan && (
+            <div className="border-b bg-fill px-4 py-4 md:px-6 md:py-5">
+              <p className="text-[15px] leading-relaxed text-label">
+                At these targets,{' '}
+                <b className={`num font-semibold ${categoryPlan.leftover >= 0 ? 'text-good' : 'text-bad'}`}>
+                  {formatCurrencyAbs(categoryPlan.leftover)}
+                </b>{' '}
+                {categoryPlan.leftover >= 0 ? 'is left' : 'is short'} at cycle end — for paying debt
+                down faster, or for saving.
+              </p>
+              <p className="t-caption mt-1">
+                {formatCurrencyAbs(categoryPlan.income)} income minus{' '}
+                {formatCurrencyAbs(categoryPlan.planned)} planned across every category ({categoryPlan.targetedCount}{' '}
+                of {categoryPlan.totalCount} with a target set, the rest at typical).
+              </p>
+            </div>
+          )}
           <TableScroller>
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
@@ -284,6 +303,8 @@ export function PlanView({
           )}
         </Panel>
       )}
+
+      <DirectionTable direction={direction} />
 
       {gapClosers && (
         <Panel

@@ -17,7 +17,7 @@ import { buildCostOfDebt } from './lib/costOfDebt';
 import { buildHabits } from './lib/habits';
 import { buildHeadlines } from './lib/headlines';
 import { deriveSafeToSpend } from './lib/safeToSpend';
-import { buildBudgetProgress } from './lib/budgets';
+import { buildBudgetProgress, buildCategoryPlan } from './lib/budgets';
 import { buildGapClosers, buildTrajectory } from './lib/trajectory';
 import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
@@ -48,7 +48,6 @@ import { buildDrift } from './lib/drift';
 import { buildBasket } from './lib/basket';
 import { buildFeesAudit } from './lib/fees';
 import { buildSavingsFinder } from './lib/savingsFinder';
-import { solveExtraForDate, solveExtraForGoal } from './lib/solver';
 import { bestQuickWin } from './lib/scenario';
 // Everything that is not the opening screen loads on first use. Today is a hand-drawn page; the
 // other views carry Recharts, the debt engine's UI and the PDF reader, which together doubled the
@@ -338,6 +337,10 @@ export default function App() {
     () => (processed ? buildBudgetProgress(processed, targets) : null),
     [processed, targets],
   );
+  const categoryPlan = useMemo(
+    () => buildCategoryPlan(budgets, summary?.income?.projected),
+    [budgets, summary],
+  );
   const trajectory = useMemo(
     () =>
       processed && balanced.some((b) => b.known)
@@ -357,13 +360,6 @@ export default function App() {
     () => summariseGoals(goals, Math.max(0, processed?.netAvg ?? 0)),
     [goals, processed],
   );
-  // "What would it take": the Plan view calls the solver on demand with these.
-  const solverInputs = useMemo(
-    () => ({ debts, debtBudget, gapClosers, processed, planOptions }),
-    [debts, debtBudget, gapClosers, processed, planOptions],
-  );
-  const solve = useMemo(() => ({ solveExtraForDate, solveExtraForGoal }), []);
-
   // Headlines read every analytic, so they come last.
   const headlines = useMemo(
     () =>
@@ -509,9 +505,8 @@ export default function App() {
               )}
             {activeTab === 'plan' && (
               <PlanView
-                safe={safe}
-                summary={summary}
                 budgets={budgets}
+                categoryPlan={categoryPlan}
                 onSetTarget={setTarget}
                 trajectory={trajectory}
                 monthlySaving={monthlySaving}
@@ -521,15 +516,6 @@ export default function App() {
                 onAddGoal={addGoal}
                 onRemoveGoal={removeGoal}
                 direction={direction}
-                debts={debts}
-                debtBudget={debtBudget}
-                solverInputs={solverInputs}
-                solve={solve}
-                onOpenDebt={() => setActiveTab('debt')}
-                subscriptions={subscriptions}
-                lineOverrides={lineOverrides}
-                onSetLineOverride={setLineOverride}
-                asOf={today}
               />
             )}
               {activeTab === 'debt' && (

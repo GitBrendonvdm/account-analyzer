@@ -25,6 +25,7 @@ const KIND_LABEL = {
   consolidation: 'consolidation',
   'avoidable-fees': 'fees',
   'new-charge': 'new charge',
+  minor: 'small/unproven',
   drift: 'drift',
   basket: 'trips',
   'card-interest': 'card interest',
