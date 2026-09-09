@@ -7,13 +7,30 @@ import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON } from './rowIcons';
 import { VariantTransactionRow } from './VariantTransactionRow';
 import { WeekCells } from './WeekCells';
 import { ForecastCell } from './ForecastCell';
+import { RowOverrideEditor } from './RowOverrideEditor';
+import { overrideBadge, sharedOverride } from '../../lib/txnOverrides';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
-export function GroupedTransactionRow({ group, months, highlightCells = false, sort, cycleWeeks }) {
+export function GroupedTransactionRow({
+  group,
+  months,
+  highlightCells = false,
+  sort,
+  cycleWeeks,
+  columns,
+  txnOverrides,
+  onSetTxnOverride,
+  labelChoices,
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
   const hasVariants = group.variants.length > 1;
   const rowIcon = group.isException ? EXCEPTION_DESCRIPTION_ICON : DESCRIPTION_ICON;
   const sortedVariantRows = sortTableItems(group.variantRows, sort);
+  // The row can be opened for its variants, for the editor, or both; a row with neither is inert.
+  const canEdit = Boolean(onSetTxnOverride && group.keys?.length);
+  const shared = canEdit ? sharedOverride(group.keys, txnOverrides) : null;
+  const badge = overrideBadge(shared);
 
   return (
     <>
@@ -35,7 +52,28 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
               {hasVariants && (
                 <span className="ml-1 text-[10px] text-label-3">({group.variants.length} variants)</span>
               )}
+              {/* A stored correction must be visible without opening the editor, or the reader
+                  cannot tell an app judgement from one of their own. */}
+              {badge && (
+                <span className="ml-1.5 rounded bg-fill-2 px-1.5 py-0.5 text-[10px] text-info max-md:text-[11px]">
+                  {badge}
+                </span>
+              )}
             </span>
+            {canEdit && (
+              <button
+                type="button"
+                aria-pressed={editing}
+                title={`Mark ${group.description} expected or unexpected, or move it`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing((v) => !v);
+                }}
+                className="press ml-1 rounded-full px-1.5 text-[11px] text-label-4 hover:text-label max-md:min-h-11 max-md:min-w-11"
+              >
+                {editing ? '✕' : '⋯'}
+              </button>
+            )}
           </span>
           {group.isException && (
             <span className="ml-2 text-[10px] font-medium text-warn">
@@ -93,6 +131,19 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
         </td>
         <td />
       </tr>
+      {editing && (
+        <RowOverrideEditor
+          columns={columns}
+          label={group.description}
+          keys={group.keys}
+          flag={shared?.flag}
+          category={shared?.category}
+          spendingGroup={shared?.spendingGroup}
+          choices={labelChoices}
+          onChange={onSetTxnOverride}
+          isException={group.isException}
+        />
+      )}
       {expanded &&
         sortedVariantRows.map((variant) => (
           <VariantTransactionRow

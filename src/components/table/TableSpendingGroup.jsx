@@ -14,7 +14,7 @@ import { PIN_FILL } from './stickyColumn';
  * The Spending Group level — the export's own taxonomy sitting between a flow and its categories.
  * It carries no model of its own: every figure here is the sum of the categories beneath it.
  */
-export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks }) {
+export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
   const [expanded, setExpanded] = useState(false);
   const sortedCategories = sortTableItems(sub.sub ?? [], sort);
   const icon = getSpendingGroupIconConfig(sub.name);
@@ -68,6 +68,10 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
             parentGroup={parentGroup}
             sort={sort}
             cycleWeeks={cycleWeeks}
+            columns={columns}
+            txnOverrides={txnOverrides}
+            onSetTxnOverride={onSetTxnOverride}
+            labelChoices={labelChoices}
           />
         ))}
     </>

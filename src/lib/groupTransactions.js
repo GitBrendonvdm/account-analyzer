@@ -54,11 +54,15 @@ export function groupTransactionsByDescription(items, months, skipExpected = fal
         variants: info?.variants ?? [key],
         amountsByMonth: {},
         datesByMonth: {},
+        // Transaction keys, so the reader's corrections can be written against the rows this
+        // display group actually stands for. See lib/txnOverrides.js.
+        keys: [],
       });
     }
     const g = groups.get(key);
     g.amountsByMonth[m] = (g.amountsByMonth[m] || 0) + item.AmountNum;
     g.datesByMonth[m] = item.Date;
+    if (item.key) g.keys.push(item.key);
   });
 
   const list = [...groups.values()];
@@ -74,13 +78,15 @@ export function groupTransactionsByDescription(items, months, skipExpected = fal
       const variantRows = g.variants.map((variantDesc) => {
         const amountsByMonth = {};
         const datesByMonth = {};
+        const variantKeys = [];
         items.forEach((item) => {
           const m = getPayMonth(item);
           if (item.Description !== variantDesc || !months.includes(m)) return;
           amountsByMonth[m] = (amountsByMonth[m] || 0) + item.AmountNum;
           datesByMonth[m] = item.Date;
+          if (item.key) variantKeys.push(item.key);
         });
-        return { description: variantDesc, amountsByMonth, datesByMonth };
+        return { description: variantDesc, amountsByMonth, datesByMonth, keys: variantKeys };
       });
       return {
         ...g,

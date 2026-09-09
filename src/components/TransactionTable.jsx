@@ -53,11 +53,13 @@ function weekSpan(processed, wk) {
 /** True once the scroller shows its last column — the point the "more to the right" fade lies. */
 const scrolledToEnd = (el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
 
-export function TransactionTable({ processed }) {
+export function TransactionTable({ processed, txnOverrides, onSetTxnOverride, labelChoices }) {
   const [sort, setSort] = useState({ key: 'group', direction: 'asc' });
   const [atEnd, setAtEnd] = useState(false);
   const handleSort = (key) => setSort((current) => nextSort(current, key));
   const weeks = processed.cycleWeeks ?? [];
+  // Group + cycles + weeks + left-to-payday + forecast + typical. The override editor spans them.
+  const columns = 1 + processed.months.length + weeks.length + 3;
   const cycleEnd = fmtDate(processed.currentCycleEnd);
 
   return (
@@ -200,6 +202,10 @@ export function TransactionTable({ processed }) {
                   months={processed.months}
                   sort={sort}
                   cycleWeeks={processed.cycleWeeks}
+                  columns={columns}
+                  txnOverrides={txnOverrides}
+                  onSetTxnOverride={onSetTxnOverride}
+                  labelChoices={labelChoices}
                 />
               ))}
             </tbody>

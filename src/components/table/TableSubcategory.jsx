@@ -11,7 +11,7 @@ import { WeekCells } from './WeekCells';
 import { ForecastCell } from './ForecastCell';
 import { PIN_PLAIN, PIN_WARN } from './stickyColumn';
 
-export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {
+export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
   const [expanded, setExpanded] = useState(false);
   // The parent's forecast is split across these rows, so the tree adds up.
   const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, sub);
@@ -73,6 +73,10 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
             highlightCells={highlightUnmatchedTransfer}
             sort={sort}
             cycleWeeks={cycleWeeks}
+            columns={columns}
+            txnOverrides={txnOverrides}
+            onSetTxnOverride={onSetTxnOverride}
+            labelChoices={labelChoices}
           />
         ))}
     </>

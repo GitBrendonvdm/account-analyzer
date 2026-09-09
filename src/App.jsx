@@ -57,6 +57,7 @@ const StatementUpload = lazy(() =>
   import('./components/StatementUpload').then((m) => ({ default: m.StatementUpload })),
 );
 
+import { applyTxnOverrides, labelChoices } from './lib/txnOverrides';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -69,7 +70,7 @@ export default function App() {
   const today = useToday();
   const {
     ready,
-    data,
+    data: rawData,
     accounts,
     createAccount,
     deleteAccount,
@@ -95,8 +96,33 @@ export default function App() {
     dismissLocalDump,
     exportUrl,
   } = useAnalyzerState();
+  const settings = useSettings();
 
-  const processed = useTransactionData(data, selectedAccounts, monthRange);
+  // The reader's corrections to individual payments: expected/unexpected, and moving one to another
+  // category. A re-label is baked into the rows HERE, before anything reads them, so the exception
+  // classifier profiles the row under its new category and every builder in the app agrees on what
+  // it is — rather than a dozen call sites each remembering to ask. See lib/txnOverrides.js.
+  const storedTxnOverrides = settings.get('txnOverrides', null);
+  const txnOverrides = useMemo(() => storedTxnOverrides ?? {}, [storedTxnOverrides]);
+  const data = useMemo(() => applyTxnOverrides(rawData, txnOverrides), [rawData, txnOverrides]);
+  const labels = useMemo(() => labelChoices(rawData), [rawData]);
+  const setTxnOverride = useCallback(
+    (keys, patch) => {
+      const next = { ...(settings.get('txnOverrides', null) ?? {}) };
+      (Array.isArray(keys) ? keys : [keys]).filter(Boolean).forEach((key) => {
+        const merged = { ...(next[key] ?? {}), ...patch };
+        // A cleared field is removed rather than stored as null, so an override that has been
+        // undone in every respect leaves nothing behind to reason about later.
+        Object.keys(merged).forEach((k) => merged[k] == null && delete merged[k]);
+        if (Object.keys(merged).length) next[key] = merged;
+        else delete next[key];
+      });
+      settings.set('txnOverrides', next);
+    },
+    [settings],
+  );
+
+  const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);
   const chartData = useChartData(data, selectedAccounts, processed);
   const summary = useMemo(() => deriveCycleSummary(processed), [processed]);
 
@@ -157,9 +183,6 @@ export default function App() {
     () => (processed ? buildBalanceBands(data, selectedAccounts, accounts, processed, { cycles: 3 }) : null),
     [data, selectedAccounts, accounts, processed],
   );
-
-
-  const settings = useSettings();
 
   // What the household means to put away each cycle, which the debt budget adds back before it
   // calls the difference a deficit. It used to be the Plan tab's slider; it is a Debt dial now,
@@ -473,7 +496,15 @@ export default function App() {
                 />
               )}
               {activeTab !== 'today' && activeTab !== 'accounts' && <Headlines headlines={headlines} />}
-              {activeTab === 'table' && <LedgerView processed={processed} positions={balanced} />}
+              {activeTab === 'table' && (
+                <LedgerView
+                  processed={processed}
+                  positions={balanced}
+                  txnOverrides={txnOverrides}
+                  onSetTxnOverride={setTxnOverride}
+                  labelChoices={labels}
+                />
+              )}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
               {activeTab === 'habits' && (
                 <HabitsView

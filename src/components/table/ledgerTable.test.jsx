@@ -7,6 +7,8 @@ import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { VariantTransactionRow } from './VariantTransactionRow';
+import { GroupedTransactionRow } from './GroupedTransactionRow';
+import { RowOverrideEditor } from './RowOverrideEditor';
 import { forecastOf } from './forecast';
 
 /**
@@ -110,8 +112,8 @@ const processed = {
   dataThrough: new Date(2026, 8, 17),
 };
 
-const render = (p = processed) =>
-  renderToStaticMarkup(createElement(TransactionTable, { processed: p }))
+const render = (p = processed, extra = {}) =>
+  renderToStaticMarkup(createElement(TransactionTable, { processed: p, ...extra }))
     .replace(/&#x27;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
@@ -249,5 +251,89 @@ describe('the Forecast column', () => {
     const exceptions = cells(expenseExceptions);
     expect(exceptions.at(-3)).toBe('');
     expect(exceptions.at(-2)).toContain('3 400');
+  });
+});
+
+describe('correcting a payment', () => {
+  const COLUMNS = 1 + MONTHS.length + WEEKS.length + 3;
+  const descriptionGroup = {
+    description: 'Builders',
+    variants: ['Builders Warehouse'],
+    variantRows: [],
+    amountsByMonth: { '2026-09': -4000 },
+    datesByMonth: { '2026-09': '2026-09-10' },
+    keys: ['k1', 'k2'],
+    expected: -400,
+    weeklyRemaining: [-400, 0],
+    monthCount: 1,
+    totalMonths: 3,
+    isException: true,
+  };
+  const inTable = (el) =>
+    renderToStaticMarkup(createElement('table', null, createElement('tbody', null, el)))
+      .replace(/&#x27;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+  const descRow = (over = {}) =>
+    inTable(
+      createElement(GroupedTransactionRow, {
+        group: descriptionGroup,
+        months: MONTHS,
+        sort: { key: 'group', direction: 'asc' },
+        cycleWeeks: WEEKS,
+        columns: COLUMNS,
+        ...over,
+      }),
+    );
+
+  it('offers nothing to press when no caller can write a correction', () => {
+    // Read-only callers must not sprout controls they cannot honour.
+    const html = descRow();
+    expect(html).not.toContain('aria-pressed');
+    expect(html).not.toContain('Mark Builders');
+  });
+
+  it('shows a stored correction on the row, without it having to be opened', () => {
+    const html = descRow({ onSetTxnOverride: () => {}, txnOverrides: { k1: { flag: 'unexpected' }, k2: { flag: 'unexpected' } } });
+    expect(html).toContain('unexpected');
+    // Only where the payments AGREE — one corrected and one not says nothing.
+    expect(descRow({ onSetTxnOverride: () => {}, txnOverrides: { k1: { flag: 'unexpected' } } })).not.toContain('>unexpected<');
+  });
+
+  it('spans the whole grid when the editor is open, and says what the choice changes', () => {
+    const html = inTable(
+      createElement(RowOverrideEditor, {
+        columns: COLUMNS,
+        label: 'Builders',
+        keys: ['k1', 'k2'],
+        flag: 'unexpected',
+        choices: { categories: ['Groceries', 'Home Maintenance'], spendingGroups: ['Day-to-day'] },
+        onChange: () => {},
+        isException: true,
+      }),
+    );
+    // A wrong colSpan would shear every column right of it.
+    expect(html).toMatch(new RegExp(`colSpan="${COLUMNS}"`));
+    expect(html).toContain('2 payments');
+    expect(html).toContain('Home Maintenance');
+    // The effect is stated, because a control whose consequence is invisible gets used wrongly.
+    expect(html).toContain('left out of the averages, the forecast and its range');
+    expect(html).toContain('Reset');
+  });
+
+  it('offers only labels already in the file', () => {
+    const html = inTable(
+      createElement(RowOverrideEditor, {
+        columns: COLUMNS,
+        label: 'Builders',
+        keys: ['k1'],
+        choices: { categories: ['Groceries'], spendingGroups: [] },
+        onChange: () => {},
+      }),
+    );
+    expect(html).toContain('as imported');
+    expect(html).toContain('Groceries');
+    // No spending-group picker when the export has no such column.
+    expect(html).not.toContain('>Group<');
   });
 });

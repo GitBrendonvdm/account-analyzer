@@ -98,7 +98,7 @@ function skipsSpendingGroup(groupName) {
   return groupName === 'Transfers' || groupName.includes('Exceptions');
 }
 
-export function processTransactionData(data, selectedAccounts, monthRange, asOf = new Date()) {
+export function processTransactionData(data, selectedAccounts, monthRange, asOf = new Date(), { txnOverrides = null } = {}) {
   if (!data || data.length === 0) return null;
 
   const selected = new Set(selectedAccounts);
@@ -213,6 +213,10 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     expenseSparseCategories: clusters.expenseSparseCategories,
     excessIds,
     transferIds,
+    // The reader's verdicts, which beat the sparsity rules. Both halves of a split row carry the
+    // original row's key, so marking a charge expected keeps its surplus half out of the
+    // exceptions too — one payment, one judgement.
+    flags: txnOverrides,
   };
   rowsToGroup.forEach((t) => {
     const mainGroup = resolveMainGroup(t, exceptionState);

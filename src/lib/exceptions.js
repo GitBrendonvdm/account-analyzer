@@ -9,6 +9,7 @@ import {
 import { getPayMonth, isSalaryCategory } from './effectivePayMonth';
 import { buildDescriptionClusters } from './descriptionClustering';
 import { isTransfer } from './transfers';
+import { flagOf } from './txnOverrides';
 
 const CATEGORY_SEPARATOR = '\u0000';
 
@@ -253,16 +254,25 @@ export function buildExceptionClusters(items, months, transferIds) {
   return state;
 }
 
+/**
+ * Which of the five groups a row belongs to.
+ *
+ * THE READER OUTRANKS THE CLASSIFIER: `state.flags` carries their expected/unexpected verdicts and
+ * beats every rule here. See lib/txnOverrides.js for why sparsity is only a proxy and what the
+ * flag actually changes. A transfer stays a transfer whatever the flag — both legs are the same
+ * money, and calling one of them expected would put a phantom flow into a total that must be zero.
+ */
 export function resolveMainGroup(transaction, state) {
-  const { incomeSparseCategories, expenseSparseCategories, excessIds, transferIds } = state;
+  const { incomeSparseCategories, expenseSparseCategories, excessIds, transferIds, flags } = state;
 
   if (isTransfer(transaction, transferIds)) return 'Transfers';
 
+  const verdict = flagOf(transaction, flags);
   // The surplus half of a split row is the exception itself — see buildSplitAmounts.
   const category = categoryName(transaction);
   const isSurplus = excessIds?.has(transaction.id) ?? false;
-  const isExceptionIncome = isSurplus || incomeSparseCategories.has(category);
-  const isExceptionExpense = isSurplus || expenseSparseCategories.has(category);
+  const isExceptionIncome = verdict ? verdict === 'unexpected' : isSurplus || incomeSparseCategories.has(category);
+  const isExceptionExpense = verdict ? verdict === 'unexpected' : isSurplus || expenseSparseCategories.has(category);
 
   if (transaction.AmountNum > 0) {
     return isExceptionIncome ? 'Income Exceptions' : 'Income';
