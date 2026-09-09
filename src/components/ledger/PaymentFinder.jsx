@@ -4,6 +4,7 @@ import { Card, CardHead } from '../ui/Surface';
 import { formatCurrency } from '../../utils/format';
 import { QUICK_FILTERS, findPayments } from '../../lib/paymentSearch';
 import { isByRule } from '../../lib/txnRules';
+import { suggestName, suggestSynonyms } from '../../lib/providers';
 
 /**
  * Find a payment, then do something about it — search, quick filters, a flat list, and the
@@ -53,6 +54,7 @@ export function PaymentFinder({
   choices = { categories: [], spendingGroups: [] },
   onSetTxnOverride,
   onCreateRule,
+  onCreateProvider,
 }) {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState([]);
@@ -223,6 +225,19 @@ export function PaymentFinder({
               >
                 Reset
               </button>
+              {onCreateProvider && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const names = result.rows.filter((r) => selected.has(r.key)).map((r) => r.Description);
+                    onCreateProvider({ name: suggestName(names), synonyms: suggestSynonyms(names) });
+                  }}
+                  title="Fold these branch names onto one shop, so the ledger has one row for it and its forecast has all of its history"
+                  className="press glass-chip min-h-11 px-3 py-1 text-[12px] text-info sm:min-h-0"
+                >
+                  Group as a provider
+                </button>
+              )}
               {onCreateRule && query.trim() && (
                 <button
                   type="button"

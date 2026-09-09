@@ -53,7 +53,7 @@ function weekSpan(processed, wk) {
 /** True once the scroller shows its last column — the point the "more to the right" fade lies. */
 const scrolledToEnd = (el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
 
-export function TransactionTable({ processed, txnOverrides, onSetTxnOverride, labelChoices }) {
+export function TransactionTable({ processed, txnOverrides, onSetTxnOverride, labelChoices, providers }) {
   const [sort, setSort] = useState({ key: 'group', direction: 'asc' });
   const [atEnd, setAtEnd] = useState(false);
   const handleSort = (key) => setSort((current) => nextSort(current, key));
@@ -206,6 +206,7 @@ export function TransactionTable({ processed, txnOverrides, onSetTxnOverride, la
                   txnOverrides={txnOverrides}
                   onSetTxnOverride={onSetTxnOverride}
                   labelChoices={labelChoices}
+                  providers={providers}
                 />
               ))}
             </tbody>

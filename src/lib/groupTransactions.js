@@ -1,5 +1,6 @@
 import { getPayMonth } from './effectivePayMonth';
 import { clusterKey, buildDescriptionClusters } from './descriptionClustering';
+import { providerOf } from './providers';
 import { monthlyAvg } from './expected';
 
 /**
@@ -38,7 +39,14 @@ function allocate(groups, { expected = 0, weeklyRemaining = [], excludeMonths } 
   });
 }
 
-export function groupTransactionsByDescription(items, months, skipExpected = false, parent = {}) {
+/**
+ * @param providers  Provider[] (settings.txnProviders). A provider folds the branches of one chain
+ *   onto one row — "Pnp Crp Glengarry", "Pnp Hpr Brackenfell" and "Pick N Pay Asap Kenilworth" are
+ *   three strings the clusterer cannot relate, because as text they are not similar, and one shop.
+ *   The branches become this row's variants, which is the container the table already has for
+ *   "several names, one thing", so nothing below here changes.
+ */
+export function groupTransactionsByDescription(items, months, skipExpected = false, parent = {}, providers = null) {
   const currentMonth = months[months.length - 1] ?? '';
   const { descToCluster, clusterInfo } = buildDescriptionClusters(items.map((t) => t.Description));
   const groups = new Map();
@@ -46,12 +54,14 @@ export function groupTransactionsByDescription(items, months, skipExpected = fal
   items.forEach((item) => {
     const m = getPayMonth(item);
     if (!months.includes(m)) return;
-    const key = clusterKey(item.Description, descToCluster);
+    const provider = providerOf(item.Description, providers);
+    const key = provider ?? clusterKey(item.Description, descToCluster);
     if (!groups.has(key)) {
-      const info = clusterInfo.get(key);
+      const info = provider ? null : clusterInfo.get(key);
       groups.set(key, {
-        description: info?.canonical ?? key,
-        variants: info?.variants ?? [key],
+        description: provider ?? info?.canonical ?? key,
+        provider: provider ?? null,
+        variants: provider ? [] : (info?.variants ?? [key]),
         amountsByMonth: {},
         datesByMonth: {},
         // Transaction keys, so the reader's corrections can be written against the rows this
@@ -60,6 +70,8 @@ export function groupTransactionsByDescription(items, months, skipExpected = fal
       });
     }
     const g = groups.get(key);
+    // A provider's variants are the real descriptions it stands for, collected as they are met.
+    if (provider && !g.variants.includes(item.Description)) g.variants.push(item.Description);
     g.amountsByMonth[m] = (g.amountsByMonth[m] || 0) + item.AmountNum;
     g.datesByMonth[m] = item.Date;
     if (item.key) g.keys.push(item.key);

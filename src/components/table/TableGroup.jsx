@@ -11,7 +11,7 @@ import { WeekCells } from './WeekCells';
 import { ForecastCell, RemainingCell } from './ForecastCell';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
-export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
+export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices, providers }) {
   const [collapsed, setCollapsed] = useState(true);
   const groupIcon = getGroupIconConfig(group.name);
   const sortedSub = sortTableItems(group.sub, sort);
@@ -93,6 +93,7 @@ export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverri
               txnOverrides={txnOverrides}
               onSetTxnOverride={onSetTxnOverride}
               labelChoices={labelChoices}
+              providers={providers}
             />
           ) : (
             <TableSubcategory
@@ -106,6 +107,7 @@ export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverri
               txnOverrides={txnOverrides}
               onSetTxnOverride={onSetTxnOverride}
               labelChoices={labelChoices}
+              providers={providers}
             />
           ),
         )}

@@ -1,6 +1,7 @@
 import { TransactionTable } from './TransactionTable';
 import { PaymentFinder } from './ledger/PaymentFinder';
 import { RulesPanel } from './ledger/RulesPanel';
+import { ProvidersPanel } from './ledger/ProvidersPanel';
 
 /**
  * The ledger: find a payment, the standing rules that correct payments in bulk, then the table.
@@ -20,6 +21,10 @@ export function LedgerView({
   ruleDraft,
   onRuleDraft,
   exceptionKeys,
+  providers,
+  onSetProviders,
+  providerDraft,
+  onProviderDraft,
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -32,6 +37,16 @@ export function LedgerView({
           choices={labelChoices}
           onSetTxnOverride={onSetTxnOverride}
           onCreateRule={onRuleDraft ? (seed) => onRuleDraft({ description: seed.description ?? '', minAmount: '', set: { category: '', flag: '' } }) : null}
+          onCreateProvider={onProviderDraft}
+        />
+      )}
+      {data && onSetProviders && (
+        <ProvidersPanel
+          providers={providers}
+          data={data}
+          onChange={onSetProviders}
+          draft={providerDraft}
+          onDraft={onProviderDraft}
         />
       )}
       {data && onSetRules && (
@@ -49,6 +64,7 @@ export function LedgerView({
         txnOverrides={txnOverrides}
         onSetTxnOverride={onSetTxnOverride}
         labelChoices={labelChoices}
+        providers={providers}
       />
     </div>
   );

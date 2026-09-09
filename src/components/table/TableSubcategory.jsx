@@ -13,7 +13,7 @@ import { overrideBadge, sharedOverride } from '../../lib/txnOverrides';
 import { EditToggle } from './EditToggle';
 import { PIN_PLAIN, PIN_WARN } from './stickyColumn';
 
-export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
+export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices, providers }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   // Every payment in this category, so one correction moves the lot.
@@ -22,7 +22,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks, c
   const shared = canEdit ? sharedOverride(keys, txnOverrides) : null;
   const badge = overrideBadge(shared);
   // The parent's forecast is split across these rows, so the tree adds up.
-  const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, sub);
+  const groupedItems = useGroupedTransactions(sub.items, months, sub.skipExpected, sub, providers);
   const sortedGroupedItems = sortTableItems(groupedItems, sort);
   const subIcon = getSubcategoryIconConfig(parentGroup, sub.name);
   const highlightUnmatchedTransfer = Boolean(sub.isUnmatchedTransfer);
@@ -102,6 +102,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks, c
             txnOverrides={txnOverrides}
             onSetTxnOverride={onSetTxnOverride}
             labelChoices={labelChoices}
+            providers={providers}
           />
         ))}
     </>

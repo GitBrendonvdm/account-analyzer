@@ -117,6 +117,13 @@ export default function App() {
     [rawData, txnRules, manualOverrides],
   );
   const [ruleDraft, setRuleDraft] = useState(null);
+  // Providers fold the branches of one shop onto one row — the bank writes "Pnp Hpr Brackenfell",
+  // the household shops at Pick n Pay. Purely a display and grouping identity, so it stays out of
+  // the correction map above and travels to the ledger on its own.
+  const storedProviders = settings.get('txnProviders', null);
+  const providers = useMemo(() => (Array.isArray(storedProviders) ? storedProviders : []), [storedProviders]);
+  const setProviders = useCallback((next) => settings.set('txnProviders', next), [settings]);
+  const [providerDraft, setProviderDraft] = useState(null);
   const setTxnRules = useCallback((next) => settings.set('txnRules', next), [settings]);
   const data = useMemo(() => applyTxnOverrides(rawData, txnOverrides), [rawData, txnOverrides]);
   const labels = useMemo(() => labelChoices(rawData), [rawData]);
@@ -527,6 +534,10 @@ export default function App() {
                   ruleDraft={ruleDraft}
                   onRuleDraft={setRuleDraft}
                   exceptionKeys={exceptionKeys}
+                  providers={providers}
+                  onSetProviders={setProviders}
+                  providerDraft={providerDraft}
+                  onProviderDraft={setProviderDraft}
                 />
               )}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
