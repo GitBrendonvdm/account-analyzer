@@ -159,7 +159,7 @@ export function TransactionTable({ processed }) {
                 </th>
                 <th
                   className="border-b bg-info/15 px-4 pb-3 text-right max-md:pb-0"
-                  title={`Where this cycle closes on ${cycleEnd}: what has landed so far plus everything still expected. This is the row's own arithmetic — "Typical" beside it is an average of completed cycles, not a total of this one.`}
+                  title={`Where this cycle closes on ${cycleEnd}: what has landed so far plus everything still expected. The smaller pair under each figure is the range that row actually ran over the last few cycles from this point — the forecast is the middle of a spread, not a promise. "Typical" beside it is an average of completed cycles, not a total of this one.`}
                 >
                   <SortHeader
                     label="Forecast"
@@ -191,6 +191,7 @@ export function TransactionTable({ processed }) {
                 netAvg={processed.netAvg}
                 cycleWeeks={processed.cycleWeeks}
                 weeklyRemaining={processed.netWeeklyRemaining}
+                netRemainder={processed.netRemainder}
               />
               {processed.rows.map((g) => (
                 <TableGroup

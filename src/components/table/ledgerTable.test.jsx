@@ -25,18 +25,21 @@ const WEEKS = [
   { index: 2, label: '21 Sept', isCurrent: false },
 ];
 
-const category = (name, soFar, weekly) => ({
+const category = (name, soFar, weekly, remainder = null) => ({
   name,
   key: name,
   totalsByMonth: { '2026-07': -9000, '2026-08': -9500, '2026-09': soFar },
   avg: -9300,
   weeklyRemaining: weekly,
   expected: weekly.reduce((s, x) => s + x, 0),
+  // What this row spent from this cycle day onward in each of six prior cycles — the band's
+  // evidence. See lib/forecastBand.js.
+  remainder,
   items: [],
   sub: [],
 });
 
-const groceries = category('Groceries', -4000, [-600, -400]);
+const groceries = category('Groceries', -4000, [-600, -400], [-900, -1400, -1000, -1100, -950, -1050]);
 const fuel = category('Fuel', -1600, [-300, -100]);
 
 const expenseGroup = {
@@ -45,6 +48,7 @@ const expenseGroup = {
   avg: -18600,
   weeklyRemaining: [-900, -500],
   expected: -1400,
+  remainder: [-1300, -1900, -1400, -1500, -1350, -1450],
   sub: [groceries, fuel],
   isException: false,
   isTransfer: false,
@@ -173,6 +177,28 @@ describe('the Forecast column', () => {
 
   it('sorts on it', () => {
     expect(render()).toContain('Sort by Forecast');
+  });
+
+  it('shows a range under the figure, from what the row itself has run', () => {
+    const html = render();
+    // Expense: R5 600 booked, and its six prior cycles needed between R1 325 and R1 700 more from
+    // this point — so R6 925 to R7 300 around a R7 000 forecast.
+    expect(html).toContain('R 6 925–R 7 300');
+    // The figure itself is untouched, so the column still reconciles.
+    expect(html).toContain('R 7 000');
+    // A spend range must read upwards. Printed in the band's own (negative) order it came out
+    // "R 7 300–R 6 925", which every reader would call a bug.
+    expect(html).not.toContain('R 7 300–R 6 925');
+  });
+
+  it('leaves the range off where it would be noise, or where there is no history for one', () => {
+    // Fuel has no remainder history at all: a figure, and nothing pretending to bracket it.
+    expect(render()).not.toContain('R 1 900–');
+    // A row whose cycles are all but identical says nothing: the reader learns nothing from
+    // "R 5 000, and probably R 5 000".
+    const flat = category('Flat', -4000, [-600, -400], [-1000, -1000, -1000, -1001, -999, -1000]);
+    const html = render({ ...processed, rows: [{ ...expenseGroup, remainder: null, sub: [flat] }] });
+    expect(html).not.toMatch(/R 4 9\d\d–/);
   });
 
   it('adds up: the flow rows and the exceptions reconcile with Net Total', () => {

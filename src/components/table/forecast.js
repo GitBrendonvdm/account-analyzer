@@ -26,9 +26,28 @@
  * Total, which has always counted the exceptions.
  */
 export function forecastOf(item, months) {
+  if (!months?.length) return null;
+  return soFarOf(item, months) + (item?.expected ?? 0);
+}
+
+/** What this cycle has already booked for the row; 0 when there is no current cycle. */
+export function soFarOf(item, months) {
   const current = months?.[months.length - 1];
-  if (!current) return null;
-  const soFar = item?.totalsByMonth?.[current] ?? item?.amountsByMonth?.[current] ?? 0;
-  const remaining = item?.expected ?? 0;
-  return soFar + remaining;
+  if (!current) return 0;
+  return item?.totalsByMonth?.[current] ?? item?.amountsByMonth?.[current] ?? 0;
+}
+
+/**
+ * Is this row's band worth the ink? A rent line that has been R12 000 every cycle for a year does
+ * not need telling you it will probably be R12 000, and sixty such lines would bury the ones that
+ * genuinely could go either way. Both floors have to clear: an absolute one so small rows stay
+ * quiet, and a share of the figure so large ones are not called precise for being large.
+ */
+export const BAND_MIN_SPREAD = 200;
+export const BAND_MIN_SHARE = 0.04;
+
+export function bandWorthShowing(band, mid) {
+  if (!band) return false;
+  const spread = Math.abs(band.high - band.low);
+  return spread > BAND_MIN_SPREAD && spread > BAND_MIN_SHARE * Math.abs(mid ?? 0);
 }

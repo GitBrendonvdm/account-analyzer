@@ -7,7 +7,7 @@ import { RowIcon } from './RowIcon';
 import { getSpendingGroupIconConfig } from './rowIcons';
 import { TableSubcategory } from './TableSubcategory';
 import { WeekCells } from './WeekCells';
-import { forecastOf } from './forecast';
+import { ForecastCell } from './ForecastCell';
 import { PIN_FILL } from './stickyColumn';
 
 /**
@@ -53,7 +53,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks 
           {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
         </td>
         <td className="p-3 text-right font-semibold">
-          {sub.isVolume ? '' : <Cell val={forecastOf(sub, months)} absolute />}
+          {sub.isVolume ? '' : <ForecastCell item={sub} months={months} />}
         </td>
         <td className="p-3 text-right">
           <Cell val={sub.avg} absolute />

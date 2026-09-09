@@ -2,7 +2,9 @@ import { formatCurrency } from '../../utils/format';
 import { RowIcon } from './RowIcon';
 import { NET_TOTAL_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
-import { forecastOf } from './forecast';
+import { forecastBand } from '../../lib/forecastBand';
+import { bandWorthShowing } from './forecast';
+import { formatCurrencyAbs } from '../../utils/format';
 import { PIN_FILL_2 } from './stickyColumn';
 
 /**
@@ -16,12 +18,21 @@ function NetAmount({ val }) {
   return <span className={`tabular-nums ${tone}`}>{formatCurrency(v)}</span>;
 }
 
-export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeeks, weeklyRemaining }) {
-  // The row closes on itself: what the cycle has netted so far plus what is still expected.
-  const forecast = forecastOf(
-    { totalsByMonth: { [months[months.length - 1]]: netByMonth[netByMonth.length - 1] }, expected: netExpected },
-    months,
-  );
+export function NetTotalRow({
+  months,
+  netByMonth,
+  netExpected,
+  netAvg,
+  cycleWeeks,
+  weeklyRemaining,
+  netRemainder,
+}) {
+  // The row closes on itself: what the cycle has netted so far plus what is still expected. The
+  // band under it combines every flow group cycle by cycle (see processTransactionData), so income
+  // and spend move together in it instead of adding two independent extremes.
+  const soFar = netByMonth[netByMonth.length - 1] ?? 0;
+  const forecast = soFar + netExpected;
+  const band = forecastBand(soFar, netExpected, netRemainder);
   return (
     <tr className="bg-fill-2 font-bold text-white">
       <td className={`p-4 ${PIN_FILL_2}`}>
@@ -54,7 +65,17 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeek
         <NetAmount val={netExpected} />
       </td>
       <td className="p-4 text-right">
-        <NetAmount val={forecast} />
+        <span className="inline-flex flex-col items-end">
+          <NetAmount val={forecast} />
+          {bandWorthShowing(band, forecast) && (
+            <span
+              className="num text-[11px] leading-tight font-normal text-label-4"
+              title={`Over the last ${band.cycles} cycles the household netted between ${formatCurrencyAbs(band.low)} and ${formatCurrencyAbs(band.high)} from this point in the cycle.`}
+            >
+              {formatCurrencyAbs(band.low)}–{formatCurrencyAbs(band.high)}
+            </span>
+          )}
+        </span>
       </td>
       <td className="p-4 text-right">
         <NetAmount val={netAvg} />

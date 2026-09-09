@@ -9,7 +9,7 @@ import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { WeekCells } from './WeekCells';
-import { forecastOf } from './forecast';
+import { ForecastCell } from './ForecastCell';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function TableGroup({ group, months, sort, cycleWeeks }) {
@@ -66,7 +66,7 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
             charged is part of where this cycle closes, and leaving it blank stopped the column
             reconciling with Net Total, which counts them. */}
         <td className="p-4 text-right font-semibold">
-          {group.isTransfer ? '' : <Cell val={forecastOf(group, months)} absolute />}
+          {group.isTransfer ? '' : <ForecastCell item={group} months={months} />}
         </td>
         <td className="p-4 text-right">
           <Cell val={group.avg} absolute />

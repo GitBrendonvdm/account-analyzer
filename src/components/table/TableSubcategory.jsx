@@ -8,7 +8,7 @@ import { GroupedTransactionRow } from './GroupedTransactionRow';
 import { RowIcon } from './RowIcon';
 import { getSubcategoryIconConfig } from './rowIcons';
 import { WeekCells } from './WeekCells';
-import { forecastOf } from './forecast';
+import { ForecastCell } from './ForecastCell';
 import { PIN_PLAIN, PIN_WARN } from './stickyColumn';
 
 export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks }) {
@@ -58,7 +58,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
           {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
         </td>
         <td className="p-3 text-right font-semibold">
-          {sub.isVolume ? '' : <Cell val={forecastOf(sub, months)} absolute />}
+          {sub.isVolume ? '' : <ForecastCell item={sub} months={months} />}
         </td>
         <td className="p-3 text-right">
           <Cell val={sub.avg} absolute />

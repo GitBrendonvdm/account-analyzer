@@ -3,6 +3,7 @@ import { parseAccount } from './accounts';
 import { addMonthsToKey, enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
 import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { monthlyAvg } from './expected';
+import { combine, remainderPerCycle } from './forecastBand';
 import { cycleBoundsOf } from './flows';
 import { addDays, buildCycleCalendar, cycleDay } from './cycleCurve';
 import {
@@ -382,7 +383,12 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
           0,
         )
       : 0;
-    return { discrete, weeklyAvg, weeklyRemaining, nextCycleAvg };
+    // What the same row actually spent from this cycle day onward, in each prior cycle. The band
+    // around the forecast is percentiles of these, so the row is measured against its own past
+    // rather than against a widened average. Kept per cycle, never as a low/high pair, because
+    // percentiles do not add and a parent must combine cycle by cycle — see forecastBand.js.
+    const remainder = remainderPerCycle(catItems, priorMonths, starts, observedDay, { monthOf });
+    return { discrete, weeklyAvg, weeklyRemaining, nextCycleAvg, remainder };
   };
 
   const { sub: transferSubs, pairedIds } = buildTransferSubcategories(
@@ -449,6 +455,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         weeklyAvg: envelope.weeklyAvg,
         weeklyRemaining: envelope.weeklyRemaining,
         expected: envelope.weeklyRemaining.reduce((s, x) => s + x, 0),
+        remainder: envelope.remainder,
         nextCycleAvg: envelope.nextCycleAvg,
         items: sData.items,
         isException: isExceptionGroup,
@@ -475,6 +482,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         avg: monthlyAvg(sgData.totals, calcMonths, { excludeMonths }),
         weeklyRemaining: weekly,
         expected: weekly.reduce((s, x) => s + x, 0),
+        remainder: combine(categories.map((c) => c.remainder)),
         nextCycleAvg: categories.reduce((s, c) => s + (c.nextCycleAvg ?? 0), 0),
         sub: categories.sort((a, b) => a.name.localeCompare(b.name)),
         items: categories.flatMap((c) => c.items),
@@ -507,6 +515,15 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     if (!skipExpected) {
       sub.forEach((s) => s.weeklyRemaining?.forEach((v, w) => (groupWeekly[w] += v)));
     }
+    // Exceptions and transfers forecast nothing, so they get no band either — but an exception's
+    // own remainder history is still real, and the Net Total band below needs it to be honest.
+    const groupRemainder = remainderPerCycle(
+      gData.items ?? sub.flatMap((x) => x.items ?? []),
+      priorMonths,
+      starts,
+      observedDay,
+      { monthOf },
+    );
     const isTransferGroup = gName === 'Transfers';
     return {
       name: gName,
@@ -518,6 +535,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       avg: isTransferGroup ? 0 : monthlyAvg(gData.totals, calcMonths, { excludeMonths }),
       weeklyRemaining: groupWeekly,
       expected: groupWeekly.reduce((s, x) => s + x, 0),
+      remainder: isTransferGroup ? [] : groupRemainder,
       nextCycleAvg: skipExpected ? 0 : sub.reduce((s, x) => s + (x.nextCycleAvg ?? 0), 0),
       sub,
       isException: isExceptionGroup,
@@ -563,6 +581,9 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const netWeeklyRemaining = zeroWeeks().map(
     (_, w) => (incomeRow?.weeklyRemaining?.[w] ?? 0) + (expenseRow?.weeklyRemaining?.[w] ?? 0),
   );
+  // Net's band combines every flow group cycle by cycle — exceptions included, because netByMonth
+  // counts them — so income and spend move together in it rather than as two independent extremes.
+  const netRemainder = combine(rows.filter((r) => !r.isTransfer).map((r) => r.remainder));
   // What the cycle after this one is expected to do, from the regular flows alone.
   const nextCycleExpected = {
     income: incomeRow?.nextCycleAvg ?? 0,
@@ -586,6 +607,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     incomeRemaining,
     expenseRemaining,
     netExpected,
+    netRemainder,
     cycleWeeks,
     currentWeek,
     netWeeklyRemaining,

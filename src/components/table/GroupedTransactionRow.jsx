@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatCurrency, formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
-import { Cell } from './Cell';
 import { RowIcon } from './RowIcon';
 import { DESCRIPTION_ICON, EXCEPTION_DESCRIPTION_ICON } from './rowIcons';
 import { VariantTransactionRow } from './VariantTransactionRow';
 import { WeekCells } from './WeekCells';
-import { forecastOf } from './forecast';
+import { ForecastCell } from './ForecastCell';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function GroupedTransactionRow({ group, months, highlightCells = false, sort, cycleWeeks }) {
@@ -88,11 +87,8 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
           )}
         </td>
         <td className="p-2 text-right">
-          <span
-            className="font-semibold"
-            title="Where this row closes: what it has charged this cycle, plus its share of what is still expected"
-          >
-            <Cell val={forecastOf(group, months)} />
+          <span className="font-semibold" title="Where this row closes: what it has charged this cycle, plus its share of what is still expected">
+            <ForecastCell item={group} months={months} absolute={false} />
           </span>
         </td>
         <td />
