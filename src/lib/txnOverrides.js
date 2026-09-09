@@ -26,6 +26,37 @@
 
 export const FLAGS = ['expected', 'unexpected'];
 
+/**
+ * A third verdict, and a different kind of thing: not "does this shape the forecast" but "did this
+ * payment happen at all".
+ *
+ * When an account is renumbered the bank writes the same debit under both references for a cycle,
+ * so one R6 675 instalment arrives as two rows and is counted as R13 350 (see duplicatePayments.js).
+ * The copy is not an exception — an exception is a real payment kept out of the averages — it is
+ * not a payment. So it leaves the data entirely, before anything reads it, and every total,
+ * balance, average, forecast and band agrees without knowing this happened.
+ *
+ * It is kept OUT of FLAGS deliberately: `flagOf` feeds the exception classifier, which must go on
+ * seeing only the two verdicts it reasons about. Marking a row duplicate must not quietly also make
+ * it expected.
+ */
+export const DUPLICATE = 'duplicate';
+
+/** Has the reader struck this row as a payment that never happened? */
+export function isDuplicate(transaction, overrides) {
+  return transaction?.key ? overrides?.[transaction.key]?.flag === DUPLICATE : false;
+}
+
+/**
+ * `data` without the rows struck as duplicates. Returns the input untouched when there are none,
+ * so the memo downstream does not invalidate on every render.
+ */
+export function dropDuplicates(data, overrides) {
+  if (!data?.length || !overrides) return data;
+  if (!Object.values(overrides).some((o) => o?.flag === DUPLICATE)) return data;
+  return data.filter((t) => !isDuplicate(t, overrides));
+}
+
 /** The verdict on one row, or null. */
 export function flagOf(transaction, overrides) {
   const key = transaction?.key;

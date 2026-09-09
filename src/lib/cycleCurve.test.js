@@ -111,7 +111,9 @@ describe.skipIf(!real)('buildCycleCalendar against the real export', () => {
   // The body runs even when skipped; a missing export must not break collection.
   if (!real) return;
   const months = [...new Set(real?.map((t) => t['Pay Month']) ?? [])].sort();
-  const asOf = new Date(2026, 7, 6);
+  // Read from where the export ends: "the cycle in progress" is a moving target, and a date the
+  // file has since passed describes a cycle that has closed.
+  const asOf = new Date(2026, 8, 4);
 
   it('reads a 23rd boundary in the previous calendar month', () => {
     const cal = buildCycleCalendar(real, months, asOf);
@@ -119,14 +121,16 @@ describe.skipIf(!real)('buildCycleCalendar against the real export', () => {
     expect(cal.startMonthOffset).toBe(-1);
   });
 
-  it('puts the current cycle at 23 Jul - 22 Aug and marks it projected', () => {
+  it('puts the current cycle at 23 Aug - 22 Sep and marks it projected', () => {
     const cal = buildCycleCalendar(real, months, asOf);
-    expect(iso(cal.starts['2026-08'])).toBe('2026-07-23');
-    expect(iso(cal.ends['2026-08'])).toBe('2026-08-22');
-    expect(cal.lengths['2026-08']).toBe(31);
-    expect(cal.isProjected['2026-08']).toBe(true);
+    expect(iso(cal.starts['2026-09'])).toBe('2026-08-23');
+    expect(iso(cal.ends['2026-09'])).toBe('2026-09-22');
+    expect(cal.lengths['2026-09']).toBe(31);
+    expect(cal.isProjected['2026-09']).toBe(true);
+    // A cycle the data has run past is not projected any more.
+    expect(cal.isProjected['2026-08']).toBe(false);
     // Derived rather than hard-coded — see processTransactionData.test.js.
-    expect(iso(cal.dataThrough) <= '2026-08-06').toBe(true);
+    expect(iso(cal.dataThrough) <= '2026-09-04').toBe(true);
   });
 
   it('contains every transaction within its own pay-month cycle', () => {

@@ -26,35 +26,38 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
   // The body runs even when skipped; a missing export must not break collection.
   if (!real) return;
   const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
-  const asOf = new Date(2026, 7, 6); // Thu 6 Aug 2026
+  // The last day the export reaches. These assertions describe a cycle in progress, so they have
+  // to be read from the moment the file ends rather than a date that ages out of it: the window is
+  // driven by the data, so a stale asOf simply describes a cycle the file has already left behind.
+  const asOf = new Date(2026, 8, 4); // Fri 4 Sep 2026
   const processed = processTransactionData(real, accounts, 6, asOf);
 
   it('anchors the current cycle on the pay-month boundary', () => {
-    expect(processed.currentMonth).toBe('2026-08');
-    expect(iso(processed.currentCycleStart)).toBe('2026-07-23');
-    expect(iso(processed.currentCycleEnd)).toBe('2026-08-22');
-    expect(iso(processed.nextPayDate)).toBe('2026-08-23');
+    expect(processed.currentMonth).toBe('2026-09');
+    expect(iso(processed.currentCycleStart)).toBe('2026-08-23');
+    expect(iso(processed.currentCycleEnd)).toBe('2026-09-22');
+    expect(iso(processed.nextPayDate)).toBe('2026-09-23');
     expect(processed.cycleLength).toBe(31);
-    expect(processed.cycleDay).toBe(15);
-    expect(processed.daysToPayday).toBe(16);
+    expect(processed.cycleDay).toBe(13);
+    expect(processed.daysToPayday).toBe(18);
     expect(processed.isProjectedCycleEnd).toBe(true);
     // Clamped to the as-of date: the export may reach further than the moment being simulated.
     expect(iso(processed.dataThrough) <= lastDate(real)).toBe(true);
-    expect(iso(processed.dataThrough) <= '2026-08-06').toBe(true);
+    expect(iso(processed.dataThrough) <= '2026-09-04').toBe(true);
   });
 
   it('surfaces only weeks that fall inside the pay cycle', () => {
     const labels = processed.cycleWeeks.map((w) => w.label);
-    // The old payday rule (25th rolled forward to Monday) produced a trailing "24 Aug" column
-    // covering 24-30 Aug — entirely outside the 23 Jul - 22 Aug pay month.
-    expect(labels).toEqual(['03 Aug', '10 Aug', '17 Aug']);
-    expect(labels).not.toContain('24 Aug');
+    // The old payday rule (25th rolled forward to Monday) produced a trailing column covering the
+    // week after the boundary — entirely outside the 23 Aug - 22 Sep pay month.
+    expect(labels).toEqual(['31 Aug', '07 Sept', '14 Sept', '21 Sept']);
+    expect(labels).not.toContain('28 Sept');
   });
 
   it('marks the week containing today as current', () => {
     const current = processed.cycleWeeks.filter((w) => w.isCurrent);
     expect(current).toHaveLength(1);
-    expect(current[0].label).toBe('03 Aug');
+    expect(current[0].label).toBe('31 Aug');
   });
 
   it('keeps each row\'s Remaining equal to the sum of its weekly split', () => {
@@ -138,7 +141,14 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     // the label from their category.
     const movements = labelled.filter((t) => /transfer|repayment/i.test(t.Category ?? ''));
     expect(movements.length).toBeGreaterThan(0);
-    expect(movements.filter((t) => !processed.transferIds.has(t.id))).toEqual([]);
+    // …except a leg that pays a loan, which outranks the label: moving money to savings leaves it
+    // yours, but a loan instalment is cash gone, and honouring the label there removed the cost of
+    // the loans from the table entirely. The Nedbank bond is currently paid in two parts, so both
+    // arrive labelled Transfer and both are real spend.
+    const stillLabelled = movements.filter(
+      (t) => !processed.transferIds.has(t.id) && !processed.loanInstalmentIds.has(t.id),
+    );
+    expect(stillLabelled).toEqual([]);
 
     // But a labelled row whose category is real spending stays spending — the label is wrong on
     // groceries, and honouring it deleted them from Expense.
@@ -147,10 +157,14 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     );
     expect(groceries.length).toBeGreaterThan(0);
 
-    // ...and no spending group named Transfer is left sitting inside a flow.
+    // ...and no SPENDING GROUP named Transfer is left sitting inside a flow. A CATEGORY of that
+    // name may be: the bond instalment legs above are filed under it by the bank and are real
+    // spend, so the honest thing is to count them where the export put them.
     processed.rows
       .filter((r) => !r.isTransfer)
-      .forEach((r) => expect(r.sub.map((s) => s.name)).not.toContain('Transfer'));
+      .forEach((r) =>
+        expect(r.sub.filter((x) => x.isSpendingGroup).map((x) => x.name)).not.toContain('Transfer'),
+      );
   });
 
   it('falls back to flat categories when the export has no Spending Group column', () => {
@@ -243,12 +257,12 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     expect(categories.some((c) => !c.discrete)).toBe(true);
   });
 
-  it('describes the next cycle: 23 Aug – 22 Sep 2026, 31 days, with its expected flows', () => {
-    expect(iso(processed.nextCycle.start)).toBe('2026-08-23');
-    expect(iso(processed.nextCycle.end)).toBe('2026-09-22');
-    expect(processed.nextCycle.length).toBe(31);
+  it('describes the next cycle: 23 Sep – 22 Oct 2026, 30 days, with its expected flows', () => {
+    expect(iso(processed.nextCycle.start)).toBe('2026-09-23');
+    expect(iso(processed.nextCycle.end)).toBe('2026-10-22');
+    expect(processed.nextCycle.length).toBe(30);
     expect(processed.nextCycle.dayRanges[0].lo).toBe(1);
-    expect(processed.nextCycle.dayRanges.at(-1).hi).toBe(31);
+    expect(processed.nextCycle.dayRanges.at(-1).hi).toBe(30);
     expect(processed.nextCycleExpected.expense).toBeLessThan(0);
     expect(processed.nextCycleExpected.income).toBeGreaterThan(0);
     expect(processed.nextCycleExpected.net).toBeCloseTo(

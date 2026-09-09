@@ -198,11 +198,16 @@ export function buildSubscriptions(lines, options = {}) {
             l.observations === 2
               ? 'charged twice, about a month apart'
               : (CADENCE_WORD[l.cadence] ?? CADENCE_WORD.irregular);
+          // MONTHLY_OR_SLOWER, not merely SCHEDULED: a subscription bills on a month or longer,
+          // and a "weekly charge" of this size is a person going to the shop. Three Spar visits a
+          // fortnight are regular, sizeable and entirely deliberate — headlining them as a new
+          // charge the reader might not have meant is just wrong, and it crowds out the one line
+          // that was (a R10 223 medical aid). The lines still exist; they simply do not lead.
           const headline =
             l.perCycle >= NEW_LINE_HEADLINE_MIN &&
             l.observations >= 3 &&
             HEADLINE_KINDS.has(l.kind) &&
-            SCHEDULED.has(l.cadence);
+            MONTHLY_OR_SLOWER.has(l.cadence);
           return {
             ...l,
             cyclesSeen: cyclesSeenOf(l),

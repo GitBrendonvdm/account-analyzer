@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTxnOverrides, flagOf, labelChoices, overrideBadge, sharedOverride } from './txnOverrides';
+import { DUPLICATE, FLAGS, applyTxnOverrides, dropDuplicates, flagOf, isDuplicate, labelChoices, overrideBadge, sharedOverride } from './txnOverrides';
 import { resolveMainGroup } from './exceptions';
 import { processTransactionData } from './processTransactionData';
 import { assignKeys } from '../db/txnKey';
@@ -145,8 +145,12 @@ describe.skipIf(!real)('a correction on the real export', () => {
     const base = run(rows, null);
     const cycle = base.currentMonth;
     const exceptions = base.rows.find((r) => r.name === 'Expense Exceptions');
-    const victim = exceptions.sub[0].items[0];
-    expect(victim.key).toBeTruthy();
+    // The victim has to be IN the cycle being measured: a row's items span the whole window, and
+    // marking one from last March expected moves nothing in this month's total.
+    const victim = exceptions.sub
+      .flatMap((s) => s.items)
+      .find((t) => t['Pay Month'] === cycle && t.key && t.AmountNum < 0);
+    expect(victim).toBeTruthy();
 
     const after = run(rows, { [victim.key]: { flag: 'expected' } });
     const before = exceptions.totalsByMonth[cycle] ?? 0;
@@ -173,5 +177,39 @@ describe.skipIf(!real)('a correction on the real export', () => {
     expect(net(run(rows, { [victim.key]: { flag: 'expected' } }))).toBe(net(base));
     expect(net(run(rows, { [victim.key]: { flag: 'unexpected' } }))).toBe(net(base));
     expect(net(run(rows, { [victim.key]: { category: 'Zzz Moved' } }))).toBe(net(base));
+  });
+});
+
+describe('duplicates', () => {
+  const rows = [
+    { key: 'a', Description: 'Fnb Home *6996', AmountNum: -6674.53 },
+    { key: 'b', Description: 'Fnb Home *1106', AmountNum: -6674.53 },
+    { key: 'c', Description: 'Spar', AmountNum: -120 },
+  ];
+
+  it('takes the struck row out of the data entirely', () => {
+    // Not an exception — an exception is a real payment kept out of the averages. This one never
+    // happened, so every total, balance and forecast below simply never sees it.
+    const out = dropDuplicates(rows, { b: { flag: DUPLICATE } });
+    expect(out.map((t) => t.key)).toEqual(['a', 'c']);
+  });
+
+  it('returns the same array when nothing is struck, so the memo below holds', () => {
+    expect(dropDuplicates(rows, { b: { flag: 'unexpected' } })).toBe(rows);
+    expect(dropDuplicates(rows, {})).toBe(rows);
+    expect(dropDuplicates(rows, null)).toBe(rows);
+  });
+
+  it('keeps the duplicate verdict away from the exception classifier', () => {
+    // flagOf feeds resolveMainGroup, which reasons about expected/unexpected only. Striking a row
+    // must not quietly also declare it expected.
+    expect(flagOf(rows[1], { b: { flag: DUPLICATE } })).toBeNull();
+    expect(FLAGS).not.toContain(DUPLICATE);
+  });
+
+  it('can be put back', () => {
+    expect(dropDuplicates(rows, { b: { flag: null } })).toBe(rows);
+    expect(isDuplicate(rows[1], { b: { flag: null } })).toBe(false);
+    expect(isDuplicate(rows[1], { b: { flag: DUPLICATE } })).toBe(true);
   });
 });

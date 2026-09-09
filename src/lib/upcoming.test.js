@@ -169,7 +169,9 @@ describe.skipIf(!real)('buildUpcoming against the real export', () => {
   });
   const names = [...new Set(data.map((t) => t.Account))];
   const months = [...new Set(data.map((t) => t['Pay Month']))].sort();
-  const asOf = new Date(2026, 7, 22);
+  // The end of the export. "What is coming up" is a claim about the cycle in progress, so it has
+  // to be asked from where the data stops, not from a date the file has already run past.
+  const asOf = new Date(2026, 8, 4);
   const calendar = buildCycleCalendar(data, months, asOf);
   const byId = new Map();
   names.forEach((n) => {

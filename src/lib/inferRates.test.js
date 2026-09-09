@@ -278,6 +278,10 @@ describe.skipIf(!real)('inferRates on the real export', () => {
       expect(rateSteps(t).some((s) => s.kind === 'rateStep' && s.date.getFullYear() === 2026)).toBe(true);
     });
     const instalments = bonds.map((t) => t.instalment).sort((a, b) => b - a);
+    // The Nedbank bond is currently collected in two legs in the same cycle, R19 600 + R3 254.88.
+    // Read one leg at a time it came to R19 600 — below the interest on the balance, so the bond
+    // projected as never being paid off. The instalment is what a cycle pays, not what one debit
+    // order collects.
     expect(instalments).toEqual([22854.88, 6674.53]);
     const remaining = bonds.map((t) => t.remainingMonths).sort((a, b) => b - a);
     expect(remaining[0]).toBeGreaterThanOrEqual(300);

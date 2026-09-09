@@ -440,19 +440,62 @@ export function inferInstalment(rows, data, { isCard = false, transfers = null, 
   });
 
   if (paired.length) {
-    const lookback = paired.slice(-INSTALMENT_LOOKBACK_POSTINGS).map((p) => p.amount);
+    /**
+     * ONE CYCLE, ONE INSTALMENT — however many debit orders the bank used to collect it.
+     *
+     * A lender may split the collection: the Nedbank bond currently arrives as R19 600 and
+     * R3 254.88 in the same cycle. Read one leg at a time, the instalment reads R19 600, which is
+     * not merely R3 255 short — it is below the interest on the balance, so `remainingTerm` returns
+     * Infinity and the Debt view reports a bond that is never paid off. The contractual instalment
+     * is what the cycle paid, so the legs are added before anything else looks at them.
+     *
+     * A cycle with an extra lump sum in it is inflated by this, and is caught where it always was:
+     * `current` must sit within INSTALMENT_PAIR_TOLERANCE of the median of the lookback, so an
+     * unusual cycle is passed over in favour of an ordinary one.
+     */
+    const byCycle = new Map();
+    const counted = new Set();
+    paired.forEach((p) => {
+      // The same amount, to the same loan, on the same day, twice. That is a renumbered account
+      // reported under both references (see duplicatePayments.js), not an instalment paid twice —
+      // and doubling a cycle here reads as a recast, which throws away the regression that fits
+      // the balance. Two genuinely identical instalments on one day would be indistinguishable,
+      // and taking them as one is much the safer way to be wrong about a contractual amount.
+      const same = `${p.cycle}|${cents(p.amount)}|${p.date.getTime()}`;
+      if (counted.has(same)) return;
+      counted.add(same);
+      const merged = byCycle.get(p.cycle);
+      if (!merged) {
+        byCycle.set(p.cycle, { ...p });
+        return;
+      }
+      merged.amount += p.amount;
+      // The cycle's last leg carries the date and the paying account: it is the one that settled it.
+      if (p.date >= merged.date) {
+        merged.date = p.date;
+        merged.debit = p.debit;
+        merged.credit = p.credit;
+      }
+    });
+    const perCycle = [...byCycle.values()].sort((a, b) => (a.cycle < b.cycle ? -1 : a.cycle > b.cycle ? 1 : 0));
+
+    const lookback = perCycle.slice(-INSTALMENT_LOOKBACK_POSTINGS).map((p) => p.amount);
     const typical = median(lookback);
     const current =
-      [...paired].reverse().find((p) => Math.abs(p.amount - typical) <= INSTALMENT_PAIR_TOLERANCE * typical) ??
-      paired[paired.length - 1];
+      [...perCycle].reverse().find((p) => Math.abs(p.amount - typical) <= INSTALMENT_PAIR_TOLERANCE * typical) ??
+      perCycle[perCycle.length - 1];
+    // `history` — and so `changed`, and the regression's "the instalment never moved" gate — stays
+    // on the LEGS. A cycle that paid the instalment twice (the vehicle loan, December 2025) sums to
+    // double and would read as a recast, which throws away the regression that fits its balance.
+    // The legs say what the contractual amount is; the cycles say what was paid.
     const history = runsOf(paired);
-    const latest = paired[paired.length - 1];
+    const latest = perCycle[perCycle.length - 1];
     return {
       amount: current.amount,
-      day: dayOfMonthMode(paired.map((p) => p.date)),
+      day: dayOfMonthMode(perCycle.map((p) => p.date)),
       changed: history.length > 1,
       history,
-      observations: paired.map(({ date, amount, cycle }) => ({ date, amount, cycle })),
+      observations: perCycle.map(({ date, amount, cycle }) => ({ date, amount, cycle })),
       payingAccountId: accountIdOf(latest.debit.Account),
       payingCategory: latest.debit.Category ?? null,
       typicalRepayment: null,

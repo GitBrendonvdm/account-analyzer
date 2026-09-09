@@ -57,7 +57,7 @@ const StatementUpload = lazy(() =>
   import('./components/StatementUpload').then((m) => ({ default: m.StatementUpload })),
 );
 
-import { applyTxnOverrides, labelChoices } from './lib/txnOverrides';
+import { applyTxnOverrides, dropDuplicates, labelChoices } from './lib/txnOverrides';
 import { effectiveOverrides } from './lib/txnRules';
 import { exceptionKeysOf } from './lib/paymentSearch';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
@@ -125,7 +125,12 @@ export default function App() {
   const setProviders = useCallback((next) => settings.set('txnProviders', next), [settings]);
   const [providerDraft, setProviderDraft] = useState(null);
   const setTxnRules = useCallback((next) => settings.set('txnRules', next), [settings]);
-  const data = useMemo(() => applyTxnOverrides(rawData, txnOverrides), [rawData, txnOverrides]);
+  // Re-labels first, then the rows the reader has struck as duplicates leave altogether — so the
+  // exception classifier, the transfer pairing and every total below simply never see them.
+  const data = useMemo(
+    () => dropDuplicates(applyTxnOverrides(rawData, txnOverrides), txnOverrides),
+    [rawData, txnOverrides],
+  );
   const labels = useMemo(() => labelChoices(rawData), [rawData]);
   const setTxnOverride = useCallback(
     (keys, patch) => {
@@ -544,6 +549,7 @@ export default function App() {
                   providerDraft={providerDraft}
                   onProviderDraft={setProviderDraft}
                   spend={spend}
+                  rawData={rawData}
                 />
               )}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
