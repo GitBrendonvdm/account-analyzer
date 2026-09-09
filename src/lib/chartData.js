@@ -1,8 +1,6 @@
 import { enrichWithEffectivePayMonths, getPayMonth } from './effectivePayMonth';
-import { buildExceptionClusters, resolveMainGroup } from './exceptions';
 import { projectedMonthNet } from './expected';
-import { detectTransferPairs } from './transfers';
-import { parseAccount } from './accounts';
+import { loanAccountsOf } from './flows';
 import { formatMonthLabel } from '../utils/format';
 import {
   endOfDay,
@@ -38,21 +36,36 @@ export function chartGranularity(monthCount) {
  * Classification still runs on the unfiltered data: a transfer pair spans two accounts, so
  * detecting pairs on a filtered set would orphan a leg and it would resurface as phantom income.
  */
-function netTransactions(data, months, selectedAccounts) {
+/**
+ * The rows the chart draws — the SAME rows the table counted, not a second opinion about them.
+ *
+ * This used to re-run the whole classification: its own detectTransferPairs, its own
+ * buildExceptionClusters, its own loan-account list, then resolveMainGroup over the result. Three
+ * of those four were doing nothing. resolveMainGroup answers 'Transfers' exactly when the row is in
+ * transferIds (or is zero), so the exception clustering — the expensive step — was computed and
+ * thrown away, and the pair detection reproduced a set the caller was already holding.
+ *
+ * Worse than wasted work, it was a second answer. The table releases the paying leg of a loan pair
+ * back into Expense; a private detectTransferPairs does not know that, so the chart and the table
+ * could disagree about what a transfer is, and the running total the chart drew was not the running
+ * total the table added up. `processed.transferIds` is the table's final verdict, so taking it is
+ * both less code and the only way the two can agree.
+ *
+ * Loan accounts come from flows.js for the same reason, and it honours an account whose type the
+ * reader has overridden, which the inline check here did not.
+ */
+function netTransactions(data, months, selectedAccounts, transferIds) {
   const selected = new Set(selectedAccounts ?? []);
   const scopedData = enrichWithEffectivePayMonths(data, months);
-  const { transferIds } = detectTransferPairs(data, months);
-  const exceptionState = { ...buildExceptionClusters(scopedData, months, transferIds), transferIds };
-  const loanAccounts = new Set(
-    [...new Set(data.map((t) => t.Account))].filter((a) => parseAccount(a).type === 'Loan'),
-  );
+  const loanAccounts = loanAccountsOf(data);
 
   return scopedData
     .filter((t) => {
       if (!months.includes(getPayMonth(t))) return false;
       if (selectedAccounts && !selected.has(t.Account)) return false;
       if (loanAccounts.has(t.Account)) return false;
-      return resolveMainGroup(t, exceptionState) !== 'Transfers';
+      // Both legs of a transfer are the same money; a zero contributes nothing to a running total.
+      return !transferIds?.has(t.id) && t.AmountNum !== 0;
     })
     .map((t) => ({
       ...t,
@@ -224,7 +237,7 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
     nextPayDate,
   } = processed;
   const granularity = chartGranularity(months.length);
-  const transactions = netTransactions(data, calcMonths, selectedAccounts);
+  const transactions = netTransactions(data, calcMonths, selectedAccounts, processed.transferIds);
   const today = new Date();
   const todayEnd = endOfDay(today);
 
