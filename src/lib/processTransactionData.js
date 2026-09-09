@@ -352,8 +352,13 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     ? Math.max(0, Math.min(lastWeek, mondayWeekIndex(asOf, currentCycleStart)))
     : 0;
   const cycleStartMonday = currentCycleStart ? mondayOf(currentCycleStart) : null;
-  // Only the current week onward are shown as columns; past weeks are elapsed.
+  // The day-of-cycle span each Monday column covers. Prior cycles are bucketed against these
+  // spans rather than by week index, because cycles hold 4-6 Monday-weeks depending on which
+  // weekday the boundary lands on.
+  const dayRanges = weekDayRanges(currentCycleStart, currentCycleEnd);
+  const dataThrough = calendar.dataThrough;
   const cycleWeeks = [];
+  // Only the current week onward are shown; a past week is over and expects nothing.
   for (let w = currentWeek; w <= lastWeek; w++) {
     const monday = cycleStartMonday
       ? new Date(cycleStartMonday.getFullYear(), cycleStartMonday.getMonth(), cycleStartMonday.getDate() + w * 7)
@@ -364,11 +369,6 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       isCurrent: w === currentWeek,
     });
   }
-  // The day-of-cycle span each Monday column covers. Prior cycles are bucketed against these
-  // spans rather than by week index, because cycles hold 4-6 Monday-weeks depending on which
-  // weekday the boundary lands on.
-  const dayRanges = weekDayRanges(currentCycleStart, currentCycleEnd);
-  const dataThrough = calendar.dataThrough;
 
   // The cycle after this one, under the same boundary rule the calendar closes the current cycle
   // with. Its shape is what cash-to-payday needs for the week after payday and what the Debt view

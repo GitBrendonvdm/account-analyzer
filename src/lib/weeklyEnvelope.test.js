@@ -162,50 +162,71 @@ describe('weeklyRemainingByWeek — the current week is time-aware', () => {
   });
 });
 
-describe('weeklyRemainingByWeek — a stale export does not write off unobserved weeks', () => {
+describe('weeklyRemainingByWeek — a week that is over expects nothing', () => {
   const weekAvg = [-500, -1000, -900, -800, -600];
   const base = { sign: -1, weekdayCurve: CURVE, dayRanges: RANGES, discrete: false };
-  // Today is in week 3 (10-16 Aug); the data ends on day 4 (Sun 26 Jul), so weeks 1 and 2 were
-  // never observed at all.
+  // Today is in week 3 (10-16 Aug); the data ends on day 4 (Sun 26 Jul), so weeks 1 and 2 have
+  // been lived through but never exported.
   const asOf = new Date(2026, 7, 12);
 
-  it('carries the average for elapsed weeks the data never reached', () => {
+  /**
+   * This used to go the other way. An elapsed week the export had not reached kept its average,
+   * and the week the data ended inside kept the share of its average falling after the last
+   * observed day — reasoning that those transactions exist and will arrive with the next import,
+   * so leaving them out would understate the cycle.
+   *
+   * That is true of the CYCLE TOTAL and false of the words on the screen. Those days have been
+   * lived: whatever was spent on them was spent, and "left to payday" is what you have yet to
+   * spend, not what your bank has yet to report. On the real file, with an export five days stale,
+   * it put R4 819 into a week that had already run — so the row read 82 008 + 6 264 + 8 175 +
+   * 1 263 = 97 710 against a Forecast of 102 380, with nothing on screen owning the difference.
+   *
+   * The cost is real and is the reason it was built the other way: while the export lags, the
+   * Forecast omits the days it has not reported and steps up at the next import. Claiming only
+   * what is known plus what is genuinely still to come is the honest direction to be wrong in.
+   */
+  it('writes off an elapsed week the export never reached', () => {
     const r = weeklyRemainingByWeek([], '2026-08', STARTS, 3, weekAvg, {
       ...base,
       asOf,
       dataThrough: new Date(2026, 6, 26),
-      observedDay: 4,
-    });
-    expect(r[0]).toBe(0); // days 1-4: observed and locked
-    expect(r[1]).toBe(weekAvg[1]);
-    expect(r[2]).toBe(weekAvg[2]);
-    expect(r[4]).toBe(weekAvg[4]);
-  });
-
-  it('carries the unobserved share of the week the data ends inside', () => {
-    // Data ends Tue 28 Jul (day 6, inside week 1 = days 5-11): 50% of the week's spend has
-    // usually landed by Tuesday night, so half of week 1 is still owed.
-    const r = weeklyRemainingByWeek([tx('2026-07-27', -300)], '2026-08', STARTS, 3, weekAvg, {
-      ...base,
-      asOf,
-      dataThrough: new Date(2026, 6, 28),
-      observedDay: 6,
-    });
-    expect(r[0]).toBe(0);
-    expect(r[1]).toBeCloseTo(-1000 * (1 - 0.5), 6);
-    expect(r[2]).toBe(weekAvg[2]);
-  });
-
-  it('locks every elapsed week when the data is current', () => {
-    const r = weeklyRemainingByWeek([], '2026-08', STARTS, 3, weekAvg, {
-      ...base,
-      asOf,
-      dataThrough: asOf,
-      observedDay: 21,
     });
     expect(r[0]).toBe(0);
     expect(r[1]).toBe(0);
     expect(r[2]).toBe(0);
+    // Weeks still to come are untouched — this is only about weeks that are over.
+    expect(r[4]).toBe(weekAvg[4]);
+  });
+
+  it('writes off the week the data ends inside, once that week is past', () => {
+    const r = weeklyRemainingByWeek([tx('2026-07-27', -300)], '2026-08', STARTS, 3, weekAvg, {
+      ...base,
+      asOf,
+      dataThrough: new Date(2026, 6, 28),
+    });
+    expect(r[1]).toBe(0);
+    expect(r[2]).toBe(0);
+  });
+
+  it('locks every elapsed week when the data is current, as it always did', () => {
+    const r = weeklyRemainingByWeek([], '2026-08', STARTS, 3, weekAvg, {
+      ...base,
+      asOf,
+      dataThrough: asOf,
+    });
+    expect(r[0]).toBe(0);
+    expect(r[1]).toBe(0);
+    expect(r[2]).toBe(0);
+  });
+
+  it('leaves the current week and the future to their own rules', () => {
+    const r = weeklyRemainingByWeek([], '2026-08', STARTS, 3, weekAvg, {
+      ...base,
+      asOf,
+      dataThrough: asOf,
+    });
+    expect(r[3]).not.toBe(0);
+    expect(r[4]).toBe(weekAvg[4]);
   });
 });
 

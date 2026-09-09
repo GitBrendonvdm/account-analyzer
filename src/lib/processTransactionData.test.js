@@ -71,6 +71,23 @@ describe.skipIf(!real)('processTransactionData against the real export', () => {
     });
   });
 
+  it('keeps that equal to the sum of the week columns the reader can SEE', () => {
+    /**
+     * The stricter half, and the one that was broken. Summing the whole array proves the model is
+     * self-consistent; it says nothing about whether the reader can follow the arithmetic. The
+     * columns began at the week the clock is in, while the envelope kept money in the week the
+     * export ends inside — five days earlier with a stale file — so an Expense row read
+     * 82 008 + 6 264 + 8 175 + 1 263 = 97 710 against a Forecast of 102 380, with R4 819 counted
+     * in a column that was never drawn.
+     */
+    const shown = processed.cycleWeeks.map((w) => w.index);
+    expect(shown.length).toBeGreaterThan(0);
+    processed.rows.forEach((row) => {
+      const visible = shown.reduce((s, i) => s + ((row.weeklyRemaining ?? [])[i] ?? 0), 0);
+      expect(visible).toBeCloseTo(row.expected ?? 0, 6);
+    });
+  });
+
   it('nests categories under the export\'s Spending Group column', () => {
     const expense = processed.rows.find((r) => r.name === 'Expense');
     expect(expense.sub.every((s) => s.isSpendingGroup)).toBe(true);

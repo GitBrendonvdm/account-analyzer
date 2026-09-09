@@ -254,24 +254,9 @@ function currentWeekRemaining({ actual, avg, sign, curve, asOf, dataThrough, wee
 }
 
 /**
- * What an ELAPSED week the data ends inside still owes: the share of its expectation past the last
- * observed weekday. A bill keeps whatever of it has not landed.
- */
-function unobservedRemaining({ actual, avg, sign, curve, dataThrough, discrete }) {
-  const E = Math.max(0, avg * sign);
-  const A = Math.max(0, actual * sign);
-  if (E <= 0) return 0;
-  if (discrete) return Math.max(0, E - A) * sign;
-  const observedShare = curve[Math.min(6, mondayIndexOfDay(dataThrough))];
-  return E * (1 - observedShare) * sign;
-}
-
-/**
- * Remaining spend per week column under the envelope model. Weeks before the current one are 0
- * (locked at actuals) when the data reached them; an elapsed week the data never reached carries
- * its average and the week the data ends inside carries its unobserved share (`observedDay`, the
- * cycle day the data reaches — omit it and every elapsed week is taken as observed). The current
- * week is time-aware; future weeks carry their averages. Indexed 0..weekCount-1; the sum is the
+ * Remaining spend per week column under the envelope model. Weeks before the current one are 0 —
+ * they are over, and what was spent on them was spent, whether or not the export has reported it.
+ * The current week is time-aware; future weeks carry their averages. Indexed 0..weekCount-1; the sum is the
  * total remaining for the cycle.
  */
 export function weeklyRemainingByWeek(
@@ -287,7 +272,6 @@ export function weeklyRemainingByWeek(
     dataThrough,
     dayRanges,
     discrete = false,
-    observedDay = null,
     monthOf = defaultMonthOf,
   } = {},
 ) {
@@ -313,19 +297,17 @@ export function weeklyRemainingByWeek(
       : start;
 
   return weekAvg.map((avg, w) => {
-    if (w < currentWeek) {
-      const range = ranges[w];
-      if (observedDay == null || !range || range.hi <= observedDay) return 0; // observed — locked
-      if (range.lo > observedDay) return avg; // the data never reached this week
-      return unobservedRemaining({
-        actual: actualByWeek[w],
-        avg,
-        sign,
-        curve,
-        dataThrough: dataThrough ?? asOf,
-        discrete,
-      });
-    }
+    // A WEEK THAT IS OVER EXPECTS NOTHING. Those days have happened: whatever was spent on them
+    // was spent, and "left to payday" is what you have yet to spend, not what the export has yet
+    // to report. This used to hand an elapsed week the share of its average falling after the last
+    // observed day, so a five-day-stale file put R4 819 of Friday-to-Sunday spend into a week that
+    // had already run — money nobody was going to spend again, sitting inside both the remaining
+    // figure and the Forecast.
+    //
+    // The cost is stated plainly: while the export lags, the cycle Forecast leaves out the days it
+    // has not reported, and steps up when the next import arrives. That is the honest direction to
+    // be wrong in — the figure claims only what is known plus what is genuinely still to come.
+    if (w < currentWeek) return 0;
     if (w === currentWeek) {
       return currentWeekRemaining({
         actual: actualByWeek[w],
