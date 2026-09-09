@@ -87,8 +87,8 @@ export function TransactionTable({ processed }) {
                 {weeks.length > 0 && (
                   <th
                     className="border-b border-l-2 border-l-info/30 bg-info/8 px-4 pt-3 pb-1 text-center text-info"
-                    colSpan={weeks.length + 1}
-                    title={`Forecast for the rest of this pay cycle, to ${cycleEnd}. Completed weeks are locked at what actually happened; the current week is prorated by how much of it is left.`}
+                    colSpan={weeks.length + 2}
+                    title={`Forecast for the rest of this pay cycle, to ${cycleEnd}. Completed weeks are locked at what actually happened; the current week is prorated by how much of it is left. The last column closes the row: what has landed so far plus everything still expected.`}
                   >
                     Forecast to {cycleEnd}
                   </th>
@@ -152,6 +152,18 @@ export function TransactionTable({ processed }) {
                   <SortHeader
                     label="Left to payday"
                     sortKey="remaining"
+                    sort={sort}
+                    onSort={handleSort}
+                    className="justify-end text-info"
+                  />
+                </th>
+                <th
+                  className="border-b bg-info/15 px-4 pb-3 text-right max-md:pb-0"
+                  title={`Where this cycle closes on ${cycleEnd}: what has landed so far plus everything still expected. This is the row's own arithmetic — "Typical" beside it is an average of completed cycles, not a total of this one.`}
+                >
+                  <SortHeader
+                    label="Forecast"
+                    sortKey="forecast"
                     sort={sort}
                     onSort={handleSort}
                     className="justify-end text-info"

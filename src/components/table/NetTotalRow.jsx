@@ -2,6 +2,7 @@ import { formatCurrency } from '../../utils/format';
 import { RowIcon } from './RowIcon';
 import { NET_TOTAL_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
+import { forecastOf } from './forecast';
 import { PIN_FILL_2 } from './stickyColumn';
 
 /**
@@ -16,6 +17,11 @@ function NetAmount({ val }) {
 }
 
 export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeeks, weeklyRemaining }) {
+  // The row closes on itself: what the cycle has netted so far plus what is still expected.
+  const forecast = forecastOf(
+    { totalsByMonth: { [months[months.length - 1]]: netByMonth[netByMonth.length - 1] }, expected: netExpected },
+    months,
+  );
   return (
     <tr className="bg-fill-2 font-bold text-white">
       <td className={`p-4 ${PIN_FILL_2}`}>
@@ -46,6 +52,9 @@ export function NetTotalRow({ months, netByMonth, netExpected, netAvg, cycleWeek
       <WeekCells weekly={weeklyRemaining} weeks={cycleWeeks ?? []} pad="p-4" signed />
       <td className="p-4 text-right">
         <NetAmount val={netExpected} />
+      </td>
+      <td className="p-4 text-right">
+        <NetAmount val={forecast} />
       </td>
       <td className="p-4 text-right">
         <NetAmount val={netAvg} />

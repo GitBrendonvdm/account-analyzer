@@ -9,6 +9,7 @@ import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { WeekCells } from './WeekCells';
+import { forecastOf } from './forecast';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function TableGroup({ group, months, sort, cycleWeeks }) {
@@ -60,6 +61,9 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
         />
         <td className="p-4 text-right font-semibold text-info">
           {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
+        </td>
+        <td className="p-4 text-right font-semibold">
+          {group.isException || group.isTransfer ? '' : <Cell val={forecastOf(group, months)} absolute />}
         </td>
         <td className="p-4 text-right">
           <Cell val={group.avg} absolute />

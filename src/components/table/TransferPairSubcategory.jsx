@@ -63,6 +63,7 @@ export function TransferPairSubcategory({ sub, months, sort, cycleWeeks }) {
         <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} />
         <td />
         <td />
+        <td />
       </tr>
       {expanded &&
         matchGroups.map((group) => (

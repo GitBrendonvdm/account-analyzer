@@ -49,6 +49,7 @@ export function TransferMatchRow({ group, months, cycleWeeks }) {
       <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-2" />
       <td />
       <td />
+      <td />
     </tr>
   );
 }

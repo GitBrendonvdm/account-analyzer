@@ -39,6 +39,7 @@ export function VariantTransactionRow({ variant, months, cycleWeeks }) {
       <WeekCells weekly={undefined} weeks={cycleWeeks ?? []} pad="p-1.5" />
       <td />
       <td />
+      <td />
     </tr>
   );
 }
