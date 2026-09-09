@@ -185,28 +185,49 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
    * The surplus row's id is offset well past any real one (ids are positions in the file) so the
    * sets keyed on id — transfers, reversals — cannot collide with it.
    */
-  const excessIds = new Set();
-  const rowsToGroup = [];
-  scopedData.forEach((t) => {
-    const excess = clusters.splitAmounts.get(t.id);
-    if (!excess) {
-      rowsToGroup.push(t);
-      return;
-    }
-    const sign = t.AmountNum < 0 ? -1 : 1;
-    const usual = Math.abs(t.AmountNum) - excess;
-    if (usual > 0.005) rowsToGroup.push({ ...t, AmountNum: sign * usual, splitFrom: t.id });
-    const id = EXCESS_ID_OFFSET + t.id;
-    excessIds.add(id);
-    rowsToGroup.push({
-      ...t,
-      id,
-      AmountNum: sign * excess,
-      splitFrom: t.id,
-      isExcess: true,
-      Description: `${t.Description} · above usual`,
+  const splitBy = (splitAmounts) => {
+    const excessIds = new Set();
+    const rows = [];
+    scopedData.forEach((t) => {
+      const excess = splitAmounts.get(t.id);
+      if (!excess) {
+        rows.push(t);
+        return;
+      }
+      const sign = t.AmountNum < 0 ? -1 : 1;
+      const usual = Math.abs(t.AmountNum) - excess;
+      if (usual > 0.005) rows.push({ ...t, AmountNum: sign * usual, splitFrom: t.id });
+      const id = EXCESS_ID_OFFSET + t.id;
+      excessIds.add(id);
+      rows.push({
+        ...t,
+        id,
+        AmountNum: sign * excess,
+        splitFrom: t.id,
+        isExcess: true,
+        Description: `${t.Description} · above usual`,
+      });
     });
-  });
+    return { rows, excessIds };
+  };
+  const { rows: rowsToGroup, excessIds } = splitBy(clusters.splitAmounts);
+
+  /**
+   * THE BAND IS CLASSIFIED THE SAME WAY THE FORECAST IS, over its own wider window.
+   *
+   * The band reads every complete cycle, not just the visible ones, and it used to read them RAW:
+   * the exception classifier only ran on the slider's window, so a one-off outside it was never
+   * carved out and sat in the base flow. The forecast excluded one-offs and the band did not, which
+   * is two answers to one question — R230 000 of income and R202 000 of spend appeared in the
+   * remainder history of cycles the averages had deliberately left out, and the band around
+   * "R3 900 still to come" ran to R69 836.
+   *
+   * So the classifier runs a second time over every cycle, and the rows the band measures are split
+   * by THAT verdict. Same rules, same code, a different window — rather than one window classified
+   * and another not.
+   */
+  const bandClusters = buildExceptionClusters(scopedData, allMonths, transferIds);
+  const { rows: bandRows, excessIds: bandExcessIds } = splitBy(bandClusters.splitAmounts);
 
   const exceptionState = {
     incomeSparseCategories: clusters.incomeSparseCategories,
@@ -218,40 +239,56 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // exceptions too — one payment, one judgement.
     flags: txnOverrides,
   };
-  rowsToGroup.forEach((t) => {
-    const mainGroup = resolveMainGroup(t, exceptionState);
-    const m = mainGroup === 'Transfers' ? t['Pay Month'] : getPayMonth(t);
+  /**
+   * Where a row belongs: its flow, its cycle, its spending group and its category. One router, used
+   * by the display pass and the band pass alike, so the two can never drift into disagreeing about
+   * which row is whose. Returns null for a row that belongs in no total.
+   */
+  const routeOf = (t, state) => {
+    const mainGroup = resolveMainGroup(t, state);
     // Every total below is account-scoped. Previously only the sub-row month cells were filtered,
     // so group rows, the Net Total and every average silently ignored the account chips.
-    if (!selected.has(t.Account)) return;
-    // A row outside the month slider still counts for ONE thing: the band. Narrowing the slider
-    // must not make the app more confident about the future, and at four cycles there are three
-    // observations, at which p10 is barely inside the cheapest fortnight ever seen — on this file
-    // it came out ABOVE the forecast it was supposed to bracket. So out-of-window rows are kept
-    // aside for the band and are invisible to every total, average and forecast below.
-    const inWindow = calcMonths.includes(m);
-
+    if (!selected.has(t.Account)) return null;
     // Transfers carry no total at all. Both legs are the same money moving between the user's own
     // accounts, so the honest figure is zero — and summing the legs that survive the account filter
     // produced a large number that swung wildly (R-41 350 → R+19 896 on the same data) purely
     // because half of a pair had been switched off. Nothing downstream reads this total: the net
     // row is Income + Expense, and the pair rows below show gross volume.
-    if (mainGroup === 'Transfers') return;
-
+    if (mainGroup === 'Transfers') return null;
     const c = t.Category || 'Uncategorized';
     // Categories nest under the export's own Spending Group when the column is present. Transfers
     // and Exceptions stay flat — they're already homogeneous, so the level would add 11 rows with
     // one child each.
     const sg =
       useSpendingGroups && !skipsSpendingGroup(mainGroup) ? spendingGroupOf(t) : FLAT_LEVEL;
-    const g = groups[mainGroup];
     // A row that reached a flow despite being labelled "Transfer" is one whose label we've already
     // rejected — nesting it under a "Transfer" heading inside Expense would only re-assert it.
     const level = sg === TRANSFER_SPENDING_GROUP ? UNCLASSIFIED_SPENDING_GROUP : sg;
+    return { mainGroup, m: getPayMonth(t), c, level };
+  };
+  const cellOf = (mainGroup, level, c) => {
+    const g = groups[mainGroup];
     if (!g.sub[level]) g.sub[level] = { totals: {}, sub: {} };
     if (!g.sub[level].sub[c]) g.sub[level].sub[c] = { totals: {}, items: [], bandItems: [] };
-    g.sub[level].sub[c].bandItems.push(t);
-    if (!inWindow) return;
+    return g;
+  };
+
+  // Pass one: what the reader sees. The month slider owns this, and nothing outside it appears in
+  // any total, average or forecast.
+  const bandExceptionState = {
+    incomeSparseCategories: bandClusters.incomeSparseCategories,
+    expenseSparseCategories: bandClusters.expenseSparseCategories,
+    excessIds: bandExcessIds,
+    transferIds,
+    flags: txnOverrides,
+  };
+
+  rowsToGroup.forEach((t) => {
+    const route = routeOf(t, exceptionState);
+    if (!route) return;
+    const { mainGroup, m, c, level } = route;
+    if (!calcMonths.includes(m)) return;
+    const g = cellOf(mainGroup, level, c);
     g.totals[m] = (g.totals[m] || 0) + t.AmountNum;
     g.sub[level].totals[m] = (g.sub[level].totals[m] || 0) + t.AmountNum;
     g.sub[level].sub[c].totals[m] = (g.sub[level].sub[c].totals[m] || 0) + t.AmountNum;
@@ -260,6 +297,15 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // Income + Expense (exceptions folded into their base flow) drive the net-per-month totals.
     const flow = mainGroup.includes('Income') ? 'Income' : 'Expense';
     totalsByMonth[flow][m] = (totalsByMonth[flow][m] || 0) + t.AmountNum;
+  });
+
+  // Pass two: what the BAND measures. Every cycle in the file, classified by the wider window's own
+  // verdict, and touching nothing but `bandItems` — no total, average or forecast can see these.
+  bandRows.forEach((t) => {
+    const route = routeOf(t, bandExceptionState);
+    if (!route) return;
+    const { mainGroup, c, level } = route;
+    cellOf(mainGroup, level, c).sub[level].sub[c].bandItems.push(t);
   });
 
   // Cycle-phase inputs: learn how far through the current pay-cycle we are, and the

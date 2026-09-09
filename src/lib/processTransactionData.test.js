@@ -382,6 +382,20 @@ describe.skipIf(!real)('the band ignores the month slider', () => {
     expect(cheapest).toBeLessThan(dearest / 2);
   });
 
+  it('carves one-offs out of the band, the way the forecast already does', () => {
+    // The band reads cycles the slider does not show, and the exception classifier used to run
+    // only on the slider's window — so a one-off outside it was never split out and sat in the
+    // base flow. The forecast excluded one-offs and the band did not: R202 000 of spend and
+    // R230 000 of income turned up in the remainder history, and the range around "R3 900 still to
+    // come" ran to R69 836. The classifier now runs over the band's own window too.
+    const expense = expenseOf(9);
+    const magnitudes = expense.remainder.map(Math.abs).sort((a, b) => a - b);
+    const median = magnitudes[Math.floor(magnitudes.length / 2)];
+    // No cycle is an order of magnitude past the middle of the pack any more.
+    expect(magnitudes.at(-1)).toBeLessThan(median * 4);
+    expect(magnitudes.length).toBeGreaterThan(15);
+  });
+
   it('leaves the visible columns and averages to the slider, untouched', () => {
     const narrow = expenseOf(4);
     const wide = expenseOf(25);
