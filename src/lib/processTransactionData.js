@@ -221,10 +221,15 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   rowsToGroup.forEach((t) => {
     const mainGroup = resolveMainGroup(t, exceptionState);
     const m = mainGroup === 'Transfers' ? t['Pay Month'] : getPayMonth(t);
-    if (!calcMonths.includes(m)) return;
     // Every total below is account-scoped. Previously only the sub-row month cells were filtered,
     // so group rows, the Net Total and every average silently ignored the account chips.
     if (!selected.has(t.Account)) return;
+    // A row outside the month slider still counts for ONE thing: the band. Narrowing the slider
+    // must not make the app more confident about the future, and at four cycles there are three
+    // observations, at which p10 is barely inside the cheapest fortnight ever seen — on this file
+    // it came out ABOVE the forecast it was supposed to bracket. So out-of-window rows are kept
+    // aside for the band and are invisible to every total, average and forecast below.
+    const inWindow = calcMonths.includes(m);
 
     // Transfers carry no total at all. Both legs are the same money moving between the user's own
     // accounts, so the honest figure is zero — and summing the legs that survive the account filter
@@ -244,7 +249,9 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // rejected — nesting it under a "Transfer" heading inside Expense would only re-assert it.
     const level = sg === TRANSFER_SPENDING_GROUP ? UNCLASSIFIED_SPENDING_GROUP : sg;
     if (!g.sub[level]) g.sub[level] = { totals: {}, sub: {} };
-    if (!g.sub[level].sub[c]) g.sub[level].sub[c] = { totals: {}, items: [] };
+    if (!g.sub[level].sub[c]) g.sub[level].sub[c] = { totals: {}, items: [], bandItems: [] };
+    g.sub[level].sub[c].bandItems.push(t);
+    if (!inWindow) return;
     g.totals[m] = (g.totals[m] || 0) + t.AmountNum;
     g.sub[level].totals[m] = (g.sub[level].totals[m] || 0) + t.AmountNum;
     g.sub[level].sub[c].totals[m] = (g.sub[level].sub[c].totals[m] || 0) + t.AmountNum;
@@ -279,6 +286,15 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     ? Math.min(curDay, cycleDay(calendar.dataThrough, currentCycleStart, cycleLen))
     : curDay;
   const priorMonths = calcMonths.slice(0, -1);
+  /**
+   * The cycles the BAND is measured over: every complete cycle the file holds, whatever the slider
+   * shows. The slider chooses what you look at and what you average; it cannot change how certain
+   * the future is, and reading only the visible window made it do exactly that — at four cycles the
+   * low end of "left to payday" came out R358 ABOVE the forecast, while twenty-four cycles put it
+   * at half. Partial cycles are dropped: the first cycle of an export starts mid-stream, so its
+   * remainder is structurally small and would masquerade as a cheap fortnight.
+   */
+  const bandMonths = allMonths.filter((m) => m < currentMonth && !calendar.isPartial[m]);
   // Each category's "remaining" is projected with the weekly-envelope model, split per Monday-week:
   // elapsed weeks are locked at their actuals (a quiet week stays quiet), the current week tops up
   // to its average, and future weeks carry their averages. Group/Net remaining = sums of these.
@@ -360,7 +376,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     return isRegularAmount([...totals.values()]);
   };
   /** The envelope inputs for one category: its cadence verdict, weekly averages and remaining. */
-  const catEnvelope = (items, flow) => {
+  const catEnvelope = (items, flow, bandItems = items) => {
     const catItems = items.filter((t) => !transferIds.has(t.id));
     const discrete = isDiscreteCadence(catItems, priorMonths, { monthOf });
     const weeklyAvg = buildWeeklyAvg(catItems, priorMonths, starts, dayRanges, { monthOf });
@@ -391,7 +407,13 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // around the forecast is percentiles of these, so the row is measured against its own past
     // rather than against a widened average. Kept per cycle, never as a low/high pair, because
     // percentiles do not add and a parent must combine cycle by cycle — see forecastBand.js.
-    const remainder = remainderPerCycle(catItems, priorMonths, starts, observedDay, { monthOf });
+    const remainder = remainderPerCycle(
+      bandItems.filter((t) => !transferIds.has(t.id)),
+      bandMonths,
+      starts,
+      observedDay,
+      { monthOf },
+    );
     return { discrete, weeklyAvg, weeklyRemaining, nextCycleAvg, remainder };
   };
 
@@ -443,7 +465,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
       // Per-category weekly-envelope remaining, split by cycle-week; total is the sum.
       const envelope = skipExpected
         ? { discrete: false, weeklyAvg: zeroWeeks(), weeklyRemaining: zeroWeeks(), nextCycleAvg: 0 }
-        : catEnvelope(sData.items, flow);
+        : catEnvelope(sData.items, flow, sData.bandItems ?? sData.items);
       const nonTransferItems = sData.items.filter((t) => !transferIds.has(t.id));
       return {
         name: sName,
@@ -462,6 +484,8 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         remainder: envelope.remainder,
         nextCycleAvg: envelope.nextCycleAvg,
         items: sData.items,
+        // Kept off the row's own display: these are only what the band is measured over.
+        bandItems: sData.bandItems ?? sData.items,
         isException: isExceptionGroup,
         skipExpected,
         // Flag-only (no visual, no effect on the estimate): the payment usually lands by
@@ -490,6 +514,7 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
         nextCycleAvg: categories.reduce((s, c) => s + (c.nextCycleAvg ?? 0), 0),
         sub: categories.sort((a, b) => a.name.localeCompare(b.name)),
         items: categories.flatMap((c) => c.items),
+        bandItems: categories.flatMap((c) => c.bandItems ?? c.items),
         isException: isExceptionGroup,
         isSpendingGroup: true,
         skipExpected,
@@ -522,8 +547,8 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
     // Exceptions and transfers forecast nothing, so they get no band either — but an exception's
     // own remainder history is still real, and the Net Total band below needs it to be honest.
     const groupRemainder = remainderPerCycle(
-      gData.items ?? sub.flatMap((x) => x.items ?? []),
-      priorMonths,
+      gData.items ?? sub.flatMap((x) => x.bandItems ?? x.items ?? []),
+      bandMonths,
       starts,
       observedDay,
       { monthOf },

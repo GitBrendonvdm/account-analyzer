@@ -32,7 +32,7 @@ const render = (el) =>
     .replace(/&#x27;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
-    .replace(/[  ]/g, ' ');
+    .replace(/[\u00a0\u202f]/g, ' ');
 
 const props = (over = {}) => ({
   providers: [],

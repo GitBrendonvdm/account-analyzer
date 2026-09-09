@@ -337,3 +337,44 @@ describe.skipIf(!real)('buildExceptionClusters — the one-pass profile matches 
     });
   });
 });
+
+describe.skipIf(!real)('the band ignores the month slider', () => {
+  if (!real) return;
+  const accounts = [...new Set(real?.map((t) => t.Account) ?? [])];
+  // Mid-cycle: 10 Aug is day 19 of the 23 Jul - 22 Aug cycle, so there is a remainder to bracket.
+  const asOf = new Date(2026, 7, 10);
+  const expenseOf = (range) =>
+    (processTransactionData(real, accounts, range, asOf).rows ?? []).find((r) => r.name === 'Expense');
+
+  /**
+   * The slider chooses what you look at and what the app averages. It cannot change how certain
+   * the future is, and it used to: at four cycles the band had three observations, p10 sat barely
+   * inside the cheapest fortnight ever recorded, and the "low" end of what was left to spend came
+   * out ABOVE the forecast it was bracketing. Twenty-four cycles put that same low at half.
+   */
+  it('measures over every complete cycle, however few the reader is looking at', () => {
+    const narrow = expenseOf(4);
+    const wide = expenseOf(25);
+    expect(narrow.remainder.length).toBe(wide.remainder.length);
+    expect(narrow.remainder.length).toBeGreaterThan(15);
+  });
+
+  it('keeps the low end genuinely below the forecast it brackets', () => {
+    const narrow = expenseOf(4);
+    const sorted = [...narrow.remainder].sort((a, b) => a - b);
+    // Spend is negative, so the cheapest fortnight is the last of these.
+    const cheapest = Math.abs(sorted.at(-1));
+    const dearest = Math.abs(sorted[0]);
+    expect(cheapest).toBeLessThan(dearest / 2);
+  });
+
+  it('leaves the visible columns and averages to the slider, untouched', () => {
+    const narrow = expenseOf(4);
+    const wide = expenseOf(25);
+    // The band is wider; the row itself still shows only what was asked for.
+    expect(Object.keys(narrow.totalsByMonth).length).toBeLessThan(
+      Object.keys(wide.totalsByMonth).length,
+    );
+    expect(narrow.avg).not.toBe(wide.avg);
+  });
+});

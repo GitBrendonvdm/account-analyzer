@@ -96,9 +96,10 @@ describe('forecastBand', () => {
     expect(band.high).toBeGreaterThanOrEqual(band.mid);
   });
 
-  it('follows the visible window, which the month slider owns', () => {
-    // The slider governs display and arithmetic together (processTransactionData), so a reader who
-    // narrows to four cycles gets the band those four support rather than none at all.
+  it('will speak from three observations, though it is fed every cycle in the file', () => {
+    // processTransactionData measures the band over every complete cycle regardless of the month
+    // slider — narrowing the view cannot make the future more certain. This floor is what remains
+    // for a file that genuinely holds only a few cycles.
     expect(BAND_MIN_CYCLES).toBe(3);
     const narrow = forecastBand(-5000, -1000, [-1000, -1200, -900]);
     expect(narrow).not.toBeNull();
