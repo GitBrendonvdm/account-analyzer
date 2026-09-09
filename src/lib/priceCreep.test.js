@@ -40,9 +40,14 @@ function line(runs, over = {}) {
     regimes,
     perCycleAmounts,
     cyclesPresent: Math.min(12, observations),
+    status: 'active',
+    ended: false,
     ...over,
   };
 }
+
+/** The complete-cycle list a line's own regimes run over, so its latest price reads as current. */
+const cyclesOf = (l) => cycles(l.observations);
 
 describe('buildPriceCreep', () => {
   it('reads one step and what it costs', () => {
@@ -124,6 +129,36 @@ describe('buildPriceCreep', () => {
     const out = buildPriceCreep([weekly, short]);
     expect(out.rising).toHaveLength(0);
     expect(out.variable).toHaveLength(0);
+  });
+
+  it('leaves out a line that has stopped charging', () => {
+    const live = line([[100, 12], [120, 12]]);
+    expect(buildPriceCreep([live], { cycles: cyclesOf(live) }).rising).toHaveLength(1);
+
+    // Lapsed by the engine, ended by the user: neither is costing anything more a cycle.
+    expect(buildPriceCreep([line([[100, 12], [120, 12]], { status: 'lapsed' })]).rising).toHaveLength(0);
+    expect(buildPriceCreep([line([[100, 12], [120, 12]], { ended: true })]).rising).toHaveLength(0);
+    expect(buildPriceCreep([line([[100, 12], [120, 12]], { ended: true })]).stale).toBe(1);
+  });
+
+  it("leaves out a line whose current price stopped being charged before the recent window", () => {
+    const l = line([[100, 12], [120, 12]]);
+    // The file has run on eight cycles past this line's last charge: the R120 is history.
+    const stale = buildPriceCreep([l], { cycles: cycles(l.observations + 8) });
+    expect(stale.rising).toHaveLength(0);
+    expect(stale.stale).toBe(1);
+    expect(stale.assumptions.join(' ')).toContain('stopped charging');
+
+    // Two cycles behind is within the window — an export a fortnight late must not blank the card.
+    expect(buildPriceCreep([l], { cycles: cycles(l.observations + 2) }).rising).toHaveLength(1);
+  });
+
+  it('gives a slower cadence a window its own rhythm fits inside', () => {
+    const quarterly = line([[100, 6], [130, 6]], { cadence: 'quarterly', perYear: 4 });
+    // Three cycles on from its last charge would be stale for a monthly line; a quarterly one is
+    // simply between charges.
+    expect(buildPriceCreep([quarterly], { cycles: cycles(quarterly.observations + 3) }).rising).toHaveLength(1);
+    expect(buildPriceCreep([quarterly], { cycles: cycles(quarterly.observations + 8) }).rising).toHaveLength(0);
   });
 
   it('needs both the percentage and the rand floor', () => {

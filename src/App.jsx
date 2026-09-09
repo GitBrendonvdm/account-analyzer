@@ -170,6 +170,15 @@ export default function App() {
     usePlanState();
   const settings = useSettings();
 
+  // The user's say over the recurring engine, read before anything that depends on it. `keep` /
+  // `ignore` are the standing-charges audit's own bookkeeping; `cancelled` and `replaced` END a
+  // line, and `lineSettled` marks one cycle of one line as landed — both change what the bills
+  // calendar and the cash path expect, so they go in at the engine rather than on the way out.
+  const storedOverrides = settings.get('lineOverrides', null);
+  const lineOverrides = useMemo(() => storedOverrides ?? {}, [storedOverrides]);
+  const storedSettled = settings.get('lineSettled', null);
+  const lineSettled = useMemo(() => storedSettled ?? {}, [storedSettled]);
+
   // ---- debt: terms off the ledgers, one engine, the plans ----------------------------------
   // These ignore the account chips on purpose: a loan you have switched off is still a loan.
   // Keyed on `data`/`accounts` only, so toggling a chip never recomputes them.
@@ -240,9 +249,12 @@ export default function App() {
   const recurring = useMemo(
     () =>
       data && calendar && transfers
-        ? buildRecurringLines(data, { accounts, calendar, transfers, asOf: today, dataThrough })
+        ? buildRecurringLines(data, {
+            accounts, calendar, transfers, asOf: today, dataThrough,
+            overrides: lineOverrides, settled: lineSettled,
+          })
         : null,
-    [data, accounts, calendar, transfers, today, dataThrough],
+    [data, accounts, calendar, transfers, today, dataThrough, lineOverrides, lineSettled],
   );
   const lines = recurring?.lines ?? null;
   const incomeProfile = useMemo(
@@ -296,13 +308,15 @@ export default function App() {
   );
 
   // ---- the savings finders ------------------------------------------------------------------
-  const storedOverrides = settings.get('lineOverrides', null);
-  const lineOverrides = useMemo(() => storedOverrides ?? {}, [storedOverrides]);
   const subscriptions = useMemo(
     () => (lines && calendar ? buildSubscriptions(lines, { calendar, dataThrough, asOf: today, lineOverrides }) : null),
     [lines, calendar, dataThrough, today, lineOverrides],
   );
-  const priceCreep = useMemo(() => (lines ? buildPriceCreep(lines) : null), [lines]);
+  // The complete cycles are what tells price creep whether a line's current price is still current.
+  const priceCreep = useMemo(
+    () => (lines ? buildPriceCreep(lines, { cycles: recurring?.cycles ?? [] }) : null),
+    [lines, recurring],
+  );
   const drift = useMemo(
     () => (data && calendar && transfers ? buildDrift(data, { transfers, calendar, accounts, selectedAccounts }) : null),
     [data, calendar, transfers, accounts, selectedAccounts],
@@ -328,6 +342,17 @@ export default function App() {
       if (value == null) delete next[lineId];
       else next[lineId] = value;
       settings.set('lineOverrides', next);
+    },
+    [settings],
+  );
+  // "This one did land" — stored as the cycle it landed in, not a boolean, so the verdict expires
+  // by itself when the next cycle opens and the engine gets to judge the charge on its own again.
+  const setLineSettled = useCallback(
+    (lineId, cycle) => {
+      const next = { ...(settings.get('lineSettled', null) ?? {}) };
+      if (cycle == null) delete next[lineId];
+      else next[lineId] = cycle;
+      settings.set('lineSettled', next);
     },
     [settings],
   );
@@ -484,6 +509,11 @@ export default function App() {
                   upcoming={upcoming}
                   cashPath={cashPath}
                   incomeProfile={incomeProfile}
+                  currentCycle={calendar?.currentMonth ?? null}
+                  lineOverrides={lineOverrides}
+                  lineSettled={lineSettled}
+                  onSettleLine={setLineSettled}
+                  onEndLine={setLineOverride}
                   onOpenAccounts={() => setActiveTab('accounts')}
                 />
               )}

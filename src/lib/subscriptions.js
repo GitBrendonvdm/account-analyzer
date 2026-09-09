@@ -23,9 +23,15 @@ import { isInternalMovementCategory } from './transfers';
  * only saving the app can actually prove; and the lines whose price dropped, for the same reason.
  *
  * The user's own verdicts come in through `lineOverrides`: `keep` takes a line out of every
- * savings total without hiding it, `cancelled` moves an active line into the wins as of today, and
- * `ignore` removes it from the audit altogether (a line the engine got wrong). Instalments and
- * card repayments are reported — they are lines too — but never counted as something to cancel.
+ * savings total without hiding it, `cancelled` moves an active line into the wins as of today,
+ * `replaced` says it has stopped but something else charges instead (a new insurer) so it leaves
+ * the totals without claiming a saving, and `ignore` removes it from the audit altogether (a line
+ * the engine got wrong). Instalments and card repayments are reported — they are lines too — but
+ * never counted as something to cancel.
+ *
+ * `cancelled` and `replaced` also reach recurring.js, which marks those lines `ended`: no next
+ * date, never due, gone from the bills calendar. That is why a `replaced` line can be both active
+ * here and absent from Coming up.
  */
 
 const R = (n) => formatCurrencyAbs(n);
@@ -112,7 +118,7 @@ function trialConvertedOf(line) {
  *   calendar:      buildCycleCalendar(data, allMonths, asOf)
  *   dataThrough:   Date (defaults to the calendar's)
  *   asOf:          Date (defaults to dataThrough) — the day a `cancelled` override takes effect
- *   lineOverrides: { [lineId]: 'keep'|'cancelled'|'ignore' } (settings.lineOverrides)
+ *   lineOverrides: { [lineId]: 'keep'|'cancelled'|'replaced'|'ignore' } (settings.lineOverrides)
  * @returns {{
  *   lines: RecurringLine[],                      // active, not tentative, override ≠ ignore; `override` attached; perCycle desc
  *   byKind: { [kind]: { count, perCycle, perYear } },   // optional insurance fee utility instalment repayment person other

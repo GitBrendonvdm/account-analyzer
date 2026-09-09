@@ -1,4 +1,5 @@
 import {
+  PRICE_BASE_REGIME_MIN,
   PRICE_CREEP_MIN_CYCLES,
   PRICE_STEP_MIN_PCT,
   PRICE_STEP_MIN_RAND,
@@ -17,11 +18,18 @@ import { theilSen } from './stats';
  * the staircase of its regimes. This module reads that staircase: first price, last price, the
  * steps between, and what the difference costs a cycle.
  *
- * Two guards keep it honest. A regime seen only once is not a price — it is a one-off, an outlier
+ * Three guards keep it honest. A regime seen only once is not a price — it is a one-off, an outlier
  * the engine kept for presence — so only regimes with two or more observations are steps, and a
  * line where most observations are singletons (the pharmacy, the fuel station) is set aside as
  * "varies too much to compare" rather than reported as creeping. And the instalments are listed
  * but never totalled: the bond's instalment fell with every rate cut, which is not a price.
+ *
+ * The third guard is time. "The same things cost more" is a claim about what you are paying NOW,
+ * so a line has to still be charging to make it: one you cancelled two years ago, or a gym you
+ * left, is not costing you anything more a cycle and listing it was the single most confusing
+ * thing this module did. A line qualifies when the engine still calls it active, the user has not
+ * ended it, and its CURRENT price has been charged inside the recent window — long enough to cover
+ * the line's own rhythm, so a quarterly or annual charge is not called stale between charges.
  */
 
 const R = (n) => formatCurrencyAbs(n);
@@ -29,12 +37,17 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const CREEP_CADENCES = new Set(['monthly', 'bimonthly', 'quarterly', 'annual']);
 const DEBT_KINDS = new Set(['instalment', 'repayment']);
 /**
- * The price "when you started" must itself have been charged this many times. Two charges are a
- * pro-rata first month or a trial, and anchoring on them turned a 13% increase into a 193% one on
- * the real data; a later step may still be fresh (two charges at the new price is a step worth
- * reporting — the account fee that doubled last cycle), so only the base is held to it.
+ * How recently the current price must have been charged, in complete cycles. Three covers a
+ * monthly line that has skipped one and an export a fortnight behind; slower cadences get their
+ * own gap plus one, so a quarterly line needs four cycles and an annual one thirteen.
  */
-const BASE_REGIME_MIN_COUNT = 3;
+const RECENT_CYCLES_MIN = 3;
+/**
+ * The base rule, shared with recurring.js's inline badge (see PRICE_BASE_REGIME_MIN). A later step
+ * may still be fresh — two charges at the new price is a step worth reporting, the account fee that
+ * doubled last cycle — so only the base is held to it.
+ */
+const BASE_REGIME_MIN_COUNT = PRICE_BASE_REGIME_MIN;
 
 function cycleLabel(key) {
   if (!key) return '';
@@ -44,11 +57,22 @@ function cycleLabel(key) {
 
 const pctLabel = (pct) => `${pct >= 0 ? '+' : '−'}${Math.round(Math.abs(pct) * 100)}%`;
 
+/** The window, in complete cycles, inside which this line's latest price must have been charged. */
+function recentCyclesFor(line) {
+  const perYear = line.perYear > 0 ? line.perYear : 12;
+  return Math.max(RECENT_CYCLES_MIN, Math.ceil(12 / perYear) + 1);
+}
+
 /**
  * @param {RecurringLine[]} lines  from buildRecurringLines
+ * @param {object} options
+ *   cycles: string[] — the complete pay-cycle keys, oldest first (completeMonths(calendar)). Given
+ *     them, a line whose current price stopped being charged before the window is left out; without
+ *     them the check falls back to the engine's own active/ended flags alone.
  * @returns {{
  *   rising: CreepItem[], falling: CreepItem[],
  *   variable: [{ lineId, label, kind, singletonShare }],   // too many one-off amounts to compare
+ *   stale,                                                 // lines skipped for no longer charging
  *   extraPerCycle, extraPerYear,                           // Σ rising, instalments and repayments left out
  *   sentence, variableSentence, assumptions: string[],
  * }}
@@ -57,13 +81,20 @@ const pctLabel = (pct) => `${pct >= 0 ? '+' : '−'}${Math.round(Math.abs(pct) *
  *               slopePerYear, cyclesObserved, countsInTotal, sentence }
  * `extraPerCycle` on a falling item is negative (what the drop saves a cycle).
  */
-export function buildPriceCreep(lines) {
+export function buildPriceCreep(lines, options = {}) {
+  const cycles = options.cycles ?? [];
   const rising = [];
   const falling = [];
   const variable = [];
+  let stale = 0;
 
   (lines ?? []).forEach((line) => {
     if (!CREEP_CADENCES.has(line.cadence) || (line.cyclesPresent ?? 0) < PRICE_CREEP_MIN_CYCLES) return;
+    // Gone, by the engine's reckoning or by the user's.
+    if (line.status !== 'active' || line.ended) {
+      stale += 1;
+      return;
+    }
     const regimes = line.regimes ?? [];
     const singletons = regimes.filter((r) => r.count < 2).reduce((s, r) => s + r.count, 0);
     const singletonShare = line.observations ? ((line.outliers ?? 0) + singletons) / line.observations : 0;
@@ -79,6 +110,14 @@ export function buildPriceCreep(lines) {
     const run = kept.slice(baseIndex);
     const first = run[0];
     const last = run[run.length - 1];
+    // The current price has to be current. `last.to` is the newest cycle that price was charged in.
+    if (cycles.length) {
+      const cutoff = cycles[Math.max(0, cycles.length - recentCyclesFor(line))];
+      if (!last.to || last.to < cutoff) {
+        stale += 1;
+        return;
+      }
+    }
     const steps = run.slice(1).map((r, i) => ({
       cycle: r.from,
       from: run[i].amount,
@@ -134,9 +173,12 @@ export function buildPriceCreep(lines) {
     extraPerYear: extraPerCycle * 12,
     sentence: `The same things cost ${R(extraPerCycle)} more a cycle than when you started — ${R(extraPerCycle * 12)} a year.`,
     variableSentence: `${variable.length} line${variable.length === 1 ? '' : 's'} vary too much to compare`,
+    stale,
     assumptions: [
       'Instalments, card repayments and interest lines are listed but never totalled: a rate move is not a price.',
       `The starting price is the first amount charged at least ${BASE_REGIME_MIN_COUNT} times; a one- or two-off opening charge is not a price.`,
+      'Only lines still charging count: a price you no longer pay is not costing you more.',
+      ...(stale ? [`${stale} line${stale === 1 ? '' : 's'} left out for having stopped charging.`] : []),
     ],
   };
 }

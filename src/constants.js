@@ -113,6 +113,13 @@ export const SELF_ANCHOR_FIRST_ROWS = 5;
 export const AMOUNT_CLUSTER_MIN_GAP = 2;
 export const AMOUNT_CLUSTER_TOLERANCE = 0.025;
 export const REGIME_CHAIN_MAX_GAP_DAYS = 45;
+/**
+ * A price you started on must itself have been charged this many times. Two charges are a
+ * pro-rata first month or a trial, and anchoring on one turned a 13% rise into a 193% one on the
+ * real export. Both the recurring engine's inline "+x% since" badge and the price-creep list hold
+ * their BASE regime to it, so the two can never quote a different increase for the same line.
+ */
+export const PRICE_BASE_REGIME_MIN = 3;
 export const PRICE_STEP_MIN_PCT = 0.04;
 export const PRICE_STEP_MIN_RAND = 10;
 export const RECURRING_PRESENCE_WINDOW = 12;

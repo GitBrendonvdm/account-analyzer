@@ -111,7 +111,10 @@ export function buildUpcoming(lines, options = {}) {
   const from = addDays(dataThrough, 1);
   const to = addDays(asOf, days);
 
-  const active = (lines ?? []).filter((line) => line.status === 'active' && !line.tentative);
+  // `ended` is the user's verdict from the Coming-up card: a line they have told the app has
+  // stopped charging (cancelled, or the provider swapped). It keeps its history everywhere else;
+  // here it simply no longer has a future, so it can neither be scheduled nor read as overdue.
+  const active = (lines ?? []).filter((line) => line.status === 'active' && !line.tentative && !line.ended);
   const byDate = new Map();
   const entryFor = (date) => {
     const key = dayKey(date);

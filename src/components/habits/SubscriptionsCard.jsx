@@ -15,7 +15,10 @@ import { formatCurrencyAbs } from '../../utils/format';
  * The override chips are how the user corrects the engine without touching the data: "keep" takes
  * a line out of the savings total (it is wanted), "not a subscription" removes it from the audit
  * altogether (the engine mistook a habit for a contract), "cancelled" moves it to the wins as of
- * today so that the saving is counted before the bank has stopped charging. They persist through
+ * today so that the saving is counted before the bank has stopped charging, and "replaced" says it
+ * has stopped but something else charges instead — a new insurer — so it leaves the totals without
+ * claiming a saving that was never made. The last two also end the line in the recurring engine, so
+ * it stops appearing on the bills calendar and in the cash path. They persist through
  * settings.lineOverrides, so a decision survives the next import.
  *
  * Sixty lines with a step chart each made the page twelve thousand pixels tall, so the card opens on
@@ -52,6 +55,7 @@ const OVERRIDES = [
   { value: 'keep', label: 'keep' },
   { value: 'ignore', label: 'not a subscription' },
   { value: 'cancelled', label: 'cancelled' },
+  { value: 'replaced', label: 'replaced' },
 ];
 const STATUS_TONE = { landed: 'text-good', due: 'text-label-3', overdue: 'text-warn', unobservable: 'text-label-3' };
 const STATUS_LABEL = { landed: 'landed', due: 'due', overdue: 'overdue', unobservable: 'not yet in the data' };

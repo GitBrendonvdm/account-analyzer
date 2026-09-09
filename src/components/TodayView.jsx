@@ -139,6 +139,11 @@ export function TodayView({
   upcoming,
   cashPath,
   incomeProfile,
+  currentCycle = null,
+  lineOverrides = null,
+  lineSettled = null,
+  onSettleLine = null,
+  onEndLine = null,
   onOpenLedger,
   onOpenAccounts,
 }) {
@@ -225,7 +230,15 @@ export function TodayView({
 
       {showTimeline && (
         <div className="grid gap-5 lg:grid-cols-2 3xl:col-span-12">
-          <UpcomingCard upcoming={upcoming} dataThrough={summary.dataThrough} />
+          <UpcomingCard
+            upcoming={upcoming}
+            dataThrough={summary.dataThrough}
+            currentCycle={currentCycle}
+            lineOverrides={lineOverrides}
+            lineSettled={lineSettled}
+            onSettleLine={onSettleLine}
+            onEndLine={onEndLine}
+          />
           <ChartSwitcher
             cashPath={cashPath}
             incomeProfile={incomeProfile}

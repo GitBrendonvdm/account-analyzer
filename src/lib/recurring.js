@@ -6,6 +6,7 @@ import {
   LAPSED_GAP_FACTOR,
   LAPSED_IRREGULAR_DAYS,
   LOAN_CATEGORIES,
+  PRICE_BASE_REGIME_MIN,
   PRICE_STEP_MIN_PCT,
   PRICE_STEP_MIN_RAND,
   RECURRING_MIN_PRESENCE_MONTHLY,
@@ -57,6 +58,16 @@ import { dispersion, median, mode, quantile } from './stats';
  *
  * Line ids are `key|accountId|bandIndex` and never a row id: a row's `id` is positional and
  * re-assigned on every load, while a merchant, an account and a price band survive an import.
+ *
+ * THE USER OUTRANKS THE ENGINE. Two things the data cannot show arrive as options. `settled`
+ * ({ lineId: 'YYYY-MM' }) is the user saying "this cycle's charge did land" — the home loan that
+ * came off as two odd payments the matcher could not pair to one predicted date, which the engine
+ * would otherwise keep calling overdue forever. `overrides` carries the verdicts from the
+ * standing-charges audit, of which two END a line: `cancelled` (stopped, and the money is saved)
+ * and `replaced` (stopped, but something else now charges instead — a new insurer, so no saving to
+ * claim). An ended line keeps its history and its place in the audit, but has no next date, is
+ * never due and never overdue, and is gone from the bills calendar and the cash path. `ignore` and
+ * `keep` are the audit's own business and do not reach the calendar.
  */
 
 /** Descriptions of cover and fees charged INSIDE a loan account, where no category marks them. */
@@ -86,6 +97,8 @@ const OPTIONAL_RE = /\.com|\.ai|google|apple|microsoft|netflix|spotify|youtube|s
 const DAY_MS = 86400000;
 const WEEKLY_LIKE = new Set(['weekly', 'fortnightly']);
 const LOAN_CATEGORY_SET = new Set(LOAN_CATEGORIES);
+/** The verdicts that stop a line charging. Everything else is the audit's own bookkeeping. */
+export const ENDING_OVERRIDES = new Set(['cancelled', 'replaced']);
 
 const dateOf = (t) => t.DateObj ?? parseTransactionDate(t.Date);
 const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -334,10 +347,20 @@ function regimeOf(cluster) {
   };
 }
 
+/**
+ * The line's price then versus now, for the "+29% since Jul 26" badge on the audit.
+ *
+ * The base has to be a price the line actually settled at — PRICE_BASE_REGIME_MIN charges, the
+ * same bar priceCreep.js holds its own base to. Without it a pro-rata opening month or a trial
+ * became the "from", and the badge and the price-creep list quoted two different increases for the
+ * same line. A later step is not held to it: two charges at a new price is a real step.
+ */
 function priceChangeOf(regimes) {
   const multi = regimes.filter((r) => r.count >= 2);
   if (multi.length < 2) return null;
-  const first = multi[0];
+  const baseIndex = multi.findIndex((r) => r.count >= PRICE_BASE_REGIME_MIN);
+  if (baseIndex < 0 || baseIndex === multi.length - 1) return null;
+  const first = multi[baseIndex];
   const last = multi[multi.length - 1];
   if (first.amount <= 0) return null;
   const pct = last.amount / first.amount - 1;
@@ -423,7 +446,7 @@ function cycleStatusOf({ dates, cadence, dom, shift, currentStart, currentEnd, d
 }
 
 function describeLine(line, group, bandIndex, ctx) {
-  const { calendar, cycles, dataThrough, asOf, currentStart, currentEnd } = ctx;
+  const { calendar, cycles, dataThrough, asOf, currentStart, currentEnd, currentMonth, overrides, settled } = ctx;
   const regular = line.clusters.flatMap((c) => c.obs);
   const all = [...regular, ...line.outliers].sort((a, b) => a.date - b.date);
   const dates = all.map((o) => o.date);
@@ -517,6 +540,16 @@ function describeLine(line, group, bandIndex, ctx) {
   if (group.source === 'repayment' && level === 'high') level = 'medium';
   if (tentative) level = 'low';
 
+  // The user's verdict, applied last so it overrules everything the engine just worked out.
+  // Ending a line leaves its history intact — the audit still lists it, and the wins card still
+  // reads `override` — but takes it off every forward-looking calendar.
+  const id = `${group.identity}|${group.accountId}|${bandIndex}`;
+  const override = overrides?.[id] ?? null;
+  const ended = ENDING_OVERRIDES.has(override);
+  const settledCycle = settled?.[id] ?? null;
+  const settledByUser = Boolean(currentMonth && settledCycle === currentMonth);
+  const cycleStatus = ended ? null : settledByUser ? 'landed' : judged.cycleStatus;
+
   const category = mode(rows.map((t) => t.Category ?? ''));
   const spendingGroup = mode(rows.map((t) => spendingGroupOf(t)));
   const description = mode(rows.map((t) => (t.Description ?? '').toString())) ?? '';
@@ -533,7 +566,7 @@ function describeLine(line, group, bandIndex, ctx) {
 
   const sample = all[0];
   return {
-    id: `${group.identity}|${group.accountId}|${bandIndex}`,
+    id,
     key: group.key,
     label,
     source: group.source,
@@ -569,11 +602,15 @@ function describeLine(line, group, bandIndex, ctx) {
     domIqr,
     gapIqr,
     weekendShift,
-    nextDate,
-    dueCycle,
-    dueThisCycle,
+    nextDate: ended ? null : nextDate,
+    dueCycle: ended ? null : dueCycle,
+    dueThisCycle: ended ? false : dueThisCycle,
     status,
-    cycleStatus: judged.cycleStatus,
+    ended,
+    endedReason: ended ? override : null,
+    override,
+    settledByUser,
+    cycleStatus,
     landedKey: judged.landedKey,
     confidence,
     level,
@@ -586,12 +623,15 @@ function describeLine(line, group, bandIndex, ctx) {
  * @param data       every row (all accounts)
  * @param options    accounts: AccountRecord[]; calendar: buildCycleCalendar(data, allMonths, asOf);
  *                   transfers: buildFullTransfers(data); asOf: Date; dataThrough: Date (defaults to
- *                   the calendar's); includeRepayments = true
+ *                   the calendar's); includeRepayments = true;
+ *                   overrides: { [lineId]: 'keep'|'ignore'|'cancelled'|'replaced' } (settings.lineOverrides);
+ *                   settled: { [lineId]: 'YYYY-MM' } (settings.lineSettled) — cycles the user has
+ *                   confirmed landed, for charges that arrived in a shape the matcher cannot pair
  * @returns {{ lines: RecurringLine[], explained: Set<Transaction>, cycles: string[] }}
  *   `lines` sorted by perCycle descending; `cycles` = the complete cycles the presence window draws on.
  */
 export function buildRecurringLines(data, options = {}) {
-  const { accounts = null, calendar, transfers, includeRepayments = true } = options;
+  const { accounts = null, calendar, transfers, includeRepayments = true, overrides = null, settled = null } = options;
   const empty = { lines: [], explained: new Set(), cycles: [] };
   if (!data?.length || !calendar?.starts || !transfers) return empty;
   const dataThrough = toDay(options.dataThrough ?? calendar.dataThrough);
@@ -604,8 +644,11 @@ export function buildRecurringLines(data, options = {}) {
     cycles,
     dataThrough,
     asOf,
+    currentMonth,
     currentStart: currentMonth ? calendar.starts[currentMonth] : null,
     currentEnd: currentMonth ? calendar.ends[currentMonth] : null,
+    overrides,
+    settled,
   };
 
   const groups = identify(candidates(data, { transfers, accounts, includeRepayments }));
@@ -629,7 +672,10 @@ export function buildRecurringLines(data, options = {}) {
   return { lines, explained, cycles };
 }
 
-/** The subset due in [from, to] (Dates, inclusive) by nextDate, ascending; used by upcoming.js and cashToPayday.js. */
+/**
+ * The subset due in [from, to] (Dates, inclusive) by nextDate, ascending; used by upcoming.js and
+ * cashToPayday.js. Ended lines carry no nextDate, so they fall out here without a second check.
+ */
 export function linesDueBetween(lines, from, to) {
   const lo = toDay(from);
   const hi = toDay(to);

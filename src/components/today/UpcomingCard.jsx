@@ -14,6 +14,14 @@ import { formatCurrencyAbs } from '../../utils/format';
  * Overdue lines go first: "usually landed by now and hasn't" is the thing most worth noticing.
  * When the export is older than today, charges due in that gap are marked "not yet in the data"
  * rather than overdue, because the bank has probably paid them and the file simply stops short.
+ *
+ * An overdue line is also the one place the engine is most often wrong in a way only the reader
+ * can fix, so each one carries three verdicts. "Paid" is for a charge that landed in a shape the
+ * matcher could not pair to one predicted date — a home loan taken as two odd debits — and settles
+ * just this cycle, so next cycle the engine judges it afresh. "Stopped" and "Replaced" both retire
+ * the line: no next date, gone from this calendar and from the cash path. They differ only in what
+ * they claim — "Stopped" is money saved and shows up in the wins; "Replaced" is a new insurer at a
+ * new price, where claiming a saving would be a lie.
  */
 
 const DAY_MS = 86400000;
@@ -54,20 +62,78 @@ function StatusChip({ status, days }) {
   return <span className={`shrink-0 rounded bg-fill px-1.5 py-0.5 text-[12px] ${tone}`}>{text}</span>;
 }
 
-function ItemRow({ label, amount, level, status, days, account }) {
+function ItemRow({ label, amount, level, status, days, account, children }) {
   return (
-    <li className="flex items-center gap-3 py-1.5 text-[14px]">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 py-1.5 text-[14px]">
       <Mark level={level} />
       <span className="min-w-0 flex-grow truncate text-label-2" title={account ? `${label} · ${account}` : label}>
         {label}
       </span>
       <StatusChip status={status} days={days} />
       <span className="num shrink-0 font-medium">{formatCurrencyAbs(amount)}</span>
+      {children}
     </li>
   );
 }
 
-export function UpcomingCard({ upcoming, dataThrough, className = '' }) {
+const VERDICTS = [
+  { id: 'paid', label: 'Paid', hint: 'It landed — this cycle only' },
+  { id: 'cancelled', label: 'Stopped', hint: "Cancelled — it isn't coming back" },
+  { id: 'replaced', label: 'Replaced', hint: 'Switched provider — no saving to claim' },
+];
+
+/**
+ * The three verdicts, as one chip group per overdue line.
+ *
+ * They sit on their own row below `sm` at a 44px height so a thumb can land on one, and shrink to
+ * the inline group the desktop has elsewhere in the app (see SubscriptionsCard's OverrideControl,
+ * which this deliberately matches — the same decision reached from two places should look the
+ * same). Pressing an active chip clears the verdict, so a mis-tap is one tap to undo.
+ */
+function VerdictChips({ line, settledCycle, override, onSettle, onEnd }) {
+  if (!onSettle && !onEnd) return null;
+  const active = settledCycle ? 'paid' : override;
+  const press = (id) => {
+    if (id === 'paid') return onSettle?.(line.id, active === 'paid' ? null : 'settle');
+    return onEnd?.(line.id, active === id ? null : id);
+  };
+  return (
+    <span
+      className="glass-chip flex w-full gap-0.5 p-0.5 sm:w-auto sm:shrink-0"
+      role="group"
+      aria-label={`What happened to ${line.label}`}
+    >
+      {VERDICTS.map((v) => {
+        const on = active === v.id;
+        return (
+          <button
+            key={v.id}
+            type="button"
+            aria-pressed={on}
+            title={v.hint}
+            onClick={() => press(v.id)}
+            className={`press min-h-11 flex-auto rounded-full px-2.5 py-1 text-[12px] whitespace-nowrap sm:min-h-0 sm:flex-none sm:text-[11px] ${
+              on ? 'bg-fill-2 font-semibold text-label' : 'text-label-3 hover:text-label'
+            }`}
+          >
+            {v.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+export function UpcomingCard({
+  upcoming,
+  dataThrough,
+  currentCycle = null,
+  lineOverrides = null,
+  lineSettled = null,
+  onSettleLine = null,
+  onEndLine = null,
+  className = '',
+}) {
   if (!upcoming) return null;
 
   const horizonFrom = toDate(upcoming.horizon?.from);
@@ -81,6 +147,9 @@ export function UpcomingCard({ upcoming, dataThrough, className = '' }) {
     const due = toDate(line.nextDate);
     return due && lastObserved ? Math.max(0, daysBetween(due, lastObserved)) : null;
   };
+  // "Paid" settles the CURRENT cycle, so the writer needs its key. Without one — a file with no
+  // complete cycle yet — the chips would have nothing to write, so they stay off.
+  const settle = currentCycle && onSettleLine ? (id, verdict) => onSettleLine(id, verdict ? currentCycle : null) : null;
 
   return (
     <Card className={`materialize flex flex-col p-5 sm:p-8 ${className}`}>
@@ -92,6 +161,13 @@ export function UpcomingCard({ upcoming, dataThrough, className = '' }) {
       {overdue.length > 0 && (
         <div className="mt-6">
           <div className="t-label text-warn">Usually landed by now</div>
+          {(settle || onEndLine) && (
+            <p className="t-caption mt-1">
+              Tell the app what happened: <b className="font-semibold text-label-2">Paid</b> if it landed in an
+              odd shape this cycle, <b className="font-semibold text-label-2">Stopped</b> if it is cancelled,{' '}
+              <b className="font-semibold text-label-2">Replaced</b> if something else charges instead.
+            </p>
+          )}
           <ul className="mt-1.5 flex flex-col">
             {overdue.map((line) => (
               <ItemRow
@@ -101,7 +177,15 @@ export function UpcomingCard({ upcoming, dataThrough, className = '' }) {
                 level={line.level}
                 status="overdue"
                 days={overdueDays(line)}
-              />
+              >
+                <VerdictChips
+                  line={line}
+                  settledCycle={lineSettled?.[line.id] ?? null}
+                  override={lineOverrides?.[line.id] ?? null}
+                  onSettle={settle}
+                  onEnd={onEndLine}
+                />
+              </ItemRow>
             ))}
           </ul>
         </div>

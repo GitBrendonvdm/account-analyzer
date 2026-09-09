@@ -60,7 +60,10 @@ function anchors(through) {
 }
 
 /** Build lines from fixture rows. Returns the engine's result plus the non-anchor lines. */
-function build(rows, { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true } = {}) {
+function build(
+  rows,
+  { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true, overrides, settled } = {},
+) {
   const data = [...anchors(through), ...rows].map((r, i) => ({ ...r, id: i, key: r.key ?? `k${i}` }));
   const months = [...new Set(data.map((t) => t['Pay Month']))].sort();
   const calendar = buildCycleCalendar(data, months, asOf);
@@ -72,6 +75,8 @@ function build(rows, { through = '2026-08-18', asOf = new Date(2026, 7, 22), inc
     asOf,
     dataThrough: new Date(y, m - 1, d),
     includeRepayments,
+    overrides,
+    settled,
   });
   return { ...result, data, calendar, lines: result.lines.filter((l) => l.key !== 'checkers') };
 }
@@ -273,6 +278,46 @@ describe('buildRecurringLines', () => {
     // Before the predicted date, and before today: simply due.
     const due = build(rows, { through: '2026-08-08', asOf: new Date(2026, 7, 9) });
     expect(due.lines[0].cycleStatus).toBe('due');
+  });
+
+  it("6b. the user's 'paid' verdict settles the current cycle only", () => {
+    const rows = monthly('2026-01', 7, { day: 10 }).map((d) => row(d, 'Vodacom', BANK, -899));
+    const base = build(rows, { through: '2026-08-14' });
+    const id = base.lines[0].id;
+    expect(base.lines[0].cycleStatus).toBe('overdue');
+
+    const settled = build(rows, { through: '2026-08-14', settled: { [id]: '2026-08' } });
+    expect(settled.lines[0].cycleStatus).toBe('landed');
+    expect(settled.lines[0].settledByUser).toBe(true);
+    // Still a live line: the verdict is about one cycle, not about the contract.
+    expect(settled.lines[0].ended).toBe(false);
+    expect(iso(settled.lines[0].nextDate)).toBe('2026-08-10');
+
+    // A verdict left over from an earlier cycle does not carry into this one.
+    const stale = build(rows, { through: '2026-08-14', settled: { [id]: '2026-07' } });
+    expect(stale.lines[0].cycleStatus).toBe('overdue');
+  });
+
+  it("6c. 'cancelled' and 'replaced' end a line; 'keep' leaves it alone", () => {
+    const rows = monthly('2026-01', 7, { day: 10 }).map((d) => row(d, 'Vodacom', BANK, -899));
+    const id = build(rows, { through: '2026-08-14' }).lines[0].id;
+
+    for (const verdict of ['cancelled', 'replaced']) {
+      const { lines } = build(rows, { through: '2026-08-14', overrides: { [id]: verdict } });
+      expect(lines[0].ended).toBe(true);
+      expect(lines[0].endedReason).toBe(verdict);
+      expect(lines[0].nextDate).toBeNull();
+      expect(lines[0].dueThisCycle).toBe(false);
+      expect(lines[0].cycleStatus).toBeNull();
+      // The history survives: the audit still has a line to show and a total to correct.
+      expect(lines[0].status).toBe('active');
+      expect(lines[0].observations).toBe(7);
+      expect(linesDueBetween(lines, new Date(2026, 7, 1), new Date(2026, 8, 30))).toHaveLength(0);
+    }
+
+    const kept = build(rows, { through: '2026-08-14', overrides: { [id]: 'keep' } });
+    expect(kept.lines[0].ended).toBe(false);
+    expect(kept.lines[0].cycleStatus).toBe('overdue');
   });
 
   it('7. budget-facility direct payments are not candidates, so the instalment is one line', () => {
