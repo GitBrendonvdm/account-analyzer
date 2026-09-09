@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
 import { RowIcon } from './RowIcon';
@@ -9,7 +8,7 @@ import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
 import { WeekCells } from './WeekCells';
-import { ForecastCell } from './ForecastCell';
+import { ForecastCell, RemainingCell } from './ForecastCell';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
 export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
@@ -60,7 +59,7 @@ export function TableGroup({ group, months, sort, cycleWeeks, columns, txnOverri
           pad="p-4"
         />
         <td className="p-4 text-right font-semibold text-info">
-          {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
+          {group.isException || group.isTransfer ? '' : <RemainingCell item={group} months={months} />}
         </td>
         {/* Transfers net to zero and have no flow to forecast. Exceptions do: a one-off already
             charged is part of where this cycle closes, and leaving it blank stopped the column

@@ -1,6 +1,6 @@
-import { formatCurrencyAbs } from '../../utils/format';
 import { forecastBand } from '../../lib/forecastBand';
 import { Cell } from './Cell';
+import { RangeUnder } from './RangeUnder';
 import { bandWorthShowing, forecastOf, soFarOf } from './forecast';
 
 /**
@@ -19,23 +19,37 @@ export function ForecastCell({ item, months, absolute = true }) {
   const mid = forecastOf(item, months);
   if (mid == null) return null;
   const band = forecastBand(soFarOf(item, months), item?.expected ?? 0, item?.remainder);
-  const show = bandWorthShowing(band, mid);
-  // The band is ordered by VALUE, but the cell prints magnitudes: on a spend row the lower value
-  // is the bigger number, so printing them in band order gave "R 7 300–R 6 925" — a range running
-  // backwards. Order the pair the way it will actually be read.
-  const [from, to] = show && absolute
-    ? [Math.min(Math.abs(band.low), Math.abs(band.high)), Math.max(Math.abs(band.low), Math.abs(band.high))]
-    : [band?.low, band?.high];
   return (
     <span className="inline-flex flex-col items-end">
       <Cell val={mid} absolute={absolute} />
-      {show && (
-        <span
-          className="num text-[11px] leading-tight font-normal text-label-4"
-          title={`Over the last ${band.cycles} cycles this row ran between ${formatCurrencyAbs(from)} and ${formatCurrencyAbs(to)} from this point in the cycle${band.midOutside ? '. The forecast falls outside that, so the range is stretched to reach it' : ''}.`}
-        >
-          {formatCurrencyAbs(from)}–{formatCurrencyAbs(to)}
-        </span>
+      {bandWorthShowing(band) && (
+        <RangeUnder
+          from={band.low}
+          to={band.high}
+          cycles={band.cycles}
+          signed={!absolute}
+          note={band.midOutside ? 'The forecast falls outside that, so the range is stretched to reach it' : null}
+        />
+      )}
+    </span>
+  );
+}
+
+/**
+ * The "left to payday" cell, with its own range.
+ *
+ * This is the more actionable of the two forecast figures and the one most obviously not a promise:
+ * nobody can say a fortnight will cost exactly R22 991. It is the same band with what has already
+ * landed taken back off.
+ */
+export function RemainingCell({ item, months, absolute = true, className = '' }) {
+  const remaining = item?.expected ?? 0;
+  const band = forecastBand(soFarOf(item, months), remaining, item?.remainder);
+  return (
+    <span className={`inline-flex flex-col items-end ${className}`}>
+      <Cell val={remaining} absolute={absolute} />
+      {bandWorthShowing(band) && (
+        <RangeUnder from={band.remainingLow} to={band.remainingHigh} cycles={band.cycles} signed={!absolute} />
       )}
     </span>
   );

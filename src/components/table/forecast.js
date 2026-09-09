@@ -38,16 +38,17 @@ export function soFarOf(item, months) {
 }
 
 /**
- * Is this row's band worth the ink? A rent line that has been R12 000 every cycle for a year does
- * not need telling you it will probably be R12 000, and sixty such lines would bury the ones that
- * genuinely could go either way. Both floors have to clear: an absolute one so small rows stay
- * quiet, and a share of the figure so large ones are not called precise for being large.
+ * Every forecast that HAS a range shows it.
+ *
+ * This used to suppress ranges it judged too narrow to be worth the ink — a rent line that has been
+ * R12 000 for a year does not need telling you it will probably be R12 000. That reasoning was
+ * wrong, and the reader said so plainly: a figure with no range beside it reads as a promise, and
+ * "R22 991 for the rest of the month" is not a thing anyone can promise. A tight range is not
+ * noise, it is the answer — it says this one really is predictable, which is worth knowing about a
+ * rent line precisely because it is not true of the groceries above it.
+ *
+ * What remains is the honest floor: too few cycles to have a range at all (BAND_MIN_CYCLES).
  */
-export const BAND_MIN_SPREAD = 200;
-export const BAND_MIN_SHARE = 0.04;
-
-export function bandWorthShowing(band, mid) {
-  if (!band) return false;
-  const spread = Math.abs(band.high - band.low);
-  return spread > BAND_MIN_SPREAD && spread > BAND_MIN_SHARE * Math.abs(mid ?? 0);
+export function bandWorthShowing(band) {
+  return Boolean(band);
 }

@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { formatCurrencyAbs } from '../../utils/format';
 import { sortTableItems } from '../../lib/tableSort';
 import { Cell } from './Cell';
 import { RowIcon } from './RowIcon';
 import { getSpendingGroupIconConfig } from './rowIcons';
 import { TableSubcategory } from './TableSubcategory';
 import { WeekCells } from './WeekCells';
-import { ForecastCell } from './ForecastCell';
+import { ForecastCell, RemainingCell } from './ForecastCell';
+import { RowOverrideEditor } from './RowOverrideEditor';
+import { overrideBadge, sharedOverride } from '../../lib/txnOverrides';
+import { EditToggle } from './EditToggle';
 import { PIN_FILL } from './stickyColumn';
 
 /**
@@ -16,6 +18,13 @@ import { PIN_FILL } from './stickyColumn';
  */
 export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks, columns, txnOverrides, onSetTxnOverride, labelChoices }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  // Every payment under this row, so one correction can move a whole category or spending group.
+  // `items` already holds them at both levels; a group row is the sum of its children.
+  const keys = (sub.items ?? []).map((t) => t.key).filter(Boolean);
+  const canEdit = Boolean(onSetTxnOverride && keys.length && !sub.isVolume);
+  const shared = canEdit ? sharedOverride(keys, txnOverrides) : null;
+  const badge = overrideBadge(shared);
   const sortedCategories = sortTableItems(sub.sub ?? [], sort);
   const icon = getSpendingGroupIconConfig(sub.name);
 
@@ -33,6 +42,10 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks,
             <span className="text-[10px] font-normal text-label-3">
               {sortedCategories.length}
             </span>
+            {badge && (
+              <span className="rounded bg-fill-2 px-1.5 py-0.5 text-[10px] font-normal text-info">{badge}</span>
+            )}
+            {canEdit && <EditToggle open={editing} label={sub.name} onClick={() => setEditing((v) => !v)} />}
           </span>
         </td>
         {months.map((m) => (
@@ -50,7 +63,7 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks,
           weeks={cycleWeeks ?? []}
         />
         <td className="p-3 text-right font-semibold text-info">
-          {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
+          {sub.skipExpected ? '' : <RemainingCell item={sub} months={months} />}
         </td>
         <td className="p-3 text-right font-semibold">
           {sub.isVolume ? '' : <ForecastCell item={sub} months={months} />}
@@ -59,6 +72,19 @@ export function TableSpendingGroup({ sub, months, parentGroup, sort, cycleWeeks,
           <Cell val={sub.avg} absolute />
         </td>
       </tr>
+      {editing && (
+        <RowOverrideEditor
+          columns={columns}
+          label={sub.name}
+          keys={keys}
+          flag={shared?.flag}
+          category={shared?.category}
+          spendingGroup={shared?.spendingGroup}
+          choices={labelChoices}
+          onChange={onSetTxnOverride}
+          isException={sub.isException}
+        />
+      )}
       {expanded &&
         sortedCategories.map((c) => (
           <TableSubcategory

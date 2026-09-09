@@ -4,7 +4,7 @@ import { NET_TOTAL_ICON } from './rowIcons';
 import { WeekCells } from './WeekCells';
 import { forecastBand } from '../../lib/forecastBand';
 import { bandWorthShowing } from './forecast';
-import { formatCurrencyAbs } from '../../utils/format';
+import { RangeUnder } from './RangeUnder';
 import { PIN_FILL_2 } from './stickyColumn';
 
 /**
@@ -33,6 +33,12 @@ export function NetTotalRow({
   const soFar = netByMonth[netByMonth.length - 1] ?? 0;
   const forecast = soFar + netExpected;
   const band = forecastBand(soFar, netExpected, netRemainder);
+  // SIGNED, unlike every other row's band. Net is the one figure here whose sign can go either
+  // way, so printing its edges as magnitudes turned "-R16 622 to -R4 238" into "R16 622–R4 238":
+  // two positive-looking numbers, in descending order, bracketing a negative forecast. Ordered by
+  // value (worst first) and joined with "to", because a dash between two minus signs is a mess.
+  const from = band ? Math.min(band.low, band.high) : 0;
+  const to = band ? Math.max(band.low, band.high) : 0;
   return (
     <tr className="bg-fill-2 font-bold text-white">
       <td className={`p-4 ${PIN_FILL_2}`}>
@@ -62,19 +68,17 @@ export function NetTotalRow({
       })}
       <WeekCells weekly={weeklyRemaining} weeks={cycleWeeks ?? []} pad="p-4" signed />
       <td className="p-4 text-right">
-        <NetAmount val={netExpected} />
+        <span className="inline-flex flex-col items-end">
+          <NetAmount val={netExpected} />
+          {bandWorthShowing(band) && (
+            <RangeUnder from={band.remainingLow} to={band.remainingHigh} cycles={band.cycles} signed />
+          )}
+        </span>
       </td>
       <td className="p-4 text-right">
         <span className="inline-flex flex-col items-end">
           <NetAmount val={forecast} />
-          {bandWorthShowing(band, forecast) && (
-            <span
-              className="num text-[11px] leading-tight font-normal text-label-4"
-              title={`Over the last ${band.cycles} cycles the household netted between ${formatCurrencyAbs(band.low)} and ${formatCurrencyAbs(band.high)} from this point in the cycle.`}
-            >
-              {formatCurrencyAbs(band.low)}–{formatCurrencyAbs(band.high)}
-            </span>
-          )}
+          {bandWorthShowing(band) && <RangeUnder from={from} to={to} cycles={band.cycles} signed />}
         </span>
       </td>
       <td className="p-4 text-right">

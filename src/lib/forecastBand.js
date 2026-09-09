@@ -89,8 +89,9 @@ export function combine(arrays) {
  * @param soFar     what this cycle has already booked for the row
  * @param mid       the envelope's remaining figure (so `soFar + mid` is the Forecast column)
  * @param remainder per-cycle remainders from `remainderPerCycle` / `combine`
- * @returns {{ low, mid, high, midOutside, cycles }} in the row's own sign, or null when there is
- *          too little history to say anything — a band nobody can stand behind is worse than none.
+ * @returns {{ low, mid, high, remainingLow, remainingMid, remainingHigh, midOutside, cycles }} in
+ *          the row's own sign, or null when there is too little history to say anything — a band
+ *          nobody can stand behind is worse than none.
  */
 export function forecastBand(soFar, mid, remainder) {
   const observations = (remainder ?? []).filter((v) => Number.isFinite(v));
@@ -106,6 +107,12 @@ export function forecastBand(soFar, mid, remainder) {
     low: Math.min(histLow, midTotal),
     mid: midTotal,
     high: Math.max(histHigh, midTotal),
+    // The same range with what has already landed taken back off: what is STILL to come. That is
+    // the more actionable of the two figures — "R22 991 left to payday" is a claim about a fortnight
+    // nobody can make exactly — so it carries a range of its own rather than a bare number.
+    remainingLow: Math.min(lo, hi, mid),
+    remainingMid: mid,
+    remainingHigh: Math.max(lo, hi, mid),
     midOutside: midTotal < histLow || midTotal > histHigh,
     cycles: observations.length,
   };

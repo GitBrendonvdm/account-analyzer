@@ -8,6 +8,7 @@ import { VariantTransactionRow } from './VariantTransactionRow';
 import { WeekCells } from './WeekCells';
 import { ForecastCell } from './ForecastCell';
 import { RowOverrideEditor } from './RowOverrideEditor';
+import { EditToggle } from './EditToggle';
 import { overrideBadge, sharedOverride } from '../../lib/txnOverrides';
 import { PIN_FILL, PIN_WARN } from './stickyColumn';
 
@@ -61,18 +62,7 @@ export function GroupedTransactionRow({
               )}
             </span>
             {canEdit && (
-              <button
-                type="button"
-                aria-pressed={editing}
-                title={`Mark ${group.description} expected or unexpected, or move it`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditing((v) => !v);
-                }}
-                className="press ml-1 rounded-full px-1.5 text-[11px] text-label-4 hover:text-label max-md:min-h-11 max-md:min-w-11"
-              >
-                {editing ? '✕' : '⋯'}
-              </button>
+              <EditToggle open={editing} label={group.description} onClick={() => setEditing((v) => !v)} />
             )}
           </span>
           {group.isException && (

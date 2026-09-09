@@ -193,14 +193,48 @@ describe('the Forecast column', () => {
     expect(html).not.toContain('R 7 300–R 6 925');
   });
 
-  it('leaves the range off where it would be noise, or where there is no history for one', () => {
-    // Fuel has no remainder history at all: a figure, and nothing pretending to bracket it.
-    expect(render()).not.toContain('R 1 900–');
-    // A row whose cycles are all but identical says nothing: the reader learns nothing from
-    // "R 5 000, and probably R 5 000".
-    const flat = category('Flat', -4000, [-600, -400], [-1000, -1000, -1000, -1001, -999, -1000]);
-    const html = render({ ...processed, rows: [{ ...expenseGroup, remainder: null, sub: [flat] }] });
-    expect(html).not.toMatch(/R 4 9\d\d–/);
+  it('prints the Net band signed and in value order, because net can go either way', () => {
+    // The bug this pins: Net Total's forecast is -R9 920, and its band was printed with the
+    // magnitude formatter — so "-R16 622 to -R4 238" rendered as "R 16 622–R 4 238": two
+    // positive-looking numbers, descending, bracketing a negative figure.
+    const html = render({
+      ...processed,
+      netByMonth: [12000, 11000, -8000],
+      netExpected: -1920,
+      netRemainder: [-2000, -8600, -3000, -4000, -2500, -3500],
+    });
+    const net = html.split('<tr').find((r) => r.includes('Net Total')) ?? '';
+    expect(net).toMatch(/-R [\d ]+ to -R [\d ]+/);
+    // Worst first: the range reads upward in value, like every other range in the table.
+    const [, low, high] = /-R ([\d ]+) to -R ([\d ]+)/.exec(net) ?? [];
+    expect(Number(low.replace(/ /g, ''))).toBeGreaterThan(Number(high.replace(/ /g, '')));
+    // And never as bare magnitudes, which is what made it read as a positive range.
+    expect(net).not.toMatch(/>R [\d ]+–R [\d ]+</);
+  });
+
+  it('shows a range even where it is narrow, and none only where there is no history', () => {
+    // A tight range is the answer, not noise: it says this row really is predictable, which is
+    // worth knowing precisely because it is not true of the rows around it. Suppressing it left a
+    // bare figure, and a bare figure reads as a promise.
+    const flat = { ...expenseGroup, remainder: [-1400, -1400, -1400, -1401, -1399, -1400] };
+    const html = render({ ...processed, rows: [flat] });
+    const row = html.split('<tr').find((r) => r.includes('Expense')) ?? '';
+    // Both edges round to about R7 000 — and printing that is the point: it says the row is
+    // predictable, rather than leaving a bare figure that reads as a promise.
+    expect(row).toMatch(/R [67] \d\d\d–R [67] \d\d\d/);
+
+    // With no history there is nothing to bracket it with, and inventing one would be worse.
+    const bare = render({ ...processed, rows: [{ ...expenseGroup, remainder: null }] });
+    const cells = bare.split('<tr').find((r) => r.includes('Expense')) ?? '';
+    expect(cells).toContain('R 7 000');
+    expect(cells).not.toMatch(/R [\d ]+–R [\d ]+/);
+  });
+
+  it('gives Left to payday its own range — a fortnight is never exact either', () => {
+    const html = render();
+    // Expense: R1 400 still expected, and its six prior cycles needed R1 325 to R1 700 from here.
+    expect(html).toContain('R 1 400');
+    expect(html).toMatch(/R 1 3\d\d–R 1 700/);
   });
 
   it('adds up: the flow rows and the exceptions reconcile with Net Total', () => {
@@ -319,6 +353,36 @@ describe('correcting a payment', () => {
     // The effect is stated, because a control whose consequence is invisible gets used wrongly.
     expect(html).toContain('left out of the averages, the forecast and its range');
     expect(html).toContain('Reset');
+  });
+
+  it('offers a way to name a group the bank never had', () => {
+    // "Move all Communications to Recurring" — a grouping that does not exist yet. Without this the
+    // pickers could only ever re-file into labels the export already used.
+    const html = inTable(
+      createElement(RowOverrideEditor, {
+        columns: COLUMNS,
+        label: 'Communications',
+        keys: ['k1', 'k2'],
+        choices: { categories: ['Cellphone'], spendingGroups: ['Day-to-day'] },
+        onChange: () => {},
+      }),
+    );
+    expect(html).toContain('New…');
+  });
+
+  it('keeps showing a label it has been moved to, even though the file has no such label', () => {
+    const html = inTable(
+      createElement(RowOverrideEditor, {
+        columns: COLUMNS,
+        label: 'Communications',
+        keys: ['k1'],
+        spendingGroup: 'Recurring',
+        choices: { categories: ['Cellphone'], spendingGroups: ['Day-to-day'] },
+        onChange: () => {},
+      }),
+    );
+    // Otherwise the picker would silently fall back to "as imported" and the move would look lost.
+    expect(html).toContain('Recurring');
   });
 
   it('offers only labels already in the file', () => {
