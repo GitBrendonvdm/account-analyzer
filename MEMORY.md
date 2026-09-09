@@ -1,1 +1,0 @@
-- [One way to calculate](one-way-to-calculate.md) — every figure has one derivation; re-deriving classification per view is the recurring bug source
