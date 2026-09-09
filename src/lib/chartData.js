@@ -245,7 +245,25 @@ export function buildNetTotalChartData(data, selectedAccounts, processed) {
   );
   const signedRemaining = incomeRemaining + expenseRemaining;
   const currentMonthProjected = tableMonthNet + signedRemaining;
-  const monthEndProjectedRunning = priorRunning + currentMonthProjected;
+  /**
+   * THE PROJECTION STARTS WHERE THE LINE IS, which sounds obvious and was not what happened.
+   *
+   * The dashed line is drawn from `todayRunning` — the running total summed from the base
+   * transactions — but its far end was rebuilt from a different base: every prior cycle's net out
+   * of `calcNetByMonth`, plus this cycle's projection. Those two agree only if the current cycle's
+   * transaction sum equals the table's own current-cycle total, and it does not: the table applies
+   * the effective pay month and carves surpluses into Exceptions, so the two bases differ by
+   * whatever those move. The line then leapt at today — falling R66 132 over thirteen days while
+   * the label under it said the rest of the cycle costs R16 472 — and the chart contradicted both
+   * the table and its own footnote.
+   *
+   * Anchoring to `todayRunning` makes the drawing say what the sentence says: from here, minus
+   * what is still expected. It uses the table's own remaining figure, so chart and table now agree
+   * by construction rather than by coincidence. `priorRunning + currentMonthProjected` remains the
+   * fallback for the case the anchor is missing.
+   */
+  const monthEndProjectedRunning =
+    todayRunning == null ? priorRunning + currentMonthProjected : todayRunning + signedRemaining;
 
   const expectedCtx = {
     todayCumulative: todayRunning,
