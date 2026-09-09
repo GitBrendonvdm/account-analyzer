@@ -62,7 +62,7 @@ function anchors(through) {
 /** Build lines from fixture rows. Returns the engine's result plus the non-anchor lines. */
 function build(
   rows,
-  { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true, overrides, settled } = {},
+  { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true, overrides, settled, providers } = {},
 ) {
   const data = [...anchors(through), ...rows].map((r, i) => ({ ...r, id: i, key: r.key ?? `k${i}` }));
   const months = [...new Set(data.map((t) => t['Pay Month']))].sort();
@@ -72,6 +72,7 @@ function build(
   const result = buildRecurringLines(data, {
     calendar,
     transfers,
+    providers,
     asOf,
     dataThrough: new Date(y, m - 1, d),
     includeRepayments,
@@ -520,5 +521,56 @@ describe.skipIf(!real)('recurring on the real export', () => {
       .filter((l) => l.cycleStatus === 'landed')
       .forEach((l) => expect(typeof l.landedKey).toBe('string'));
     expect(judged.every((l) => ['landed', 'due', 'overdue', 'unobservable'].includes(l.cycleStatus))).toBe(true);
+  });
+});
+
+describe('a provider is one commitment, whatever the bank calls it', () => {
+  /**
+   * The City of Cape Town rates arrived as "Easypay *City Of C…" at R3 000 a cycle and now arrive
+   * as "Coc Rates And Taxes *2693" at R4 100. As strings those are two merchants, so without the
+   * provider the engine reports a line that lapsed and a brand-new charge — a cancellation that
+   * never happened beside a commitment that is really an old one that went up by R1 100.
+   */
+  const rates = [
+    ...monthly('2025-10', 8).map((d) =>
+      row(d, 'Easypay *City Of Cape Town Za', BANK, -3000, {
+        Category: 'Home Utility & Service',
+        'Spending Group': 'Recurring',
+      }),
+    ),
+    ...monthly('2026-06', 3).map((d) =>
+      row(d, 'Coc Rates And Taxes *2693', BANK, -4100, {
+        Category: 'Home Utility & Service',
+        'Spending Group': 'Recurring',
+      }),
+    ),
+  ];
+  const providers = [{ name: 'City of Cape Town', synonyms: ['city of cape town', 'coc rates'] }];
+
+  it('reads a renamed, repriced bill as two lines without the provider', () => {
+    const { lines } = build(rates);
+    expect(lines.length).toBeGreaterThan(1);
+    // …and one of them has stopped charging, which is the false cancellation.
+    expect(lines.some((l) => l.status !== 'active')).toBe(true);
+  });
+
+  it('reads it as one line, now more expensive, with the provider', () => {
+    const { lines } = build(rates, { providers });
+    const rate = lines.filter((l) => l.key === 'provider|City of Cape Town');
+    expect(rate).toHaveLength(1);
+    expect(rate[0].status).toBe('active');
+    expect(rate[0].cadence).toBe('monthly');
+    // The whole history is behind it, so the price rise is a step in one series rather than the
+    // first sighting of a new charge.
+    expect(rate[0].observations).toBeGreaterThanOrEqual(10);
+    expect(rate[0].perCycle).toBeGreaterThan(3000);
+  });
+
+  it('leaves everything else keyed on its own merchant', () => {
+    const { lines } = build(
+      [...rates, ...monthly('2025-10', 11).map((d) => row(d, 'Netflix.Com', BANK, -499, { Category: 'Entertainment' }))],
+      { providers },
+    );
+    expect(lines.some((l) => l.key === 'netflix.com')).toBe(true);
   });
 });

@@ -300,11 +300,11 @@ export default function App() {
     () =>
       data && calendar && transfers
         ? buildRecurringLines(data, {
-            accounts, calendar, transfers, asOf: today, dataThrough,
+            accounts, calendar, transfers, asOf: today, dataThrough, providers,
             overrides: lineOverrides, settled: lineSettled,
           })
         : null,
-    [data, accounts, calendar, transfers, today, dataThrough, lineOverrides, lineSettled],
+    [data, accounts, calendar, transfers, today, dataThrough, providers, lineOverrides, lineSettled],
   );
   const lines = recurring?.lines ?? null;
   const incomeProfile = useMemo(

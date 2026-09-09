@@ -29,6 +29,7 @@ import {
 } from './merchants';
 import { isRegularAmount } from './missedPayments';
 import { spendingGroupOf } from './spendingGroups';
+import { providerOf } from './providers';
 import { dispersion, median, mode, quantile } from './stats';
 
 /**
@@ -206,7 +207,21 @@ function candidates(data, { transfers, accounts, includeRepayments }) {
 
 // ---- step 2: identity and amount clusters -----------------------------------------------------
 
-function identify(observations) {
+/**
+ * A PROVIDER OUTRANKS THE MERCHANT KEY, because it is the reader saying "these are one thing".
+ *
+ * A bill can change its name and its price at once and still be the same bill: the City of Cape
+ * Town rates arrived as "Easypay *City Of C…" at R3 000 a cycle and now arrive as "Coc Rates And
+ * Taxes *2693" at R4 100. Read as strings those are two merchants, so the engine saw a line that
+ * lapsed and a brand-new charge — reporting a cancellation that never happened, and a new
+ * commitment that is really an old one that went up by R1 100. Keyed on the provider it is one
+ * line, three cycles at R3 000 followed by one at R4 100, which is a price rise the engine already
+ * knows how to read.
+ *
+ * This is why a provider is worth more than tidier rows: it is the only place a person can tell the
+ * app that two unrelated strings are the same commitment, and nothing else can infer it.
+ */
+function identify(observations, providers) {
   const rawKeys = observations
     .filter((o) => o.source === 'charge' || o.source === 'embedded')
     .map((o) => merchantKeyOf(o.row.Description));
@@ -225,7 +240,10 @@ function identify(observations) {
       o.key = o.identity;
       return;
     }
-    const key = canonical.get(merchantKeyOf(o.row.Description)) ?? '';
+    const provider = providerOf(o.row.Description, providers);
+    const key = provider
+      ? `provider|${provider}`
+      : (canonical.get(merchantKeyOf(o.row.Description)) ?? '');
     const base = key || `ref|${o.row.Category || 'Uncategorised'}`;
     o.key = base;
     o.identity = isPersonPayment(o.row.Description) ? `person|${base}` : base;
@@ -631,7 +649,15 @@ function describeLine(line, group, bandIndex, ctx) {
  *   `lines` sorted by perCycle descending; `cycles` = the complete cycles the presence window draws on.
  */
 export function buildRecurringLines(data, options = {}) {
-  const { accounts = null, calendar, transfers, includeRepayments = true, overrides = null, settled = null } = options;
+  const {
+    accounts = null,
+    calendar,
+    transfers,
+    includeRepayments = true,
+    overrides = null,
+    settled = null,
+    providers = null,
+  } = options;
   const empty = { lines: [], explained: new Set(), cycles: [] };
   if (!data?.length || !calendar?.starts || !transfers) return empty;
   const dataThrough = toDay(options.dataThrough ?? calendar.dataThrough);
@@ -651,7 +677,7 @@ export function buildRecurringLines(data, options = {}) {
     settled,
   };
 
-  const groups = identify(candidates(data, { transfers, accounts, includeRepayments }));
+  const groups = identify(candidates(data, { transfers, accounts, includeRepayments }), providers);
   const lines = [];
   const explained = new Set();
   groups.forEach((group) => {
