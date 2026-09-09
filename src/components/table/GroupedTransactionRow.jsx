@@ -88,14 +88,12 @@ export function GroupedTransactionRow({ group, months, highlightCells = false, s
           )}
         </td>
         <td className="p-2 text-right">
-          {!group.isException && (
-            <span
-              className="font-semibold"
-              title="Where this row closes: its share of the cycle so far, plus its share of what is still expected"
-            >
-              <Cell val={forecastOf(group, months)} />
-            </span>
-          )}
+          <span
+            className="font-semibold"
+            title="Where this row closes: what it has charged this cycle, plus its share of what is still expected"
+          >
+            <Cell val={forecastOf(group, months)} />
+          </span>
         </td>
         <td />
       </tr>

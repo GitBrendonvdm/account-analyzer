@@ -13,11 +13,22 @@
  * and a row's forecast can be added to another's.
  */
 
-/** So far + still expected, for one row of the table. Null when there is no current cycle. */
+/**
+ * So far + still expected, for one row of the table. Null when there is no current cycle.
+ *
+ * Group and category rows key their cycle totals on `totalsByMonth`; the description-level rows
+ * under them use `amountsByMonth`. Both are read, so one row type cannot quietly forecast zero.
+ *
+ * A row with nothing more expected still HAS a forecast — the one-off already charged this cycle is
+ * exactly as much a part of where the cycle closes as a bill still to come. That distinction is why
+ * the exception rows print a figure here while their "left to payday" cell is rightly blank, and it
+ * is what makes the column add up: Income + Expense + the two Exceptions groups reconcile with Net
+ * Total, which has always counted the exceptions.
+ */
 export function forecastOf(item, months) {
   const current = months?.[months.length - 1];
   if (!current) return null;
-  const soFar = item?.totalsByMonth?.[current] ?? 0;
+  const soFar = item?.totalsByMonth?.[current] ?? item?.amountsByMonth?.[current] ?? 0;
   const remaining = item?.expected ?? 0;
   return soFar + remaining;
 }

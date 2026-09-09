@@ -58,7 +58,7 @@ export function TableSubcategory({ sub, months, parentGroup, sort, cycleWeeks })
           {sub.skipExpected ? '' : formatCurrencyAbs(sub.expected)}
         </td>
         <td className="p-3 text-right font-semibold">
-          {sub.skipExpected ? '' : <Cell val={forecastOf(sub, months)} absolute />}
+          {sub.isVolume ? '' : <Cell val={forecastOf(sub, months)} absolute />}
         </td>
         <td className="p-3 text-right">
           <Cell val={sub.avg} absolute />

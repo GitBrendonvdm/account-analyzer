@@ -62,8 +62,11 @@ export function TableGroup({ group, months, sort, cycleWeeks }) {
         <td className="p-4 text-right font-semibold text-info">
           {group.isException || group.isTransfer ? '' : formatCurrencyAbs(group.expected)}
         </td>
+        {/* Transfers net to zero and have no flow to forecast. Exceptions do: a one-off already
+            charged is part of where this cycle closes, and leaving it blank stopped the column
+            reconciling with Net Total, which counts them. */}
         <td className="p-4 text-right font-semibold">
-          {group.isException || group.isTransfer ? '' : <Cell val={forecastOf(group, months)} absolute />}
+          {group.isTransfer ? '' : <Cell val={forecastOf(group, months)} absolute />}
         </td>
         <td className="p-4 text-right">
           <Cell val={group.avg} absolute />

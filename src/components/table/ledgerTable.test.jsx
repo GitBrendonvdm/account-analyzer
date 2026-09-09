@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TransactionTable } from '../TransactionTable';
+import { TableGroup } from './TableGroup';
 import { TableSpendingGroup } from './TableSpendingGroup';
 import { TableSubcategory } from './TableSubcategory';
 import { TransferPairSubcategory } from './TransferPairSubcategory';
@@ -49,12 +50,54 @@ const expenseGroup = {
   isTransfer: false,
 };
 
+/**
+ * Exceptions are one-offs: no forecast to payday (nothing more is expected), but the amount already
+ * charged is part of where the cycle closes — and Net Total has always counted them.
+ */
+const exceptionGroup = (name, soFar) => ({
+  name,
+  totalsByMonth: { '2026-07': 0, '2026-08': 0, '2026-09': soFar },
+  avg: soFar,
+  weeklyRemaining: [0, 0],
+  expected: 0,
+  sub: [],
+  isException: true,
+  isTransfer: false,
+  skipExpected: true,
+});
+
+const incomeGroup = {
+  name: 'Income',
+  totalsByMonth: { '2026-07': 30000, '2026-08': 31000, '2026-09': 20000 },
+  avg: 30500,
+  weeklyRemaining: [500, 0],
+  expected: 500,
+  sub: [],
+  isException: false,
+  isTransfer: false,
+};
+
+const transfersGroup = {
+  name: 'Transfers',
+  totalsByMonth: { '2026-07': 0, '2026-08': 0, '2026-09': 0 },
+  avg: 0,
+  weeklyRemaining: [0, 0],
+  expected: 0,
+  sub: [],
+  isException: false,
+  isTransfer: true,
+};
+
+const incomeExceptions = exceptionGroup('Income Exceptions', 1200);
+const expenseExceptions = exceptionGroup('Expense Exceptions', -3400);
+
 const processed = {
-  rows: [expenseGroup],
+  rows: [incomeGroup, expenseGroup, transfersGroup, incomeExceptions, expenseExceptions],
   months: MONTHS,
   currentMonth: '2026-09',
-  netByMonth: [12000, 11000, 4400],
-  netExpected: -1400,
+  // Net counts every flow, exceptions included: 20 000 − 5 600 + 1 200 − 3 400.
+  netByMonth: [12000, 11000, 12200],
+  netExpected: -900,
   netAvg: 11500,
   netWeeklyRemaining: [-900, -500],
   cycleWeeks: WEEKS,
@@ -130,5 +173,55 @@ describe('the Forecast column', () => {
 
   it('sorts on it', () => {
     expect(render()).toContain('Sort by Forecast');
+  });
+
+  it('adds up: the flow rows and the exceptions reconcile with Net Total', () => {
+    // The bug this test exists for: the exception groups printed a blank forecast while Net Total
+    // counted them, so a reader adding the column up got a different answer from the app.
+    const flows = [incomeGroup, expenseGroup, incomeExceptions, expenseExceptions];
+    const sum = flows.reduce((s, g) => s + forecastOf(g, MONTHS), 0);
+    const net = forecastOf(
+      { totalsByMonth: { '2026-09': processed.netByMonth.at(-1) }, expected: processed.netExpected },
+      MONTHS,
+    );
+    expect(sum).toBe(net);
+    expect(net).toBe(11300);
+
+    const html = render();
+    // Each of the four is on the page, so the sum can actually be done by eye.
+    expect(html).toContain('R 20 500'); // Income:  20 000 + 500
+    expect(html).toContain('R 7 000'); // Expense: −5 600 − 1 400
+    expect(html).toContain('R 1 200'); // Income Exceptions: the one-off itself
+    expect(html).toContain('R 3 400'); // Expense Exceptions
+    expect(html).toContain('R 11 300'); // Net Total
+  });
+
+  it('leaves the forecast blank only where there is no flow to forecast', () => {
+    const cells = (group) => {
+      const html = renderToStaticMarkup(
+        createElement(
+          'table',
+          null,
+          createElement(
+            'tbody',
+            null,
+            createElement(TableGroup, { group, months: MONTHS, sort: { key: 'group', direction: 'asc' }, cycleWeeks: WEEKS }),
+          ),
+        ),
+      );
+      return [...html.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
+        .map(([, c]) => c.replace(/<[^>]*>/g, '').replace(/[\u00a0\u202f]/g, ' ').trim());
+    };
+
+    // Transfers are two legs that cancel: no flow, so neither a forecast nor a left-to-payday.
+    const transfers = cells(transfersGroup);
+    expect(transfers.at(-3)).toBe('');
+    expect(transfers.at(-2)).toBe('');
+
+    // An exception has nothing more expected — but the one-off already charged is part of where
+    // the cycle closes, and blanking it was what stopped the column reconciling with Net Total.
+    const exceptions = cells(expenseExceptions);
+    expect(exceptions.at(-3)).toBe('');
+    expect(exceptions.at(-2)).toContain('3 400');
   });
 });
