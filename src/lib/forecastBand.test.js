@@ -96,6 +96,16 @@ describe('forecastBand', () => {
     expect(band.high).toBeGreaterThanOrEqual(band.mid);
   });
 
+  it('follows the visible window, which the month slider owns', () => {
+    // The slider governs display and arithmetic together (processTransactionData), so a reader who
+    // narrows to four cycles gets the band those four support rather than none at all.
+    expect(BAND_MIN_CYCLES).toBe(3);
+    const narrow = forecastBand(-5000, -1000, [-1000, -1200, -900]);
+    expect(narrow).not.toBeNull();
+    expect(narrow.cycles).toBe(3);
+    expect(narrow.low).toBeLessThan(narrow.high);
+  });
+
   it('says nothing rather than guessing from too little history', () => {
     expect(forecastBand(0, 0, steady.slice(0, BAND_MIN_CYCLES - 1))).toBeNull();
     expect(forecastBand(0, 0, [])).toBeNull();

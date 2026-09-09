@@ -34,8 +34,15 @@ const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const itemDate = (t) => t.DateObj ?? parseTransactionDate(t.Date);
 const defaultMonthOf = (t) => t['Pay Month'];
 
-/** Fewer than this many prior cycles and a percentile is theatre, not evidence. */
-export const BAND_MIN_CYCLES = 4;
+/**
+ * Fewer than this many prior cycles and there is nothing to say. Three is low for a percentile —
+ * at three points p10 and p90 are barely inside the observed range — but the window is the month
+ * slider's, deliberately: processTransactionData keeps display and arithmetic on one window because
+ * a slider that moves the columns but not the figures reads as broken. A reader who narrows to four
+ * cycles should still get the band those four cycles support, and the tooltip always names the
+ * count so the claim stays exactly as strong as its evidence.
+ */
+export const BAND_MIN_CYCLES = 3;
 /** The band's edges. Wide enough to be worth reading, narrow enough not to be a truism. */
 export const BAND_LOW = 0.1;
 export const BAND_HIGH = 0.9;
