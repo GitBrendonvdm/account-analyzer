@@ -578,41 +578,6 @@ export const fixtureFees = {
   assumptions: ['Run rates are the median of the last 6 complete cycles; the initiation fee is listed but never in a run rate.'],
 };
 
-const finderItem = (over) => ({ kinds: [over.kind], evidence: [], lineId: null, perYear: over.perCycle * 12, ...over });
-export const fixtureFinder = {
-  items: [
-    finderItem({ id: 'new-charge:cloud', kind: 'new-charge', bucket: 'cancellable', label: 'Example Cloud', perCycle: 1299, confidence: 'medium', action: 'check whether you meant to keep it', lineId: lineCloud.id }),
-    finderItem({ id: 'subscription:gym', kind: 'subscription', bucket: 'cancellable', label: 'Example Gym', perCycle: 549, confidence: 'high', action: 'cancel', lineId: lineGym.id }),
-    finderItem({ id: 'creep:fibre', kind: 'creep', kinds: ['subscription', 'creep'], bucket: 'cancellable', label: 'Example Fibre', perCycle: 200, confidence: 'high', action: 'query or renegotiate', lineId: lineFibre.id }),
-    finderItem({ id: 'subscription:stream', kind: 'subscription', bucket: 'cancellable', label: 'Example Stream', perCycle: 199, confidence: 'high', action: 'cancel', lineId: lineStream.id }),
-    finderItem({ id: 'consolidation', kind: 'consolidation', bucket: 'cancellable', label: 'Second current account', perCycle: 120, confidence: 'medium', action: 'close the Example Savings Cheque' }),
-    finderItem({ id: 'ppi:card', kind: 'ppi', bucket: 'cancellable', label: 'Payment protection on the Example Card', perCycle: 85, confidence: 'medium', action: 'cancel the cover' }),
-    finderItem({ id: 'avoidable-fees', kind: 'avoidable-fees', bucket: 'cancellable', label: 'Transaction, ATM and penalty fees', perCycle: 35, confidence: 'high', action: 'use the bundle' }),
-    finderItem({ id: 'drift:groceries', kind: 'drift', bucket: 'behavioural', label: 'Groceries', perCycle: 1800, confidence: 'medium', action: 'see what changed' }),
-    finderItem({ id: 'basket:groceries', kind: 'basket', bucket: 'behavioural', label: 'Groceries trips', perCycle: 2000, confidence: 'low', action: 'fewer trips' }),
-  ],
-  found: 2487,
-  foundPerYear: 29844,
-  behaviouralPotential: 3800,
-  informational: [
-    finderItem({
-      id: 'card-interest',
-      kind: 'card-interest',
-      bucket: 'informational',
-      label: 'Card interest',
-      perCycle: 1700,
-      confidence: 'high',
-      action: 'becomes a saving only once the balance is paid down — see Debt',
-      sentence: 'Card interest: R 1 700 a cycle — becomes a saving only once the balance is paid down — see Debt',
-    }),
-  ],
-  deficit: 17000,
-  cover: 0.146,
-  realised: 89,
-  realisedPerYear: 1068,
-  cycles: CYCLES,
-  assumptions: ['Found counts only cancellable items at high or medium confidence; behavioural potential is shown separately.'],
-};
 
 // ---- §3.3 cashflow --------------------------------------------------------------------------
 
@@ -751,23 +716,6 @@ export const fixtureCashPathUnanchored = {
   lateSalary: null,
 };
 
-// ---- §3.1 the shortfall-closing categories --------------------------------------------------
-
-export const fixtureGapClosers = {
-  gap: 17000,
-  found: 9000,
-  closed: false,
-  shortfall: 8000,
-  plan: [
-    { name: 'Eating Out & Takeaways', typical: 5000, available: 3000, share: 0.6, spread: 800, isBill: false, cut: 3000, cutPercent: 0.6 },
-    { name: 'Entertainment', typical: 4000, available: 2400, share: 0.6, spread: 600, isBill: false, cut: 2400, cutPercent: 0.6 },
-    { name: 'Groceries', typical: 7800, available: 2340, share: 0.3, spread: 900, isBill: false, cut: 2340, cutPercent: 0.3 },
-    { name: 'Coffee', typical: 2100, available: 1260, share: 0.6, spread: 300, isBill: false, cut: 1260, cutPercent: 0.6 },
-  ],
-  candidates: [],
-  totalAvailable: 9000,
-};
-
 
 // ---- the existing views' props ----------------------------------------------------------------
 
@@ -833,40 +781,6 @@ export const fixturePositions = [
   { account: 'Example Card', type: 'Credit Card', positionByMonth: { '2026-08': -62000, '2026-07': -55000 }, deltaByMonth: { '2026-08': -7000 }, openingPosition: -42000, windowChange: -20000, currentMonthKey: '2026-08' },
 ];
 
-export const fixtureBudgets = {
-  rows: [
-    { category: 'Groceries', typical: 6000, spent: 7000, projected: 7800, target: 6500, status: 'over', over: 1300, isBill: false },
-    { category: 'Transport & Fuel', typical: 3000, spent: 2000, projected: 2900, target: null, status: 'none', over: 0, isBill: false },
-    { category: 'Example Insurer', typical: 1450, spent: 0, projected: 1450, target: null, status: 'none', over: 0, isBill: true },
-  ],
-  withTargets: [{ category: 'Groceries' }],
-  status: 'over',
-  totalProjected: 7800,
-  totalTarget: 6500,
-  overBy: 1300,
-};
-
-export const fixtureCategoryPlan = {
-  income: 75000,
-  planned: 10850,
-  leftover: 64150,
-  targetedCount: 1,
-  totalCount: 3,
-};
-
-export const fixtureTrajectory = {
-  points: Array.from({ length: 12 }, (_, i) => ({ cycle: i, date: addMonths(NEXT_PAY, i), net: -700000 - i * 12000, debt: 737000 + i * 13000, assets: 37000 + i * 1000 })),
-  horizon: 12,
-  endNet: -832000,
-  change: -132000,
-  events: [{ type: 'limit', account: 'Example Card', cycle: 4, date: addMonths(NEXT_PAY, 4) }],
-  absorber: 'Example Card',
-};
-
-export const fixtureGoals = {
-  goals: [{ id: 'g1', name: 'Example fund', target: 50000, saved: 10000, progress: 0.2, reachable: false, cycles: null, eta: null }],
-};
-
 // ---- props per view ---------------------------------------------------------------------------
 
 export const todayProps = (over = {}) => ({
@@ -882,6 +796,11 @@ export const todayProps = (over = {}) => ({
   upcoming: fixtureUpcoming,
   cashPath: fixtureCashPath,
   incomeProfile: fixtureIncomeProfile,
+  currentCycle: '2026-08',
+  lineOverrides: {},
+  lineSettled: {},
+  onSettleLine: () => {},
+  onEndLine: () => {},
   onOpenLedger: () => {},
   onOpenAccounts: () => {},
   ...over,
@@ -889,7 +808,6 @@ export const todayProps = (over = {}) => ({
 
 export const habitsProps = (over = {}) => ({
   habits: fixtureHabits,
-  finder: fixtureFinder,
   subscriptions: fixtureSubscriptions,
   priceCreep: fixturePriceCreep,
   drift: fixtureDrift,
@@ -897,21 +815,6 @@ export const habitsProps = (over = {}) => ({
   lineOverrides: { [lineStream.id]: 'keep' },
   onSetLineOverride: () => {},
   asOf: TODAY,
-  ...over,
-});
-
-export const planProps = (over = {}) => ({
-  budgets: fixtureBudgets,
-  categoryPlan: fixtureCategoryPlan,
-  onSetTarget: () => {},
-  trajectory: fixtureTrajectory,
-  monthlySaving: 3000,
-  onMonthlySavingChange: () => {},
-  gapClosers: fixtureGapClosers,
-  goals: fixtureGoals,
-  onAddGoal: () => {},
-  onRemoveGoal: () => {},
-  direction: fixtureDirection,
   ...over,
 });
 
@@ -931,9 +834,11 @@ export const accountsProps = (over = {}) => ({
 });
 
 export const NEW_PROPS = {
-  today: ['vitals', 'upcoming', 'cashPath', 'incomeProfile', 'onOpenAccounts'],
-  habits: ['finder', 'subscriptions', 'priceCreep', 'drift', 'basket', 'lineOverrides', 'onSetLineOverride'],
-  plan: ['direction', 'categoryPlan'],
+  today: [
+    'vitals', 'upcoming', 'cashPath', 'incomeProfile', 'onOpenAccounts',
+    'currentCycle', 'lineOverrides', 'lineSettled', 'onSettleLine', 'onEndLine',
+  ],
+  habits: ['subscriptions', 'priceCreep', 'drift', 'basket', 'lineOverrides', 'onSetLineOverride'],
   accounts: ['fees', 'onDeleteAccount', 'dataThrough'],
 };
 

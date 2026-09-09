@@ -57,6 +57,13 @@ const feeAdjusted = (d) => d.rateNominal + (12 * (d.feeMonthly ?? 0)) / d.balanc
 
 // ---- the miniature engine ---------------------------------------------------------------------
 
+/** Cycles to clear at the contractual payment alone; Infinity when it never covers the interest. */
+function monthsAlone(d) {
+  const payment = d.instalment ?? Math.max(d.plannedPayment ?? 0, ((d.minimumPct ?? 0) / 100) * d.balance);
+  if (!(payment > 0)) return Infinity;
+  return remainingTerm(d.balance, d.rateNominal, payment, d.feeMonthly ?? 0);
+}
+
 function payoffOrder(debts, strategy, order) {
   const avalanche = debts
     .slice()
@@ -66,9 +73,11 @@ function payoffOrder(debts, strategy, order) {
     case 'minimum':
       return debts.map((d) => d.id);
     case 'snowball':
+      // Soonest to clear on its own, matching the real engine (debtPlan.payoffOrder): a big loan
+      // nearly paid off frees its instalment before a small card at a 2% minimum does.
       return debts
         .slice()
-        .sort((a, b) => a.balance - b.balance)
+        .sort((a, b) => monthsAlone(a) - monthsAlone(b) || a.balance - b.balance)
         .map((d) => d.id);
     case 'lifetime':
       return debts
@@ -267,7 +276,7 @@ export function simulatePlan(debts, options = {}) {
   const perDebt = Object.fromEntries(
     ids.map((id) => {
       const s = state[id];
-      return [id, { clearedMonth: s.clearedMonth, clearedDate: s.clearedDate, interest: s.interest, fees: s.fees, paid: s.paid, extra: s.extra }];
+      return [id, { clearedMonth: s.clearedMonth, clearedDate: s.clearedDate, interest: s.interest, fees: s.fees, paid: s.paid, extra: s.extra, scheduled: s.scheduled ?? 0 }];
     }),
   );
 
@@ -283,6 +292,7 @@ export function simulatePlan(debts, options = {}) {
     strategy,
     order: ids,
     horizon,
+    cascade,
     cap: HORIZON,
     months,
     debtFreeDate,
@@ -303,6 +313,21 @@ export function simulatePlan(debts, options = {}) {
 
 const STRATEGIES = ['minimum', 'avalanche', 'snowball', 'lifetime', 'shortTerm'];
 
+/**
+ * The fixture's stand-in for debtPlan's cashFreedWithin: rand-months of instalment handed back
+ * inside the horizon. The real engine's contract is the thing under test in debtPlan.test.js; here
+ * it only has to move the same way, so the tiles have a figure to rank on.
+ */
+const CASH_FREED_HORIZON = 60;
+function cashFreedWithin(plan, horizon = CASH_FREED_HORIZON) {
+  if (plan.cascade) {
+    if (plan.reachedCap || !(plan.months > 0)) return 0;
+    const relief = Object.values(plan.perDebt ?? {}).reduce((sum, d) => sum + (d.scheduled ?? 0), 0);
+    return relief * Math.max(0, horizon - plan.months);
+  }
+  return (plan.freedTimeline ?? []).reduce((sum, f) => sum + f.freed * Math.max(0, horizon - f.month + 1), 0);
+}
+
 export function comparePlans(debts, options = {}) {
   const out = {};
   const names = options.order ? [...STRATEGIES, 'custom'] : STRATEGIES;
@@ -321,6 +346,7 @@ export function comparePlans(debts, options = {}) {
       monthsSavedVsMinimum: base.reachedCap || p.reachedCap ? null : base.months - p.months,
       firstPayoffMonth: first?.month ?? null,
       firstPayoffId: first?.id ?? null,
+      cashFreed: cashFreedWithin(p),
     };
   });
   const pick = (key, dir = 1) =>
@@ -331,6 +357,12 @@ export function comparePlans(debts, options = {}) {
     byInterest: pick('totalInterest'),
     byDate: pick('months'),
     byFirstRelief: pick('firstPayoffMonth'),
+    // What Auto follows: most cash freed (so scored negative), least interest breaking a draw.
+    byCashFreed:
+      table
+        .filter((r) => r.strategy !== 'minimum')
+        .sort((a, b) => b.cashFreed - a.cashFreed || a.totalInterest - b.totalInterest)[0]?.strategy ??
+      'avalanche',
   };
   return { ...out, table, best };
 }

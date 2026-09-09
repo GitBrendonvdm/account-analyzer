@@ -1,10 +1,9 @@
-import { BarChart3, Repeat, Table2, Target, Wallet } from 'lucide-react';
+import { BarChart3, Repeat, Table2, Wallet } from 'lucide-react';
 
 const TABS = [
   { id: 'table', label: 'Table', Icon: Table2 },
   { id: 'charts', label: 'Charts', Icon: BarChart3 },
   { id: 'habits', label: 'Habits', Icon: Repeat },
-  { id: 'plan', label: 'Plan', Icon: Target },
   { id: 'accounts', label: 'Accounts', Icon: Wallet },
 ];
 

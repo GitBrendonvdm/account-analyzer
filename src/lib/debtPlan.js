@@ -76,10 +76,27 @@ const byRateDesc = (a, b) => b.rateNominal - a.rateNominal || a.balance - b.bala
 const feeAdjusted = (d) => d.rateNominal + (12 * (d.feeMonthly ?? 0)) / d.balance;
 
 /**
+ * How long this debt takes to clear on its own, at its contractual payment and nothing more.
+ * Infinity when the payment does not cover the interest, so such a debt sorts last rather than
+ * first. Run over one debt in isolation, which is what "if I did nothing else" means.
+ */
+function monthsAloneOf(debt) {
+  const single = amortise(debt, {});
+  return single.cleared ? single.months : Infinity;
+}
+
+/**
  * The order debts are attacked in. `minimum` keeps the input order; `avalanche` is rate desc (ties:
- * the smaller balance first); `snowball` balance asc; `lifetime` fee-adjusted rate desc;
- * `shortTerm` the 12-month marginal value of R1 000 desc (ties: earlier cash relief); `custom`
- * is `options.order` with unknown ids appended in avalanche order.
+ * the smaller balance first); `snowball` soonest to clear on its own; `lifetime` fee-adjusted rate
+ * desc; `shortTerm` the 12-month marginal value of R1 000 desc (ties: earlier cash relief);
+ * `custom` is `options.order` with unknown ids appended in avalanche order.
+ *
+ * SNOWBALL IS TIME, NOT SIZE. The textbook orders by balance ascending, and on a page of credit
+ * cards the two agree. On a real household they do not: a R150k vehicle loan with eleven
+ * instalments left clears long before a R40k card whose minimum is 2.5% of the balance, and the
+ * whole point of the snowball — free an instalment soon, roll it onto the next — is served by the
+ * one that finishes first, not the one that is smallest. So the order is months-to-clear at the
+ * contractual payment, ascending, with balance and then rate as tie-breaks.
  *
  * @returns accountId[]
  */
@@ -90,8 +107,15 @@ export function payoffOrder(debts, strategy, options = {}) {
   switch (strategy) {
     case 'minimum':
       return ids(active);
-    case 'snowball':
-      return ids([...active].sort((a, b) => a.balance - b.balance || b.rateNominal - a.rateNominal));
+    case 'snowball': {
+      const alone = new Map(active.map((d) => [d.id, monthsAloneOf(d)]));
+      return ids(
+        [...active].sort(
+          (a, b) =>
+            alone.get(a.id) - alone.get(b.id) || a.balance - b.balance || b.rateNominal - a.rateNominal,
+        ),
+      );
+    }
     case 'lifetime':
       return ids([...active].sort((a, b) => feeAdjusted(b) - feeAdjusted(a) || a.balance - b.balance));
     case 'shortTerm': {
@@ -480,12 +504,50 @@ function firstCleared(plan) {
   return plan.events.find((e) => e.type === 'cleared') ?? null;
 }
 
+/** Five years: long enough for a vehicle loan to clear and its instalment to be felt. */
+export const CASH_FREED_HORIZON = 60;
+
+/**
+ * How much cash a plan puts back in the household's hands over `horizon` cycles, counted as
+ * rand-months: a R5 000 instalment freed with 40 cycles of the horizon left is worth 200 000, the
+ * same instalment freed with 4 left is worth 20 000. That is the shape of "as much money a month as
+ * possible, as soon as possible" — it rewards size and earliness together, where a debt-free date
+ * alone rewards only the finish and an interest total rewards neither.
+ *
+ * The cascade decides when money is actually yours. With it ON a freed instalment is spent at once
+ * on the next debt, so nothing returns until the last one clears and then all of it does; with it
+ * OFF each payoff is money back that cycle. A plan that never clears returns nothing.
+ *
+ * Only compare scores across plans that share a cascade setting. `minimum` forces it off, so its
+ * figure is counted under the other rule and reads high beside a cascading plan that is quietly
+ * reinvesting the same money; `comparePlans` never lets it win for that reason, the same reason it
+ * is the baseline for every other column rather than a candidate.
+ */
+export function cashFreedWithin(plan, horizon = CASH_FREED_HORIZON) {
+  if (!plan) return 0;
+  if (plan.cascade) {
+    if (plan.reachedCap || !(plan.months > 0)) return 0;
+    const finalRelief = Object.values(plan.perDebt ?? {}).reduce((sum, d) => sum + (d.scheduled ?? 0), 0);
+    return finalRelief * Math.max(0, horizon - plan.months);
+  }
+  return (plan.freedTimeline ?? []).reduce(
+    (sum, f) => sum + f.freed * Math.max(0, horizon - f.month + 1),
+    0,
+  );
+}
+
 /**
  * Every strategy on the same inputs, with `minimum` as the baseline.
  *
  * @returns {{ minimum, avalanche, snowball, lifetime, shortTerm, custom?,
- *   table: [{ strategy, months, debtFreeDate, totalInterest, totalFees, interestSavedVsMinimum, monthsSavedVsMinimum, firstPayoffMonth, firstPayoffId }],
- *   best: { byInterest, byDate, byFirstRelief } }}
+ *   table: [{ strategy, months, debtFreeDate, totalInterest, totalFees, interestSavedVsMinimum,
+ *             monthsSavedVsMinimum, firstPayoffMonth, firstPayoffId, cashFreed }],
+ *   best: { byInterest, byDate, byFirstRelief, byCashFreed } }}
+ *
+ * `best.byCashFreed` is what the Auto strategy follows: the ordering that hands the most money back
+ * per month, soonest (see cashFreedWithin). It is a different question from `byInterest`, which
+ * minimises what the bank keeps over the whole life of the debt, and the two often disagree — the
+ * cheapest plan can be the one that frees nothing for six years.
  */
 export function comparePlans(debts, options = {}) {
   const names = options.order?.length ? [...STRATEGIES, 'custom'] : STRATEGIES;
@@ -507,15 +569,24 @@ export function comparePlans(debts, options = {}) {
       monthsSavedVsMinimum: minimum.months - plan.months,
       firstPayoffMonth: first?.month ?? null,
       firstPayoffId: first?.id ?? null,
+      cashFreed: cashFreedWithin(plan),
     };
   });
   const candidates = table.filter((r) => r.strategy !== 'minimum');
-  const pick = (score) => {
+  /**
+   * The candidate with the smallest score, `tie` breaking a draw. The tie-break is not decoration:
+   * when nothing clears inside the horizon every plan frees exactly nothing, and without one the
+   * winner would be whichever strategy happens to be listed first — a coin toss wearing a badge.
+   */
+  const pick = (score, tie = () => 0) => {
     let best = null;
     candidates.forEach((r) => {
       const value = score(r);
       if (value == null) return;
-      if (!best || value < best.value) best = { strategy: r.strategy, value };
+      const breaker = tie(r) ?? 0;
+      if (!best || value < best.value || (value === best.value && breaker < best.breaker)) {
+        best = { strategy: r.strategy, value, breaker };
+      }
     });
     return best?.strategy ?? 'minimum';
   };
@@ -526,6 +597,14 @@ export function comparePlans(debts, options = {}) {
       byInterest: pick((r) => r.totalInterest),
       byDate: pick((r) => r.months),
       byFirstRelief: pick((r) => r.firstPayoffMonth ?? Infinity),
+      // `pick` takes the smallest, and more freed cash is better, so it is scored negative. When
+      // no plan frees anything inside the horizon — a household so far under water that nothing
+      // clears — the least interest paid decides, because "costs you least" is the only honest
+      // answer left when "hands you back the most" has no winner.
+      byCashFreed: pick(
+        (r) => -r.cashFreed,
+        (r) => r.totalInterest,
+      ),
     },
   };
 }

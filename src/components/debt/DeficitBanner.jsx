@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
+import { AlertTriangle, Sparkles } from 'lucide-react';
 import { Card } from '../ui/Surface';
 import { formatCurrencyAbs } from '../../utils/format';
 
@@ -31,7 +31,7 @@ function Assumptions({ items }) {
   );
 }
 
-export function DeficitBanner({ debtBudget, onOpenPlan }) {
+export function DeficitBanner({ debtBudget }) {
   if (!debtBudget) return null;
 
   const deficit = Math.max(0, debtBudget.deficitPerCycle ?? 0);
@@ -70,17 +70,6 @@ export function DeficitBanner({ debtBudget, onOpenPlan }) {
               <Assumptions items={debtBudget.assumptions} />
             </div>
           </div>
-          {onOpenPlan && (
-            <button
-              type="button"
-              onClick={onOpenPlan}
-              className="press glass-chip flex shrink-0 items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11"
-            >
-              Close it
-              <ArrowRight size={13} />
-              Plan
-            </button>
-          )}
         </div>
       </Card>
     );

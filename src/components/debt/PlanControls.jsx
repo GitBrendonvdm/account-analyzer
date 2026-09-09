@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ArrowUp, GitMerge } from 'lucide-react';
+import { ArrowDown, ArrowUp, GitMerge } from 'lucide-react';
 import { CardHead } from '../ui/Surface';
 import { Field } from '../ui/Field';
 import { formatCurrencyAbs } from '../../utils/format';
@@ -13,16 +13,18 @@ import { formatCurrencyAbs } from '../../utils/format';
  * available otherwise — rather than zero, because a plan cannot spend money that is not there.
  * Below the deficit line nothing reaches a debt (it is stopping the bleed), and the caption says
  * exactly how much does. Anything above what the cycles already give has to be found by cuts, and
- * the link to Plan is where those cuts are listed. Every control here persists through settings so
- * the choice survives a reload and the next browser.
+ * the caption says how much. Every control here persists through settings so the choice survives a
+ * reload and the next browser.
+ *
+ * "Planned saving" came off the retired Plan tab, and it belongs here: it is the one figure that
+ * moves the deficit itself. The debt budget adds it back to the surplus before calling the
+ * difference a gap, so putting money aside on purpose is not read as money you failed to have.
  *
  * On a phone every control is a thumb tall (44px) and full width: the slider's hit box is as tall
- * as the control, and the lump and prime fields share one row with 16px inputs so iOS does not zoom
- * the page when one is focused. All of it is `max-md:`; from `md` up nothing moves.
+ * as the control, and the three numeric fields lay out two to a row with 16px inputs so iOS does
+ * not zoom the page when one is focused. All of it is `max-md:`; from `md` up nothing moves.
  */
 
-/** An inline link inside a sentence: pad the hit area out to 44px without moving the line. */
-const INLINE_TAP = 'max-md:-my-3 max-md:min-h-11 max-md:min-w-11 max-md:justify-center max-md:py-3';
 /** Make the kit's small numeric inputs phone-sized: full width, 44px, 16px type. */
 const FIELD_TAP = 'max-md:[&_input]:min-h-11 max-md:[&_input]:w-full max-md:[&_input]:text-base max-md:[&_label]:flex';
 
@@ -41,7 +43,8 @@ export function PlanControls({
   onLump,
   primeRate,
   onPrimeRate,
-  onOpenPlan,
+  monthlySaving = 0,
+  onMonthlySaving,
   order = [],
   onOrder,
   labelsById = {},
@@ -97,18 +100,9 @@ export function PlanControls({
                   : 'Nothing is left over at the moment; all of this has to be found.'}
           </p>
           {!minimum && cuts > 0 && (
-            <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] text-warn">
-              needs {formatCurrencyAbs(cuts)} of cuts
-              {onOpenPlan && (
-                <button
-                  type="button"
-                  onClick={onOpenPlan}
-                  className={`press inline-flex items-center gap-1 text-info hover:brightness-125 ${INLINE_TAP}`}
-                >
-                  <ArrowRight size={12} />
-                  Plan
-                </button>
-              )}
+            <p className="mt-1.5 text-[13px] text-warn">
+              needs {formatCurrencyAbs(cuts)} a cycle of cuts — the standing-charges audit under
+              Habits is where they are listed
             </p>
           )}
         </div>
@@ -127,7 +121,7 @@ export function PlanControls({
             {cascade ? 'Freed instalments roll on' : 'Freed instalments come back to you'}
           </button>
 
-          {/* One row of two on a phone; `md:contents` hands the fields back to the flex row above it. */}
+          {/* Two per row on a phone; `md:contents` hands the fields back to the flex row above it. */}
           <div className={`grid grid-cols-2 gap-3 md:contents ${FIELD_TAP}`}>
             <Field
               label="Lump sum"
@@ -154,6 +148,20 @@ export function PlanControls({
               placeholder="not set"
               width="w-20"
             />
+
+            {onMonthlySaving && (
+              <Field
+                label="Planned saving"
+                value={monthlySaving > 0 ? monthlySaving : ''}
+                onCommit={(raw) => {
+                  const n = Number(String(raw).replace(/[^\d.]/g, ''));
+                  onMonthlySaving(Number.isFinite(n) && n > 0 ? Math.round(n) : 0);
+                }}
+                prefix="R"
+                placeholder="0"
+                width="w-28"
+              />
+            )}
           </div>
         </div>
       </div>

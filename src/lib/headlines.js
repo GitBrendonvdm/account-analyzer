@@ -13,15 +13,18 @@ import { formatCurrencyAbs } from '../utils/format';
  * just an opinion.
  *
  * Nothing here computes. Every figure is read off a builder that owns it — the debt budget, the
- * plans, the vitals, the recurring engine, the savings finder — so a headline can never disagree
- * with the view it points at. That is also why every input past the first seven is optional: the
+ * plans, the vitals, the recurring engine, the standing-charges audit — so a headline can never
+ * disagree with the view it points at. That is also why every input past the first seven is optional: the
  * builders land in the app one at a time, and a caller that has only the old seven still gets the
  * old headlines. A missing builder means a missing headline, never a thrown one.
  *
- * Two sources were retired on purpose. `summary.missedPayments` judged "overdue" by amount
+ * Three sources were retired on purpose. `summary.missedPayments` judged "overdue" by amount
  * consistency and called the vehicle loan late every month; the recurring engine's `overdue` list
- * knows the day a line usually lands. And the "n merchants bill you every cycle" line invited the
- * reader to imagine cancelling a bond; the finder's `found` counts only what could be cancelled.
+ * knows the day a line usually lands. The "n merchants bill you every cycle" line invited the
+ * reader to imagine cancelling a bond. And the savings finder's "R x of cancellable spend found"
+ * ranked and re-totalled figures every other card already carried, so a reader met the same
+ * subscription three times over — once here, once in its own hero, once on the audit — and the
+ * three could drift apart. The audit's own totals are the one place that arithmetic now lives.
  */
 
 const R = (n) => formatCurrencyAbs(n);
@@ -103,7 +106,6 @@ export function buildHeadlines({
   rateSteps = null,
   upcoming = null,
   subscriptions = null,
-  finder = null,
   drift = null,
   quickWin = null,
 } = {}) {
@@ -302,19 +304,6 @@ export function buildHeadlines({
           ? `New${since}: ${labels[0] ?? 'a charge'} — ${fresh[0].wording ?? 'new regular charge'}, ${R(fresh[0].perCycle)} a cycle.`
           : `${fresh.length} new charges${since}: ${labels.join(', ')} — together ${R(total)} a cycle.`,
       detail: `${R(total * 12)} a year if ${fresh.length === 1 ? 'it stays' : 'they all stay'}. A charge this new is the one most worth a second look.`,
-    });
-  }
-
-  // ---- 10. What could be cancelled --------------------------------------------------------------
-  if (finder && finite(finder.found) > 0) {
-    const cover = Number.isFinite(finder.cover) ? ` — ${Math.round(finder.cover * 100)}% of the gap` : '';
-    const behavioural = finite(finder.behaviouralPotential);
-    out.push({
-      id: 'found',
-      tone: 'good',
-      weight: finder.found * 12,
-      text: `${R(finder.found)} a cycle of cancellable spend found${cover}.`,
-      detail: `${R(finite(finder.foundPerYear, finder.found * 12))} a year, counting only cancellable items at high or medium confidence${behavioural > 0 ? `; ${R(behavioural)} more a cycle if the trips and drift change` : ''}.`,
     });
   }
 

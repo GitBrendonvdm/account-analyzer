@@ -28,7 +28,14 @@ const CARD = 'materialize p-5 sm:p-8';
  *
  * The extra slider is the one place the deficit is honest about itself: its floor IS the deficit.
  * Nothing reaches a debt until the bleed is stopped, so the first R{deficit} of anything found is
- * spoken for, and the plan only changes once the slider is above that line.
+ * spoken for, and the plan only changes once the slider is above that line. While the cycles close
+ * short the tiles say so in as many words rather than quietly drawing a plan nobody can follow —
+ * see StrategyTiles, which is handed the deficit for exactly that.
+ *
+ * AUTO is the default strategy and the only one most readers should ever need: it follows
+ * `plans.best.byCashFreed`, the ordering that hands the most money back per month, soonest. The
+ * five named strategies stay because a reader who wants to see why should be able to, and because
+ * Auto is only trustworthy if the tile it lands on shows its own working beside the alternatives.
  *
  * Balances-to-zero and freed-cash-over-time are two readings of the one schedule, not two separate
  * questions, so they share a Card behind a small toggle rather than both always rendering — the
@@ -40,15 +47,20 @@ const BALANCE_VIEWS = [
   { id: 'freed', label: 'Freed cash' },
 ];
 
+const AUTO = { id: 'auto', label: 'Auto', blurb: 'Whichever frees the most cash a month, soonest' };
 const STRATEGIES = [
+  AUTO,
   { id: 'minimum', label: 'Minimum', blurb: 'Only the contractual payments' },
   { id: 'avalanche', label: 'Avalanche', blurb: 'Highest rate first' },
-  { id: 'snowball', label: 'Snowball', blurb: 'Smallest balance first' },
+  { id: 'snowball', label: 'Snowball', blurb: 'Whichever clears soonest first' },
   { id: 'lifetime', label: 'Lifetime', blurb: 'Highest fee-adjusted rate first' },
   { id: 'shortTerm', label: 'Short-term', blurb: 'Most interest avoided this year first' },
   { id: 'custom', label: 'Custom', blurb: 'Your own order' },
 ];
 const STRATEGY_IDS = STRATEGIES.map((s) => s.id);
+
+/** What Auto resolves to: the most cash freed per month, soonest, else the soonest first payoff. */
+const autoPick = (plans) => plans?.best?.byCashFreed ?? plans?.best?.byFirstRelief ?? 'avalanche';
 
 const EXTRA_MAX = 20000;
 const EXTRA_STEP = 500;
@@ -69,7 +81,8 @@ export function DebtView({
   accounts,
   settings,
   onPatchAccount,
-  onOpenPlan,
+  monthlySaving = 0,
+  onMonthlySaving,
   onOpenAccounts,
   asOf,
   engine = null,
@@ -80,8 +93,8 @@ export function DebtView({
   const debtList = debts ?? EMPTY;
 
   // ---- persisted controls -------------------------------------------------------------------
-  const storedStrategy = readSetting(settings, 'debtStrategy', plans?.best?.byInterest ?? 'avalanche');
-  const strategy = STRATEGY_IDS.includes(storedStrategy) ? storedStrategy : 'avalanche';
+  const storedStrategy = readSetting(settings, 'debtStrategy', 'auto');
+  const strategy = STRATEGY_IDS.includes(storedStrategy) ? storedStrategy : 'auto';
 
   const deficit = Math.max(0, debtBudget?.deficitPerCycle ?? 0);
   const available = Math.max(0, debtBudget?.extraSchedule?.[0] ?? debtBudget?.adjusted ?? 0);
@@ -122,6 +135,9 @@ export function DebtView({
   // first-paint plan, so the two never disagree on mount.
   const gapClosed = deficit > 0 && extra > deficit;
   const extraToDebts = deficit > 0 ? Math.max(0, extra - deficit) : extra;
+  // Nothing reaches a debt while the cycles close short and the slider sits on its floor. Every
+  // plan below is then the same plan, and saying so out loud is the whole point of this view.
+  const stalled = deficit > 0 && extraToDebts <= 0;
   const inflows = useMemo(() => {
     if (gapClosed) return {};
     if (planOptions?.inflows) return planOptions.inflows;
@@ -133,24 +149,28 @@ export function DebtView({
   );
   // An `order` makes the engine run the custom plan as well; only ask for it once there is one.
   const customActive = customOrder != null || strategy === 'custom';
-  const runOptions = useMemo(
+  // Everything the comparison needs EXCEPT which strategy to show. comparePlans runs every
+  // ordering regardless, and Auto's choice is read off its answer — so the strategy cannot be an
+  // input to the run that decides it. It is put back below, for the callers that do need it.
+  const runBase = useMemo(
     () => ({
       ...(planOptions ?? {}),
-      strategy,
       ...(customActive ? { order } : {}),
       extraPerMonth: extraToDebts,
       inflows,
       cascade,
       lumps: lump > 0 ? [{ month: lumpMonth, amount: lump, targetId: null }] : [],
     }),
-    [planOptions, strategy, customActive, order, extraToDebts, inflows, cascade, lump, lumpMonth],
+    [planOptions, customActive, order, extraToDebts, inflows, cascade, lump, lumpMonth],
   );
 
   const plansShown = useMemo(
-    () => (engine?.comparePlans && debtList.length ? engine.comparePlans(debtList, runOptions) : plans),
-    [engine, debtList, runOptions, plans],
+    () => (engine?.comparePlans && debtList.length ? engine.comparePlans(debtList, runBase) : plans),
+    [engine, debtList, runBase, plans],
   );
-  const plan = plansShown?.[strategy] ?? plansShown?.avalanche ?? null;
+  const resolved = strategy === 'auto' ? autoPick(plansShown) : strategy;
+  const runOptions = useMemo(() => ({ ...runBase, strategy: resolved }), [runBase, resolved]);
+  const plan = plansShown?.[resolved] ?? plansShown?.avalanche ?? null;
 
   const sensitivityShown = useMemo(
     () =>
@@ -166,7 +186,7 @@ export function DebtView({
 
   return (
     <div className="flex flex-col gap-5">
-      <DeficitBanner debtBudget={debtBudget} onOpenPlan={onOpenPlan} />
+      <DeficitBanner debtBudget={debtBudget} />
 
       <LiabilityTable
         terms={termList}
@@ -217,7 +237,8 @@ export function DebtView({
               onLump={(v) => setSetting('debtLump', v)}
               primeRate={primeRate}
               onPrimeRate={(v) => setSetting('primeRate', v)}
-              onOpenPlan={onOpenPlan}
+              monthlySaving={monthlySaving}
+              onMonthlySaving={onMonthlySaving}
               order={order}
               onOrder={setCustomOrder}
               labelsById={labelsById}
@@ -228,10 +249,14 @@ export function DebtView({
               table={plansShown?.table ?? EMPTY}
               best={plansShown?.best}
               selected={strategy}
+              resolved={resolved}
               onSelect={(id) => setSetting('debtStrategy', id)}
               plan={plan}
               plans={plansShown}
               extra={extraToDebts}
+              deficit={deficit}
+              stalled={stalled}
+              absorberLabel={debtBudget?.absorberLabel ?? null}
               labelsById={labelsById}
             />
           </Card>
@@ -277,7 +302,6 @@ export function DebtView({
               deficit={deficit}
               incomePerCycle={incomePerCycle}
               instalmentsPerCycle={debtList.reduce((sum, d) => sum + (d.instalment ?? 0), 0)}
-              onOpenPlan={onOpenPlan}
             />
           )}
 

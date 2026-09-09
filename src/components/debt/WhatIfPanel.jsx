@@ -53,7 +53,7 @@ function Line({ children }) {
 
 const B = ({ children, tone = 'text-label' }) => <b className={`font-semibold ${tone}`}>{children}</b>;
 
-export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, instalmentsPerCycle = null, onOpenPlan }) {
+export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, instalmentsPerCycle = null }) {
   const list = useMemo(() => debts ?? [], [debts]);
   const [targetId, setTargetId] = useState(null);
   const [months, setMonths] = useState(3);
@@ -232,11 +232,6 @@ export function WhatIfPanel({ debts, base, deficit = 0, incomePerCycle = null, i
             <li key={a}>{a}</li>
           ))}
         </ul>
-      )}
-      {onOpenPlan && deficit > 0 && (
-        <button type="button" onClick={onOpenPlan} className="press mt-4 flex items-center gap-1.5 text-[13px] font-medium text-info hover:brightness-125 max-md:min-h-11">
-          Where the money could come from <ArrowRight size={13} />
-        </button>
       )}
     </Card>
   );

@@ -3,6 +3,7 @@ import { realTermsDebts } from './debtFixtures';
 import {
   addCycles,
   amortise,
+  cashFreedWithin,
   annuity,
   buildDebtBudget,
   cascadeTimeline,
@@ -124,6 +125,41 @@ describe('simulatePlan', () => {
     expect(feeAdjusted(byId[NED_BOND])).toBeCloseTo(0.0936, 3);
     expect(payoffOrder(debts, 'shortTerm')).toEqual(payoffOrder(debts, 'avalanche'));
     expect(payoffOrder(debts, 'custom', { order: [NED_BOND, 'unknown'] })).toEqual([NED_BOND, CARD, PERSONAL, FNB_BOND, VEHICLE]);
+  });
+
+  it('snowball orders by time to clear, not by balance', () => {
+    // A big loan almost paid off, and a small card whose minimum barely covers its interest. The
+    // textbook snowball attacks the card because it is smaller; the useful one attacks the loan,
+    // because that is the instalment that comes free first and rolls onto everything after it.
+    const nearlyDone = {
+      id: 'vehicle', label: 'Vehicle', type: 'Loan', balance: 60000, rateNominal: 0.095,
+      instalment: 5000, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null,
+      balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [],
+    };
+    const slowCard = {
+      id: 'card', label: 'Card', type: 'Credit Card', balance: 25000, rateNominal: 0.2075,
+      instalment: null, feeMonthly: 40, plannedPayment: 700, minimumPct: 2, creditLimit: 40000,
+      balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [],
+    };
+    const debts = [slowCard, nearlyDone];
+    expect(nearlyDone.balance).toBeGreaterThan(slowCard.balance);
+    expect(amortise(nearlyDone, {}).months).toBeLessThan(amortise(slowCard, {}).months);
+    expect(payoffOrder(debts, 'snowball')).toEqual(['vehicle', 'card']);
+  });
+
+  it('sorts a debt whose payment never covers its interest last, not first', () => {
+    const stuck = {
+      id: 'stuck', label: 'Stuck', type: 'Loan', balance: 20000, rateNominal: 0.24,
+      instalment: 100, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null,
+      balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [],
+    };
+    const ordinary = {
+      id: 'ordinary', label: 'Ordinary', type: 'Loan', balance: 90000, rateNominal: 0.1,
+      instalment: 6000, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null,
+      balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [],
+    };
+    expect(amortise(stuck, {}).cleared).toBe(false);
+    expect(payoffOrder([stuck, ordinary], 'snowball')).toEqual(['ordinary', 'stuck']);
   });
 
   it('marginal value of R1 000: lump and monthly, against the closed forms', () => {
@@ -276,6 +312,73 @@ describe('comparePlans and buildDebtBudget', () => {
     const custom = comparePlans(debts, { order: [NED_BOND] });
     expect(custom.custom.order[0]).toBe(NED_BOND);
     expect(custom.table).toHaveLength(6);
+  });
+
+  it('picks the plan that hands the most money back a month, soonest', () => {
+    const debts = realTermsDebts();
+    const options = { currentMonth: '2026-08', nextPayDate: new Date(2026, 7, 23), extraPerMonth: 8000 };
+    const plans = comparePlans(debts, options);
+
+    // Every row carries its own score, and Auto follows the largest among the real strategies.
+    // `minimum` is out of the running by construction: it is the baseline, and it forces the
+    // cascade off, so its freed cash is counted under a different rule and is not comparable.
+    plans.table.forEach((r) => expect(Number.isFinite(r.cashFreed)).toBe(true));
+    const candidates = plans.table.filter((r) => r.strategy !== 'minimum');
+    // Most cash freed, least interest breaking a draw — and on these debts every plan runs past
+    // the horizon, so it IS a draw and the tie-break is what decides.
+    const [best] = candidates
+      .slice()
+      .sort((a, b) => b.cashFreed - a.cashFreed || a.totalInterest - b.totalInterest);
+    expect(candidates.every((r) => r.cashFreed === candidates[0].cashFreed)).toBe(true);
+    expect(plans.best.byCashFreed).toBe(best.strategy);
+    expect(plans.best.byCashFreed).toBe(plans.best.byInterest);
+    expect(plans.best.byCashFreed).not.toBe('minimum');
+    expect(cashFreedWithin(plans[plans.best.byCashFreed])).toBe(best.cashFreed);
+
+    // It is a different question from "least interest": one minimises what the bank keeps, the
+    // other maximises what comes back per cycle and how soon, so the two may name different plans.
+    expect(['minimum', 'avalanche', 'snowball', 'lifetime', 'shortTerm']).toContain(plans.best.byCashFreed);
+  });
+
+  it('scores freed cash by size and earliness, and gives a plan that never clears nothing', () => {
+    const twoLoans = [
+      { id: 'fast', label: 'Fast', type: 'Loan', balance: 20000, rateNominal: 0.1, instalment: 5000, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null, balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [] },
+      { id: 'slow', label: 'Slow', type: 'Loan', balance: 200000, rateNominal: 0.1, instalment: 6000, feeMonthly: 0, plannedPayment: null, minimumPct: null, creditLimit: null, balloon: null, termMonths: null, remainingMonths: null, source: {}, assumptions: [] },
+    ];
+    // Cascade off: each payoff is money back that cycle, so an earlier one is worth more.
+    const loose = simulatePlan(twoLoans, { strategy: 'snowball', cascade: false, extraPerMonth: 0 });
+    expect(cashFreedWithin(loose, 60)).toBeGreaterThan(0);
+    // Cascade on: nothing returns until the last debt clears, then every instalment does.
+    const rolled = simulatePlan(twoLoans, { strategy: 'snowball', cascade: true, extraPerMonth: 0 });
+    expect(cashFreedWithin(rolled, 60)).toBe(11000 * (60 - rolled.months));
+    // A horizon that ends before the plan does frees nothing yet.
+    expect(cashFreedWithin(rolled, rolled.months)).toBe(0);
+    expect(cashFreedWithin(null)).toBe(0);
+
+  });
+
+  it('picks a different plan from "least interest" when the two questions disagree', () => {
+    // An expensive slow debt and a cheap one that clears fast. Avalanche attacks the expensive one
+    // and pays the least interest; snowball clears the cheap one first, so its R1 200 instalment
+    // is back in the household's hands years earlier. With the cascade off — freed instalments
+    // come back to you rather than rolling on — those are different answers, and Auto takes the
+    // second, because "as much money a month as possible" is what it was asked for.
+    const mk = (id, balance, rateNominal, instalment) => ({
+      id, label: id, type: 'Loan', balance, rateNominal, instalment, feeMonthly: 0,
+      plannedPayment: null, minimumPct: null, creditLimit: null, balloon: null, termMonths: null,
+      remainingMonths: null, source: {}, assumptions: [],
+    });
+    const debts = [mk('pricey', 150000, 0.22, 4000), mk('quick', 30000, 0.08, 1200)];
+    expect(payoffOrder(debts, 'avalanche')).toEqual(['pricey', 'quick']);
+    expect(payoffOrder(debts, 'snowball')).toEqual(['quick', 'pricey']);
+
+    const plans = comparePlans(debts, { extraPerMonth: 3000, cascade: false, currentMonth: '2026-08' });
+    const candidates = plans.table.filter((r) => r.strategy !== 'minimum');
+    expect(new Set(candidates.map((r) => r.cashFreed)).size).toBeGreaterThan(1);
+    expect(plans.best.byCashFreed).toBe('snowball');
+    expect(plans.best.byInterest).toBe('avalanche');
+    const top = Math.max(...candidates.map((r) => r.cashFreed));
+    expect(plans.table.find((r) => r.strategy === plans.best.byCashFreed).cashFreed).toBe(top);
   });
 
   it('budget: a deficit lands on the card and is priced; a planned saving frees extra', () => {

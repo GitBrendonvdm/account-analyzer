@@ -68,7 +68,31 @@ describe('DebtView', () => {
     expect(html).toContain('a cycle short');
     expect(html).toContain('stops the bleed');
     expect(html).toMatch(/type="range"[^>]*min="9500"/);
-    expect(html).toContain('Close it');
+  });
+
+  it('says there is no plan to choose while the cycles close short', () => {
+    const html = render(fixtureProps());
+    expect(html).toContain('You are spending more than you earn');
+    expect(html).toContain('nothing extra reaches a debt and there is no debt plan to choose yet');
+    expect(html).toContain('every tile below is the same one');
+    // The narrative must not offer "R 0 extra a month goes to the ..." — a sentence about nothing.
+    // On these fixtures the gap lands on the card every cycle and nothing ever clears, so what it
+    // says instead is that; a plan that did clear would get the "nothing extra to send" wording.
+    expect(html).not.toMatch(/R 0 extra a month/);
+    expect(html).toMatch(/does not clear within 50 years|nothing extra to send/);
+    // Once the slider is above the deficit the warning goes and the plans are real again.
+    const funded = render(fixtureProps({ settings: fakeSettings({ debtExtra: 20000 }) }));
+    expect(funded).not.toContain('You are spending more than you earn');
+  });
+
+  it('defaults to Auto and names the strategy it resolved to', () => {
+    const html = render(fixtureProps());
+    expect(html).toContain('>Auto<');
+    expect(html).toContain('picked for you');
+    expect(html).toMatch(/Whichever frees the most cash a month, soonest — right now, \w+/);
+    expect(html).toMatch(/aria-pressed="true"[^>]*>[\s\S]{0,200}?>Auto</);
+    // Auto borrows a real strategy's figures rather than inventing its own.
+    expect(html).toMatch(/Auto \((Avalanche|Snowball|Lifetime|Short-term|Minimum)\)/);
   });
 
   it('says what is available when the cycles close with a surplus', () => {

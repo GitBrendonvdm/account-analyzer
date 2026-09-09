@@ -69,12 +69,11 @@ const subscriptions = {
     { label: 'Coffee', perCycle: 300, wording: 'charged twice, about a month apart', headline: false },
   ],
 };
-const finder = { found: 3200, foundPerYear: 38400, cover: 0.64, deficit: 5000, behaviouralPotential: 900 };
 const drift = {
   flagged: [{ category: 'Pets', delta: 900, direction: 'up', baselineMedian: 1500, recentMedian: 2400, sentence: 'Pets: R2 400 a cycle, well outside the usual R1 500 ± R120' }],
   recent: ['2026-05', '2026-06', '2026-07'],
 };
-const everything = { ...legacy, debtBudget, plans, rateSteps, vitals, direction, upcoming, subscriptions, finder, drift };
+const everything = { ...legacy, debtBudget, plans, rateSteps, vitals, direction, upcoming, subscriptions, drift };
 
 describe('buildHeadlines — legacy contract', () => {
   it('still works with only the seven original inputs', () => {
@@ -108,7 +107,6 @@ describe('buildHeadlines — legacy contract', () => {
         rateSteps: null,
         upcoming: null,
         subscriptions: null,
-        finder: null,
         drift: null,
       }),
     ).not.toThrow();
@@ -123,7 +121,6 @@ describe('buildHeadlines — legacy contract', () => {
         rateSteps: [{}, null, [{ kind: 'rateStep' }]],
         upcoming: { overdue: [{}] },
         subscriptions: { newLines: [{ headline: true }] },
-        finder: { found: 'x' },
         drift: { flagged: [{}] },
       }),
     ).not.toThrow();
@@ -273,20 +270,13 @@ describe('buildHeadlines — new templates', () => {
     expect(byId(buildHeadlines({ summary, processed, subscriptions: quiet }), 'new-charge')).toBeUndefined();
   });
 
-  it('found replaces subscriptions and never co-exists with it', () => {
-    const withFinder = buildHeadlines({ ...legacy, finder });
-    const h = byId(withFinder, 'found');
-    expect(h).toBeDefined();
-    expect(h.tone).toBe('good');
-    expect(h.weight).toBe(3200 * 12);
-    expect(plain(h.text)).toBe('R 3 200 a cycle of cancellable spend found — 64% of the gap.');
-    expect(ids(withFinder)).not.toContain('subscriptions');
-    // The old merchants-that-bill-you line is gone even when nothing replaces it.
+  it('never prints the merchants-that-bill-you line, whatever it is handed', () => {
+    // It invited the reader to imagine cancelling a bond. Its replacement, the savings finder's
+    // "R x of cancellable spend found", is gone too: it re-totalled what the Habits cards already
+    // said, so the same subscription reached the reader twice at two different figures.
     expect(ids(buildHeadlines(legacy))).not.toContain('subscriptions');
     expect(ids(buildHeadlines({ summary, processed, habits }))).not.toContain('subscriptions');
-    const noGap = byId(buildHeadlines({ summary, processed, finder: { ...finder, cover: null } }), 'found');
-    expect(plain(noGap.text)).toBe('R 3 200 a cycle of cancellable spend found.');
-    expect(byId(buildHeadlines({ summary, processed, finder: { ...finder, found: 0 } }), 'found')).toBeUndefined();
+    expect(ids(buildHeadlines(everything))).not.toContain('found');
   });
 
   it('category-move reads drift first and habits only when drift is absent', () => {
@@ -320,7 +310,6 @@ describe('buildHeadlines — every template is reachable and prints clean text',
     'direction',
     'overdue',
     'new-charge',
-    'found',
     'category-move',
     'card-limit',
     'net-worth',
@@ -339,7 +328,6 @@ describe('buildHeadlines — every template is reachable and prints clean text',
       direction: { summary, processed, direction },
       overdue: { summary, processed, upcoming },
       'new-charge': { summary, processed, subscriptions },
-      found: { summary, processed, finder },
       'category-move': { summary, processed, drift },
       'card-limit': { summary, processed, positions, headroom },
       'net-worth': { summary, processed, netWorth },
@@ -360,7 +348,6 @@ describe('buildHeadlines — every template is reachable and prints clean text',
       { summary, processed, direction: { summary: { widening: true, netShort: -1, netLong: 0 } } },
       { summary, processed, upcoming: { overdue: [{ perCycle: 12 }] } },
       { summary, processed, subscriptions: { newLines: [{ headline: true, perCycle: 5 }] } },
-      { summary, processed, finder: { found: 1 } },
       { summary, processed, drift: { flagged: [{ delta: 400 }] } },
       { summary, processed, netWorth: { knownCount: 1, totalCount: 1, complete: true } },
     ];

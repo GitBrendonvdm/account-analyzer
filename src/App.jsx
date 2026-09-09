@@ -17,9 +17,6 @@ import { buildCostOfDebt } from './lib/costOfDebt';
 import { buildHabits } from './lib/habits';
 import { buildHeadlines } from './lib/headlines';
 import { deriveSafeToSpend } from './lib/safeToSpend';
-import { buildBudgetProgress, buildCategoryPlan } from './lib/budgets';
-import { buildGapClosers, buildTrajectory } from './lib/trajectory';
-import { summariseGoals } from './lib/goals';
 import { EmptyState } from './components/EmptyState';
 import { Login } from './components/Login';
 import { MigrateBanner } from './components/MigrateBanner';
@@ -40,14 +37,13 @@ import { processTransactionData } from './lib/processTransactionData';
 import { buildRecurringLines } from './lib/recurring';
 import { buildIncomeProfile } from './lib/incomeProfile';
 import { buildUpcoming } from './lib/upcoming';
-import { buildDirection, buildVitals } from './lib/vitals';
+import { buildVitals } from './lib/vitals';
 import { buildCashToPayday } from './lib/cashToPayday';
 import { buildSubscriptions } from './lib/subscriptions';
 import { buildPriceCreep } from './lib/priceCreep';
 import { buildDrift } from './lib/drift';
 import { buildBasket } from './lib/basket';
 import { buildFeesAudit } from './lib/fees';
-import { buildSavingsFinder } from './lib/savingsFinder';
 import { bestQuickWin } from './lib/scenario';
 // Everything that is not the opening screen loads on first use. Today is a hand-drawn page; the
 // other views carry Recharts, the debt engine's UI and the PDF reader, which together doubled the
@@ -55,7 +51,6 @@ import { bestQuickWin } from './lib/scenario';
 const LedgerView = lazy(() => import('./components/LedgerView').then((m) => ({ default: m.LedgerView })));
 const ChartsView = lazy(() => import('./components/ChartsView').then((m) => ({ default: m.ChartsView })));
 const HabitsView = lazy(() => import('./components/HabitsView').then((m) => ({ default: m.HabitsView })));
-const PlanView = lazy(() => import('./components/PlanView').then((m) => ({ default: m.PlanView })));
 const DebtView = lazy(() => import('./components/DebtView').then((m) => ({ default: m.DebtView })));
 const AccountsView = lazy(() => import('./components/AccountsView').then((m) => ({ default: m.AccountsView })));
 const StatementUpload = lazy(() =>
@@ -65,7 +60,6 @@ const StatementUpload = lazy(() =>
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
-import { usePlanState } from './hooks/usePlanState';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('today');
@@ -165,10 +159,12 @@ export default function App() {
   );
 
 
-  // ---- plan: targets, goals, scenario ------------------------------------------------------
-  const { targets, setTarget, goals, addGoal, removeGoal, monthlySaving, setMonthlySaving } =
-    usePlanState();
   const settings = useSettings();
+
+  // What the household means to put away each cycle, which the debt budget adds back before it
+  // calls the difference a deficit. It used to be the Plan tab's slider; it is a Debt dial now,
+  // and lives in settings beside every other one rather than in a hook of its own.
+  const monthlySaving = Number(settings.get('monthlySaving', 0)) || 0;
 
   // The user's say over the recurring engine, read before anything that depends on it. `keep` /
   // `ignore` are the standing-charges audit's own bookkeeping; `cancelled` and `replaced` END a
@@ -288,13 +284,6 @@ export default function App() {
         : null,
     [processedLong, data, accounts, balanced, costOfDebtLong, transfers, calendar, today],
   );
-  const direction = useMemo(
-    () =>
-      data && calendar && transfers
-        ? buildDirection({ data, accounts, transfers, calendar, lines, incomeProfile })
-        : null,
-    [data, accounts, transfers, calendar, lines, incomeProfile],
-  );
   const cashBuffer = Number(settings.get('cashBuffer', 0)) || 0;
   const cashPath = useMemo(
     () =>
@@ -329,13 +318,6 @@ export default function App() {
     () => (data && calendar && transfers ? buildFeesAudit(data, accounts, { transfers, calendar, lines: lines ?? [] }) : null),
     [data, accounts, transfers, calendar, lines],
   );
-  const finder = useMemo(
-    () =>
-      subscriptions && fees
-        ? buildSavingsFinder({ subscriptions, priceCreep, drift, fees, basket, debtBudget, processed })
-        : null,
-    [subscriptions, priceCreep, drift, fees, basket, debtBudget, processed],
-  );
   const setLineOverride = useCallback(
     (lineId, value) => {
       const next = { ...(settings.get('lineOverrides', null) ?? {}) };
@@ -358,41 +340,14 @@ export default function App() {
   );
 
   const safe = useMemo(() => deriveSafeToSpend(processed, summary), [processed, summary]);
-  const budgets = useMemo(
-    () => (processed ? buildBudgetProgress(processed, targets) : null),
-    [processed, targets],
-  );
-  const categoryPlan = useMemo(
-    () => buildCategoryPlan(budgets, summary?.income?.projected),
-    [budgets, summary],
-  );
-  const trajectory = useMemo(
-    () =>
-      processed && balanced.some((b) => b.known)
-        ? buildTrajectory(balanced, {
-            cycles: 12,
-            monthlySaving,
-            fromDate: processed.currentCycleEnd,
-          })
-        : null,
-    [balanced, monthlySaving, processed],
-  );
-  const gapClosers = useMemo(
-    () => (processed && processed.netAvg < 0 ? buildGapClosers(processed, -processed.netAvg) : null),
-    [processed],
-  );
-  const goalSummary = useMemo(
-    () => summariseGoals(goals, Math.max(0, processed?.netAvg ?? 0)),
-    [goals, processed],
-  );
   // Headlines read every analytic, so they come last.
   const headlines = useMemo(
     () =>
       buildHeadlines({
         summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits,
-        vitals, direction, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, finder, drift, quickWin,
+        vitals, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, drift, quickWin,
       }),
-    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, direction, plans, debtBudget, rateStepList, upcoming, subscriptions, finder, drift, quickWin],
+    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, plans, debtBudget, rateStepList, upcoming, subscriptions, drift, quickWin],
   );
 
 
@@ -402,10 +357,10 @@ export default function App() {
     if (import.meta.env.DEV) {
       window.__mv = {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
-        balanced, netWorth, costOfDebt, habits, headlines, safe, budgets, trajectory, gapClosers, balances, curve,
+        balanced, netWorth, costOfDebt, habits, headlines, safe, balances, curve,
         calendar, transfers, terms, debts, debtBudget, plans, marginal, sensitivity, rateSteps: rateStepList,
-        recurring, lines, incomeProfile, upcoming, processedLong, costOfDebtLong, vitals, direction,
-        cashPath, subscriptions, priceCreep, drift, basket, fees, finder, quickWin,
+        recurring, lines, incomeProfile, upcoming, processedLong, costOfDebtLong, vitals,
+        cashPath, subscriptions, priceCreep, drift, basket, fees, quickWin,
       };
     }
   });
@@ -523,7 +478,6 @@ export default function App() {
               {activeTab === 'habits' && (
                 <HabitsView
                   habits={habits}
-                  finder={finder}
                   subscriptions={subscriptions}
                   priceCreep={priceCreep}
                   drift={drift}
@@ -533,21 +487,6 @@ export default function App() {
                   asOf={today}
                 />
               )}
-            {activeTab === 'plan' && (
-              <PlanView
-                budgets={budgets}
-                categoryPlan={categoryPlan}
-                onSetTarget={setTarget}
-                trajectory={trajectory}
-                monthlySaving={monthlySaving}
-                onMonthlySavingChange={setMonthlySaving}
-                gapClosers={gapClosers}
-                goals={goalSummary}
-                onAddGoal={addGoal}
-                onRemoveGoal={removeGoal}
-                direction={direction}
-              />
-            )}
               {activeTab === 'debt' && (
                 <DebtView
                   terms={terms}
@@ -560,7 +499,8 @@ export default function App() {
                   accounts={accounts}
                   settings={settings}
                   onPatchAccount={updateAccount}
-                  onOpenPlan={() => setActiveTab('plan')}
+                  monthlySaving={monthlySaving}
+                  onMonthlySaving={(v) => settings.set('monthlySaving', v)}
                   onOpenAccounts={() => setActiveTab('accounts')}
                   asOf={today}
                   engine={debtEngine}

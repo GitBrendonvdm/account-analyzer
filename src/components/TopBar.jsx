@@ -9,7 +9,6 @@ import {
   Repeat,
   Sun,
   Table2,
-  Target,
   TrendingUp,
   Upload,
   Wallet,
@@ -21,7 +20,6 @@ const VIEWS = [
   { id: 'table', label: 'Ledger', Icon: Table2 },
   { id: 'charts', label: 'Trends', Icon: TrendingUp },
   { id: 'habits', label: 'Habits', Icon: Repeat },
-  { id: 'plan', label: 'Plan', Icon: Target },
   { id: 'debt', label: 'Debt', Icon: Landmark },
   { id: 'accounts', label: 'Accounts', Icon: Wallet },
 ];
@@ -32,10 +30,10 @@ const VIEWS = [
  * strip that permanently eats a band of the window.
  *
  * From md up the view switcher is a segmented control — one row, current state obvious, no icons
- * needed because seven short words are faster to read than seven glyphs. On a phone seven words do
+ * needed because six short words are faster to read than six glyphs. On a phone six words do
  * not fit in 360px, and a segmented control that forces the page wider than the screen makes the
  * browser zoom the whole app out to fit it. So below md the views move to an iOS-style tab bar
- * pinned to the bottom of the screen — icon over an 11px label, seven across, the thumb's reach —
+ * pinned to the bottom of the screen — icon over an 11px label, six across, the thumb's reach —
  * and the top row keeps only the wordmark, the status chip and a "more" button that drops the
  * Import / Account summary / Export / sign-out actions down as a menu.
  */

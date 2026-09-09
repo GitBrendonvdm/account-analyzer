@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { formatCurrencyAbs } from '../utils/format';
 import { Card, CardHead } from './ui/Surface';
-import { FindHero } from './habits/FindHero';
 import { SubscriptionsCard } from './habits/SubscriptionsCard';
 import { DriftCard } from './habits/DriftCard';
 import { WinsCard } from './habits/WinsCard';
@@ -80,12 +79,18 @@ function MerchantList({ merchants, months }) {
  * stopped, what changed, and — for what changed — whether it was more visits or a bigger basket;
  * then who gets the money and when in the week it goes.
  *
- * The order is the order of usefulness. The finder comes first because it is the one block with
- * a figure that can be acted on this week; the merchant ranking and the weekday chart are context
- * and sit last. The "standing commitments" and "what's changing" blocks of the previous version are
- * replaced by the standing-charges audit and the drift card, which answer the same questions from
- * the recurring engine and a robust statistic rather than from presence counts and half-window
- * means (see SubscriptionsCard and DriftCard for why that mattered).
+ * The order is the order of usefulness. The standing-charges audit comes first because it is the
+ * one block whose figures can be acted on this week; the merchant ranking and the weekday chart are
+ * context and sit last. The "standing commitments" and "what's changing" blocks of the previous
+ * version are replaced by that audit and the drift card, which answer the same questions from the
+ * recurring engine and a robust statistic rather than from presence counts and half-window means
+ * (see SubscriptionsCard and DriftCard for why that mattered).
+ *
+ * The savings finder used to sit above all of it, ranking and re-totalling figures the audit, the
+ * drift card and the basket card already carried. One subscription therefore met the reader three
+ * times — in the finder's list, in the finder's headline, and on the audit — and the three totals
+ * could drift apart, because each applied its own idea of what counted. The cards it summarised are
+ * all still here; the summary is not, and the audit's own totals are the only arithmetic left.
  *
  * Price creep no longer gets a card of its own: every line's price step already shows inline on
  * the standing-charges audit, so a second card listing the same lines just repeated the same fact
@@ -99,7 +104,6 @@ function MerchantList({ merchants, months }) {
  */
 export function HabitsView({
   habits,
-  finder,
   subscriptions,
   priceCreep,
   drift,
@@ -109,7 +113,7 @@ export function HabitsView({
   asOf,
 }) {
   const [sortBy, setSortBy] = useState('spend');
-  const anyAnalytics = Boolean(finder || subscriptions || priceCreep || drift || basket);
+  const anyAnalytics = Boolean(subscriptions || priceCreep || drift || basket);
   if (!habits && !anyAnalytics) return null;
 
   const months = habits?.months ?? [];
@@ -124,7 +128,6 @@ export function HabitsView({
 
   return (
     <div className="flex flex-col gap-5">
-      <FindHero finder={finder} />
       <SubscriptionsCard
         subscriptions={subscriptions}
         priceCreep={priceCreep}

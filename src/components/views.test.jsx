@@ -3,7 +3,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TodayView } from './TodayView';
 import { HabitsView } from './HabitsView';
-import { PlanView } from './PlanView';
 import { AccountsView } from './AccountsView';
 import {
   NEW_PROPS,
@@ -12,7 +11,6 @@ import {
   fixtureVitalsUnanchored,
   habitsProps,
   lineStream,
-  planProps,
   todayProps,
 } from './__fixtures__/analytics';
 
@@ -72,7 +70,6 @@ const padLines = (subscriptions, n = 51) => ({
 const VIEWS = [
   { name: 'TodayView', View: TodayView, props: todayProps, keys: NEW_PROPS.today, keep: ['Safe to spend before payday', 'Came in', 'Went out', 'Where it goes'] },
   { name: 'HabitsView', View: HabitsView, props: habitsProps, keys: NEW_PROPS.habits, keep: ['Where the money goes', 'When you spend'] },
-  { name: 'PlanView', View: PlanView, props: planProps, keys: NEW_PROPS.plan, keep: ['Targets', "Cut categories to close this cycle's shortfall", 'If nothing changes', 'Goals'] },
   { name: 'AccountsView', View: AccountsView, props: accountsProps, keys: NEW_PROPS.accounts, keep: ['Balances', 'What the debt costs'] },
 ];
 
@@ -159,17 +156,12 @@ describe('HabitsView blocks', () => {
     expect(html).toContain('What changed');
   });
 
-  it('renders the finder hero with the found figure and the split', () => {
+  it('has no savings-finder hero re-totalling what the cards below already say', () => {
     const html = render(HabitsView, habitsProps());
-    expect(html).toContain('Savings finder');
-    expect(html).toContain('R 2 487');
-    expect(html).toContain('15% of the R 17 000 gap · R 3 800 more if the trips and drift below change');
-    expect(html).toContain('Already saved R 89 a cycle');
-    expect(html).toContain('query or renegotiate');
-    expect(html).toContain('becomes a saving only once the balance is paid down');
-    // `sentence` already carries the informational item's own action; the explanation must not
-    // print twice ("...— see Debt — becomes a saving only once...— see Debt.").
-    expect(html.match(/becomes a saving only once the balance is paid down/g)).toHaveLength(1);
+    expect(html).not.toContain('Savings finder');
+    // The audit leads instead, and its own totals are the only arithmetic on the page.
+    expect(html.indexOf('Standing charges')).toBeGreaterThan(-1);
+    expect(html.indexOf('Standing charges')).toBeLessThan(html.indexOf('What changed'));
   });
 
   it('renders the standing charges with cadence chips, overrides and the sentence', () => {
@@ -177,6 +169,7 @@ describe('HabitsView blocks', () => {
     expect(html).toContain('4 optional services cost R 2 946 a cycle — R 35 352 a year.');
     expect(html).toContain('>monthly<');
     expect(html).toContain('not a subscription');
+    expect(html).toContain('>replaced<');
     expect(html).toMatch(new RegExp(`aria-label="Override for ${lineStream.label}"[\\s\\S]*?aria-pressed="true"[^>]*>keep<`));
     expect(html).toContain('+25% since Mar 26');
     expect(html).toContain('set aside <b');
@@ -224,54 +217,10 @@ describe('HabitsView blocks', () => {
 
   it('renders the analytics alone when the legacy habits are missing, and nothing with nothing', () => {
     const html = render(HabitsView, habitsProps({ habits: null }));
-    expect(html).toContain('Savings finder');
+    expect(html).toContain('Standing charges');
     expect(html).not.toContain('Where the money goes');
     expectClean(html);
     expect(render(HabitsView, nulled(habitsProps({ habits: null }), NEW_PROPS.habits))).toBe('');
-  });
-});
-
-describe('PlanView blocks', () => {
-  it('leads with targets — the main point — ahead of direction, the shortfall card, the trajectory and goals', () => {
-    const html = render(PlanView, planProps());
-    const at = (s) => html.indexOf(s);
-    expect(at('Targets')).toBeGreaterThan(-1);
-    expect(at('Targets')).toBeLessThan(at('Direction'));
-    expect(at('Direction')).toBeLessThan(at("Cut categories to close this cycle's shortfall"));
-    expect(at("Cut categories to close this cycle's shortfall")).toBeLessThan(at('If nothing changes'));
-    expect(at('If nothing changes')).toBeLessThan(at('<h2 class="t-head">Goals</h2>'));
-  });
-
-  it('resolves the targets to what is left over for debt or saving', () => {
-    const html = render(PlanView, planProps());
-    expect(html).toMatch(/At these targets,.*R 64 150.*is left at cycle end/s);
-    expect(html).toContain('R 75 000 income minus R 10 850 planned across every category (1 of 3 with a target set, the rest at typical)');
-    // Still renders, just without the banner, when the figure isn't available yet.
-    expect(render(PlanView, planProps({ categoryPlan: null }))).toContain('Targets');
-  });
-
-  it('writes the 3-cycle vs 12-cycle sentence', () => {
-    const html = render(PlanView, planProps());
-    expect(html).toMatch(/The 3-cycle vs 12-cycle change is widening: -?R 15 000 a cycle over the last 3 cycles against -?R 8 000 over the last 12, and -?R 4 000 the year before\./);
-  });
-
-  it('uses the Aurora tones and the interaction kit on the trajectory', () => {
-    const html = render(PlanView, planProps());
-    for (const hex of ['#10b981', '#ef4444', '#d1fae5', '#fee2e2', 'accent-blue-600']) expect(html).not.toContain(hex);
-    expect(html).toContain('accent-info');
-    expect(html).toContain('Drag across the chart to zoom in');
-  });
-
-  it('does not duplicate Today\'s safe-to-spend card or Debt\'s solver', () => {
-    const html = render(PlanView, planProps());
-    expect(html).not.toContain('Safe to spend');
-    expect(html).not.toContain('What would it take');
-  });
-
-  it('does not duplicate the Habits standing-charges table', () => {
-    const html = render(PlanView, planProps());
-    // "Standing charges" is also a Direction metric label; the table is found by its own heading.
-    expect(html).not.toContain('<h2 class="t-head">Standing charges</h2>');
   });
 });
 
