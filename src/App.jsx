@@ -21,7 +21,7 @@ import { EmptyState } from './components/EmptyState';
 import { Login } from './components/Login';
 import { MigrateBanner } from './components/MigrateBanner';
 import { buildCycleCalendar } from './lib/cycleCurve';
-import { buildFullTransfers } from './lib/flows';
+import { buildFullTransfers, spendRows } from './lib/flows';
 import { buildLiabilityTerms, rateSteps as buildRateSteps, toDebt } from './lib/inferRates';
 import {
   buildDebtBudget,
@@ -231,6 +231,11 @@ export default function App() {
     [data, allMonths, today],
   );
   const transfers = useMemo(() => (data ? buildFullTransfers(data, { accounts }) : null), [data, accounts]);
+  // The rows the ledger calls spend, across the whole file — what the provider detector reads.
+  const spend = useMemo(
+    () => (data && transfers ? spendRows(data, { transfers, accounts }) : null),
+    [data, transfers, accounts],
+  );
   const primeRate = settings.get('primeRate', null);
   const terms = useMemo(
     () => (data && transfers ? buildLiabilityTerms(data, accounts, { asOf: today, primeRate, transfers }) : []),
@@ -538,6 +543,7 @@ export default function App() {
                   onSetProviders={setProviders}
                   providerDraft={providerDraft}
                   onProviderDraft={setProviderDraft}
+                  spend={spend}
                 />
               )}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}

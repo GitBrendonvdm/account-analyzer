@@ -4,11 +4,13 @@ import { RulesPanel } from './ledger/RulesPanel';
 import { ProvidersPanel } from './ledger/ProvidersPanel';
 
 /**
- * The ledger: find a payment, the standing rules that correct payments in bulk, then the table.
+ * The ledger: find a payment, the table, then the two workshops that reshape it.
  *
- * The finder and the rules panel sit ABOVE the table because they are how the table gets fixed, and
- * neither of them filters it — the totals below never move when you search. Both are folded to a
- * single line until used, so the page still opens on the numbers.
+ * ONLY THE FINDER SITS ABOVE THE TABLE, because it is the one thing you reach for with a question
+ * already in mind ("where is that R4 000") and it answers without moving a figure — the totals below
+ * never change when you search. Providers and rules are the opposite: they are how the ledger gets
+ * reshaped, you go looking for them after reading it, and they are long. Above the table they push
+ * the numbers off the first screen, which is the wrong thing for a page whose job is the numbers.
  */
 export function LedgerView({
   processed,
@@ -25,6 +27,7 @@ export function LedgerView({
   onSetProviders,
   providerDraft,
   onProviderDraft,
+  spend,
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -40,10 +43,18 @@ export function LedgerView({
           onCreateProvider={onProviderDraft}
         />
       )}
+      <TransactionTable
+        processed={processed}
+        txnOverrides={txnOverrides}
+        onSetTxnOverride={onSetTxnOverride}
+        labelChoices={labelChoices}
+        providers={providers}
+      />
       {data && onSetProviders && (
         <ProvidersPanel
           providers={providers}
           data={data}
+          spend={spend}
           onChange={onSetProviders}
           draft={providerDraft}
           onDraft={onProviderDraft}
@@ -59,13 +70,6 @@ export function LedgerView({
           onDraft={onRuleDraft}
         />
       )}
-      <TransactionTable
-        processed={processed}
-        txnOverrides={txnOverrides}
-        onSetTxnOverride={onSetTxnOverride}
-        labelChoices={labelChoices}
-        providers={providers}
-      />
     </div>
   );
 }
