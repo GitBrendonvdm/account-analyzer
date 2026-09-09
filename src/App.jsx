@@ -58,6 +58,8 @@ const StatementUpload = lazy(() =>
 );
 
 import { applyTxnOverrides, labelChoices } from './lib/txnOverrides';
+import { effectiveOverrides } from './lib/txnRules';
+import { exceptionKeysOf } from './lib/paymentSearch';
 import { useAnalyzerState } from './hooks/useAnalyzerState';
 import { useChartData } from './hooks/useChartData';
 import { useTransactionData } from './hooks/useTransactionData';
@@ -103,7 +105,19 @@ export default function App() {
   // classifier profiles the row under its new category and every builder in the app agrees on what
   // it is — rather than a dozen call sites each remembering to ask. See lib/txnOverrides.js.
   const storedTxnOverrides = settings.get('txnOverrides', null);
-  const txnOverrides = useMemo(() => storedTxnOverrides ?? {}, [storedTxnOverrides]);
+  const manualOverrides = useMemo(() => storedTxnOverrides ?? {}, [storedTxnOverrides]);
+  // Standing rules correct payments in bulk, including ones not imported yet. They are a DEFAULT:
+  // a correction made on a specific payment beats them, which is what makes "all of these, except
+  // that one" sayable. Merged here so everything downstream sees one map and never needs to know
+  // whether a correction came from a rule or from a click.
+  const storedRules = settings.get('txnRules', null);
+  const txnRules = useMemo(() => (Array.isArray(storedRules) ? storedRules : []), [storedRules]);
+  const txnOverrides = useMemo(
+    () => effectiveOverrides(rawData, txnRules, manualOverrides),
+    [rawData, txnRules, manualOverrides],
+  );
+  const [ruleDraft, setRuleDraft] = useState(null);
+  const setTxnRules = useCallback((next) => settings.set('txnRules', next), [settings]);
   const data = useMemo(() => applyTxnOverrides(rawData, txnOverrides), [rawData, txnOverrides]);
   const labels = useMemo(() => labelChoices(rawData), [rawData]);
   const setTxnOverride = useCallback(
@@ -362,6 +376,10 @@ export default function App() {
     [settings],
   );
 
+  // Which payments the classifier filed under an Exceptions group, read off `processed` so the
+  // finder's "Exceptions" filter can never disagree with the Exceptions rows on the table.
+  const exceptionKeys = useMemo(() => exceptionKeysOf(processed), [processed]);
+
   const safe = useMemo(() => deriveSafeToSpend(processed, summary), [processed, summary]);
   // Headlines read every analytic, so they come last.
   const headlines = useMemo(
@@ -500,9 +518,15 @@ export default function App() {
                 <LedgerView
                   processed={processed}
                   positions={balanced}
+                  data={data}
                   txnOverrides={txnOverrides}
                   onSetTxnOverride={setTxnOverride}
                   labelChoices={labels}
+                  rules={txnRules}
+                  onSetRules={setTxnRules}
+                  ruleDraft={ruleDraft}
+                  onRuleDraft={setRuleDraft}
+                  exceptionKeys={exceptionKeys}
                 />
               )}
               {activeTab === 'charts' && <ChartsView chartData={chartData} />}
