@@ -7,6 +7,7 @@ import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
 import { ImportSummary } from './components/ImportSummary';
 import { closureSuggestions, loanOwedBy, settlementFor } from './lib/closure';
+import { accountIdOf } from './lib/accounts';
 import { dormantAccounts, namesOf } from './lib/hiddenAccounts';
 import { payMonthRuleOf } from './lib/loanProjection';
 import { todayIso } from './lib/statements/amounts';
@@ -18,6 +19,7 @@ import {
 } from './lib/accountSeries';
 import { applyBalances, cardHeadroom, summariseNetWorth } from './lib/netWorth';
 import { everydayAccounts, everydayFlow, netWorthTrend } from './lib/glance';
+import { normaliseAssets, withAssets } from './lib/assets';
 import { buildCostOfDebt } from './lib/costOfDebt';
 import { buildHabits } from './lib/habits';
 import { buildHeadlines } from './lib/headlines';
@@ -327,26 +329,59 @@ export default function App() {
   // switch loans off by default, and a net worth without them reads a refinance as a leap instead of
   // debt moving from one place to another. A loan with no balance of its own is valued at what the
   // loan engine says is owed, and the page says so.
-  const wholeNetWorth = useMemo(() => {
-    if (!processed) return null;
+  const wholeBalanced = useMemo(() => {
+    if (!processed) return [];
     const owed = new Map(terms.filter((t) => Number.isFinite(t.balanceOwed)).map((t) => [t.accountId, t.balanceOwed]));
-    const estimated = [];
     const byId = new Map(
       shownAccounts.map((a) => {
         const isLoan = (a.typeOverride ?? a.type) === 'Loan';
         if (isLoan && !a.closedOn && !Number.isFinite(a.currentBalance) && owed.has(a.id)) {
-          estimated.push(a.label || a.rawName);
           return [a.id, { ...a, currentBalance: -owed.get(a.id), balanceAsOf: todayIso(today), source: 'estimate' }];
         }
         return [a.id, a];
       }),
     );
     const positions = buildAccountPositions(data, [...namesOf(shownAccounts)], processed.months);
-    const summary = summariseNetWorth(applyBalances(positions, byId, processed.months, { data }), processed.months);
-    return { ...summary, estimated };
+    return applyBalances(positions, byId, processed.months, { data }).map((p) => ({
+      ...p,
+      estimated: byId.get(p.accountId ?? p.id)?.source === 'estimate',
+    }));
   }, [processed, terms, shownAccounts, data, today]);
+
+  // What the reader owns that no statement shows — a house, a car — valued month by month.
+  const storedAssets = settings.get('assets', null);
+  const assets = useMemo(() => normaliseAssets(storedAssets), [storedAssets]);
+  const saveAssets = useCallback((next) => settings.set('assets', next), [settings]);
+  const wholeNetWorth = useMemo(() => {
+    if (!processed) return null;
+    const summary = summariseNetWorth(wholeBalanced, processed.months);
+    const now = todayIso(today);
+    const endOf = (month) => {
+      const end = processed.calendar?.ends?.[month];
+      const iso = end ? todayIso(end) : now;
+      return iso < now ? iso : now;
+    };
+    return withAssets(
+      { ...summary, estimated: wholeBalanced.filter((p) => p.estimated).map((p) => p.label ?? p.account) },
+      assets,
+      endOf,
+    );
+  }, [processed, wholeBalanced, assets, today]);
+  // What is owed on each loan, so an asset bought with one can say what is left of it.
+  const loanOwed = useMemo(
+    () =>
+      new Map(
+        wholeBalanced.filter((p) => p.known && p.isLiability && p.balance < 0).map((p) => [p.accountId ?? accountIdOf(p.account), -p.balance]),
+      ),
+    [wholeBalanced],
+  );
   const trend = useMemo(
     () => netWorthTrend(wholeNetWorth, { currentMonth: processed?.currentMonth }),
+    [wholeNetWorth, processed],
+  );
+  // Every cycle in the window, for the chart on Trends; the front page shows only the last few.
+  const trendLong = useMemo(
+    () => netWorthTrend(wholeNetWorth, { currentMonth: processed?.currentMonth, cycles: Infinity }),
     [wholeNetWorth, processed],
   );
   const rateStepList = useMemo(() => terms.flatMap((t) => buildRateSteps(t)), [terms]);
@@ -677,7 +712,7 @@ export default function App() {
                   rawData={rawData}
                 />
               )}
-              {activeTab === 'charts' && <ChartsView chartData={chartData} />}
+              {activeTab === 'charts' && <ChartsView chartData={chartData} trend={trendLong} />}
               {activeTab === 'habits' && (
                 <HabitsView
                   habits={habits}
@@ -727,6 +762,10 @@ export default function App() {
                   inferredLoans={inferredLoans}
                   manage={manage}
                   trend={trend}
+                  assets={assets}
+                  onSaveAssets={saveAssets}
+                  loanOwed={loanOwed}
+                  today={todayIso(today)}
                 />
               )}
             </Suspense>

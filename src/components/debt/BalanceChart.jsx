@@ -28,6 +28,7 @@ import {
   useZoomDomain,
   yAxisStyle,
 } from '../charts/interactive';
+import { Heading } from '../ui/Disclosure';
 import { LEGEND_TAP, useNarrowViewport } from './narrow';
 
 /**
@@ -107,7 +108,7 @@ export function BalanceChart({ plan, debts = [], labelsById = {} }) {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="t-head">Balances over the plan</h2>
+          <Heading>Balances over the plan</Heading>
           <p className="t-label mt-1.5">
             Each debt stacked; the first target on top. A dashed rule marks each payoff.
           </p>

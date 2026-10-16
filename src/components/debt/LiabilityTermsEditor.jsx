@@ -58,7 +58,7 @@ function Inferred({ children }) {
   return <span className="t-caption mt-1 block max-w-[22ch] leading-snug max-md:max-w-none">{children}</span>;
 }
 
-export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onClose }) {
+export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onClose, bare = false }) {
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState({});
   const card = isCard(term);
@@ -126,28 +126,31 @@ export function LiabilityTermsEditor({ term, account, onPatchAccount, asOf, onCl
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
-        {/* `flex-1` keeps the close button on the title row instead of wrapping under it on a phone. */}
-        <div className="min-w-0 flex-1">
-          <h3 className="t-sub">{term.label} — terms</h3>
-          <p className="t-caption mt-1">
-            Typed values win and are labelled "from you". Leave a field blank to go back to the
-            inferred figure.
-          </p>
+      {/* In a dialog the dialog has the title and the close button; the fields are all that is left. */}
+      {!bare && (
+        <div className="flex items-start justify-between gap-3">
+          {/* `flex-1` keeps the close button on the title row instead of wrapping under it on a phone. */}
+          <div className="min-w-0 flex-1">
+            <h3 className="t-sub">{term.label} — terms</h3>
+            <p className="t-caption mt-1">
+              Typed values win and are labelled "from you". Leave a field blank to go back to the
+              inferred figure.
+            </p>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close the terms editor"
+              className="press inline-flex items-center justify-center rounded-full p-2 text-label-3 hover:bg-fill-2 hover:text-label max-md:min-h-11 max-md:min-w-11"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close the terms editor"
-            className="press inline-flex items-center justify-center rounded-full p-2 text-label-3 hover:bg-fill-2 hover:text-label max-md:min-h-11 max-md:min-w-11"
-          >
-            <X size={15} />
-          </button>
-        )}
-      </div>
+      )}
 
-      <div className={`mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4 ${FIELD_TAP}`}>
+      <div className={`${bare ? 'mt-1' : 'mt-5'} grid gap-x-8 gap-y-5 sm:grid-cols-2 ${bare ? '' : 'lg:grid-cols-4'} ${FIELD_TAP}`}>
         <div>
           <Field
             label="Interest rate"

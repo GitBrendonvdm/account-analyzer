@@ -2,6 +2,7 @@ import { AccountMovementChart } from './charts/AccountMovementChart';
 import { AccountPositionsTable } from './tables/AccountPositionsTable';
 import { AccountsTable } from './tables/AccountsTable';
 import { AccountsList } from './accounts/AccountsList';
+import { AssetsCard } from './accounts/AssetsCard';
 import { CostOfDebtPanel } from './CostOfDebtPanel';
 import { Card, CardHead } from './ui/Surface';
 import { Disclosure } from './ui/Disclosure';
@@ -69,6 +70,10 @@ export function AccountsView({
   inferredLoans,
   manage,
   trend,
+  assets,
+  onSaveAssets,
+  loanOwed,
+  today,
 }) {
   const list = positions ?? [];
   // A loan account showing a positive position is almost always a revolving or budget facility
@@ -93,6 +98,9 @@ export function AccountsView({
             : null
         }
       />
+      {onSaveAssets && today && (
+        <AssetsCard assets={assets} accounts={accounts} loanOwed={loanOwed} today={today} onSave={onSaveAssets} />
+      )}
       <div className="mt-2 flex flex-col gap-1 border-t pt-2">
         <Disclosure title="Balance at each pay cycle" summary="Every account, grouped by type, at the end of each cycle" merge>
           <AccountPositionsTable positions={list} months={months ?? []} currentMonth={currentMonth} />

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { Card } from './ui/Surface';
+import { Disclosure } from './ui/Disclosure';
+import { DebtLead } from './debt/DebtLead';
 import { DeficitBanner } from './debt/DeficitBanner';
 import { LiabilityTable } from './debt/LiabilityTable';
 import { PlanControls } from './debt/PlanControls';
@@ -185,7 +187,9 @@ export function DebtView({
   const hasPlan = Boolean(plan?.schedule?.length);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
+      <DebtLead terms={termList} plan={plan} />
+
       <DeficitBanner debtBudget={debtBudget} />
 
       <LiabilityTable
@@ -220,82 +224,86 @@ export function DebtView({
           )}
         </Card>
       ) : (
-        <>
-          <Card className={CARD}>
-            <PlanControls
-              strategy={strategy}
-              extra={extra}
-              floor={floor}
-              available={available}
-              deficit={deficit}
-              max={max}
-              step={EXTRA_STEP}
-              onExtra={(v) => setSetting('debtExtra', v)}
-              cascade={cascade}
-              onCascade={(v) => setSetting('debtCascade', v)}
-              lump={lump}
-              onLump={(v) => setSetting('debtLump', v)}
-              primeRate={primeRate}
-              onPrimeRate={(v) => setSetting('primeRate', v)}
-              monthlySaving={monthlySaving}
-              onMonthlySaving={onMonthlySaving}
-              order={order}
-              onOrder={setCustomOrder}
-              labelsById={labelsById}
-              debts={debtList}
-            />
-            <StrategyTiles
-              strategies={STRATEGIES}
-              table={plansShown?.table ?? EMPTY}
-              best={plansShown?.best}
-              selected={strategy}
-              resolved={resolved}
-              onSelect={(id) => setSetting('debtStrategy', id)}
-              plan={plan}
-              plans={plansShown}
-              extra={extraToDebts}
-              deficit={deficit}
-              stalled={stalled}
-              absorberLabel={debtBudget?.absorberLabel ?? null}
-              labelsById={labelsById}
-            />
-          </Card>
+        <div className="mt-2 flex flex-col gap-1 border-t pt-2">
+          <Disclosure title="Plan" summary="Where the extra goes first, which order clears debt soonest, and how much extra there is" merge>
+            <Card className={CARD}>
+              <PlanControls
+                strategy={strategy}
+                extra={extra}
+                floor={floor}
+                available={available}
+                deficit={deficit}
+                max={max}
+                step={EXTRA_STEP}
+                onExtra={(v) => setSetting('debtExtra', v)}
+                cascade={cascade}
+                onCascade={(v) => setSetting('debtCascade', v)}
+                lump={lump}
+                onLump={(v) => setSetting('debtLump', v)}
+                primeRate={primeRate}
+                onPrimeRate={(v) => setSetting('primeRate', v)}
+                monthlySaving={monthlySaving}
+                onMonthlySaving={onMonthlySaving}
+                order={order}
+                onOrder={setCustomOrder}
+                labelsById={labelsById}
+                debts={debtList}
+              />
+              <StrategyTiles
+                strategies={STRATEGIES}
+                table={plansShown?.table ?? EMPTY}
+                best={plansShown?.best}
+                selected={strategy}
+                resolved={resolved}
+                onSelect={(id) => setSetting('debtStrategy', id)}
+                plan={plan}
+                plans={plansShown}
+                extra={extraToDebts}
+                deficit={deficit}
+                stalled={stalled}
+                absorberLabel={debtBudget?.absorberLabel ?? null}
+                labelsById={labelsById}
+              />
+            </Card>
+          </Disclosure>
 
           {hasPlan && (
-            <Card className={CARD}>
-              <div className="glass-chip flex w-fit gap-1 p-1" role="group" aria-label="Chart">
-                {BALANCE_VIEWS.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setBalanceView(v.id)}
-                    aria-pressed={balanceView === v.id}
-                    className={`press rounded-full px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 ${
-                      balanceView === v.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
-                    }`}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-6">
-                {balanceView === 'balances' ? (
-                  <BalanceChart plan={plan} debts={debtList} labelsById={labelsById} />
-                ) : (
-                  <CommittedLine
-                    plan={plan}
-                    timeline={timeline}
-                    debts={debtList}
-                    labelsById={labelsById}
-                    cascade={cascade}
-                    strategy={strategy}
-                  />
-                )}
-              </div>
-            </Card>
+            <Disclosure title="Balances over the plan" summary="Each debt over time, with a pin where it clears" merge>
+              <Card className={CARD}>
+                <div className="glass-chip flex w-fit gap-1 p-1" role="group" aria-label="Chart">
+                  {BALANCE_VIEWS.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setBalanceView(v.id)}
+                      aria-pressed={balanceView === v.id}
+                      className={`press rounded-full px-3.5 py-1.5 text-[12.5px] max-md:min-h-11 ${
+                        balanceView === v.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
+                      }`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-6">
+                  {balanceView === 'balances' ? (
+                    <BalanceChart plan={plan} debts={debtList} labelsById={labelsById} />
+                  ) : (
+                    <CommittedLine
+                      plan={plan}
+                      timeline={timeline}
+                      debts={debtList}
+                      labelsById={labelsById}
+                      cascade={cascade}
+                      strategy={strategy}
+                    />
+                  )}
+                </div>
+              </Card>
+            </Disclosure>
           )}
 
-          {debtList.length > 0 && (
+          <Disclosure title="What if I pay off…" summary="Pick a debt and how soon, and see what it frees" merge>
             <WhatIfPanel
               debts={debtList}
               base={runOptions}
@@ -303,21 +311,23 @@ export function DebtView({
               incomePerCycle={incomePerCycle}
               instalmentsPerCycle={debtList.reduce((sum, d) => sum + (d.instalment ?? 0), 0)}
             />
-          )}
+          </Disclosure>
 
-          <Card className={CARD}>
-            <SensitivityStrip
-              rows={sensitivityShown ?? EMPTY}
-              debts={debtList}
-              terms={termList}
-              bp={bpShift}
-              onBp={setBpShift}
-              recast={recast}
-              onRecast={setRecast}
-              labelsById={labelsById}
-            />
-          </Card>
-        </>
+          <Disclosure title="If rates move" summary="What each quarter-point does to the instalment and the term" merge>
+            <Card className={CARD}>
+              <SensitivityStrip
+                rows={sensitivityShown ?? EMPTY}
+                debts={debtList}
+                terms={termList}
+                bp={bpShift}
+                onBp={setBpShift}
+                recast={recast}
+                onRecast={setRecast}
+                labelsById={labelsById}
+              />
+            </Card>
+          </Disclosure>
+        </div>
       )}
     </div>
   );

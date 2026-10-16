@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrencyAbs } from '../../utils/format';
+import { Heading } from '../ui/Disclosure';
 import {
   ChartFrame,
   ChartLegend,
@@ -130,7 +131,7 @@ export function CommittedLine({ plan, timeline, debts = [], labelsById = {}, cas
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="t-head">Freed cash</h2>
+          <Heading>Freed cash</Heading>
           <p className="t-label mt-1.5">
             What the instalments commit each month, and what comes back as each one clears.
           </p>

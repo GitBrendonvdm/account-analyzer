@@ -4,6 +4,8 @@ import { Card, CardHead } from '../ui/Surface';
 import { formatCurrencyAbs } from '../../utils/format';
 import { LiabilityTermsEditor } from './LiabilityTermsEditor';
 import { CARD_MINIMUM_FLOOR, CARD_MINIMUM_PCT_DEFAULT } from '../../constants';
+import { debtCostPerCycle, isCard, monthlyInterest } from '../../lib/debtCost';
+import { Sheet } from '../ui/Sheet';
 
 /**
  * Every liability on one line, with where each number came from.
@@ -12,7 +14,7 @@ import { CARD_MINIMUM_FLOOR, CARD_MINIMUM_PCT_DEFAULT } from '../../constants';
  * typed, or assumed — and a plan built on an assumed 20.75% deserves to say so next to the figure,
  * not in a footnote. So every cell that rests on provenance carries a chip (ledger / statement /
  * typed / fitted / assumed) and a confidence dot, and a card with nothing to go on says which
- * numbers are missing rather than showing zeros. The pencil opens the terms editor in place, so
+ * numbers are missing rather than showing zeros. The pencil opens the terms editor in a dialog, so
  * the typed value and the inferred one sit side by side while it is being typed.
  *
  * A card is not a loan — there is no instalment to infer, and how full it is matters in a way a
@@ -25,7 +27,7 @@ import { CARD_MINIMUM_FLOOR, CARD_MINIMUM_PCT_DEFAULT } from '../../constants';
  *
  * Eight columns need 980px, which on a phone meant a 3× sideways scroll inside the card with the
  * debt's name lost off the left edge. Below `md` the same rows are laid out as stacked cards — name
- * and chips, then label/value pairs — and the editor opens INSIDE the card that was tapped rather
+ * and chips, then label/value pairs — and the editor opens in a dialog rather
  * than under a table the thumb has scrolled past. Both layouts are rendered and CSS picks one, so
  * the facts and the cells are shared and cannot drift; the table is untouched from `md` up.
  */
@@ -57,7 +59,6 @@ const addMonths = (d, n) => {
   return out;
 };
 
-const isCard = (t) => t?.type === 'Credit Card' || t?.kind === 'card';
 
 const CONFIDENCE = {
   high: { tone: 'bg-good', title: 'High confidence' },
@@ -111,15 +112,6 @@ function rateProvenance(term) {
 function inferredRate(term) {
   const rates = (term.rateHistory ?? []).slice(-3).map((h) => h.rate);
   return median(rates);
-}
-
-function monthlyInterest(term) {
-  if (Number.isFinite(term.accruedThisCycle)) return term.accruedThisCycle;
-  if (isCard(term) && Number.isFinite(term.financeChargeMonthly)) return term.financeChargeMonthly;
-  if (Number.isFinite(term.balanceOwed) && Number.isFinite(term.rateNominal)) {
-    return (term.balanceOwed * term.rateNominal) / 12;
-  }
-  return 0;
 }
 
 function missingNumbers(term, account) {
@@ -447,7 +439,7 @@ function Fact({ label, children }) {
 }
 
 /** The phone layout: the row's cells as label/value pairs, the editor inside when open. */
-function StackedRow({ term, account, primeRate, open, onToggle, neverClearsNote, payingLabel, editor }) {
+function StackedRow({ term, account, primeRate, open, onToggle, neverClearsNote, payingLabel }) {
   const f = rowFacts(term, account);
   return (
     <li className={`border-t px-5 py-4 ${open ? 'bg-fill' : ''}`}>
@@ -498,7 +490,6 @@ function StackedRow({ term, account, primeRate, open, onToggle, neverClearsNote,
         </div>
       )}
 
-      {open && editor && <div className="mt-4 border-t pt-4">{editor}</div>}
     </li>
   );
 }
@@ -596,8 +587,7 @@ export function LiabilityTable({
 
   const termsById = Object.fromEntries(list.map((t) => [t.accountId, t]));
   const neverByPlan = Object.fromEntries((plan?.neverClears ?? []).map((n) => [n.id, n]));
-  const interest = list.reduce((s, t) => s + monthlyInterest(t), 0);
-  const fees = list.reduce((s, t) => s + (Number.isFinite(t.feeMonthly) ? t.feeMonthly : 0), 0);
+  const { interest, fees } = debtCostPerCycle(list);
   const cardsMissing = list.filter((t) => isCard(t) && missingNumbers(t, accountsById[t.accountId]).length > 0);
   const steps = flattenRateSteps(rateSteps, termsById);
   const assumptions = [...new Set(list.flatMap((t) => t.assumptions ?? []))];
@@ -624,6 +614,7 @@ export function LiabilityTable({
           onPatchAccount={onPatchAccount}
           asOf={asOf}
           onClose={() => setOpenId(null)}
+          bare
         />
       </>
     );
@@ -676,12 +667,18 @@ export function LiabilityTable({
 
       <ul className="md:hidden" aria-label="Your debts">
         {list.map((t) => (
-          <StackedRow key={t.accountId} {...rowProps(t)} editor={openId === t.accountId ? editorFor(t.accountId) : null} />
+          <StackedRow key={t.accountId} {...rowProps(t)} />
         ))}
       </ul>
 
       {openId && termsById[openId] && (
-        <div className="hidden border-t bg-fill px-6 py-5 md:block">{editorFor(openId)}</div>
+        <Sheet
+          title={`Terms for ${termsById[openId].label}`}
+          subtitle="Typed values win and are labelled “from you”. Leave a field blank to go back to the inferred figure."
+          onClose={() => setOpenId(null)}
+        >
+          <div className="mt-4">{editorFor(openId)}</div>
+        </Sheet>
       )}
 
       <div className="flex flex-col gap-3 border-t px-5 py-5 sm:px-6">

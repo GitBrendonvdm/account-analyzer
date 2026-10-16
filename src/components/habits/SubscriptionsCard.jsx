@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Card, CardHead } from '../ui/Surface';
 import { StepChart } from './StepChart';
 import { formatCurrencyAbs } from '../../utils/format';
@@ -212,73 +213,81 @@ export function SubscriptionsCard({ subscriptions, priceCreep, lineOverrides, on
         <p className="t-caption px-4 py-5 sm:px-6">No standing charges found yet — the engine needs a few complete cycles.</p>
       )}
 
-      {services.length > 0 && (
-        <ol className="flex flex-col">
-          {services.map((line) => (
-            <LineRow key={line.id} line={line} override={overrideOf(line)} onSet={onSetLineOverride} asOf={today} />
-          ))}
-        </ol>
-      )}
-
-      {debt.length > 0 && (
-        <>
-          <div className="border-t bg-fill px-4 py-2.5 text-[12px] font-semibold tracking-wide text-label-3 uppercase sm:px-6 sm:text-[11px]">
-            Instalments and repayments — debt, not subscriptions
-          </div>
+      {lines.length > 0 && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[13px] text-label-2 select-none hover:bg-fill hover:text-label max-md:min-h-11 sm:px-6 [&::-webkit-details-marker]:hidden">
+            <span>{`The ${lines.length} line${lines.length === 1 ? '' : 's'} behind these totals`}</span>
+            <ChevronDown size={15} className="shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+        {services.length > 0 && (
           <ol className="flex flex-col">
-            {debt.map((line) => (
-              <LineRow key={line.id} line={line} override={null} onSet={null} asOf={today} />
+            {services.map((line) => (
+              <LineRow key={line.id} line={line} override={overrideOf(line)} onSet={onSetLineOverride} asOf={today} />
             ))}
           </ol>
-        </>
-      )}
+        )}
 
-      {collapsible && (
-        <>
-          {!showAll && (
-            <p className="t-caption px-4 py-2.5 text-center sm:px-6">{`${shown.length} of ${lines.length} shown · totals cover all`}</p>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowAll((s) => !s)}
-            className="press min-h-11 w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label sm:min-h-0"
-          >
-            {showAll ? 'Show fewer' : `Show all ${lines.length} standing charges`}
-          </button>
-        </>
-      )}
+        {debt.length > 0 && (
+          <>
+            <div className="border-t bg-fill px-4 py-2.5 text-[12px] font-semibold tracking-wide text-label-3 uppercase sm:px-6 sm:text-[11px]">
+              Instalments and repayments — debt, not subscriptions
+            </div>
+            <ol className="flex flex-col">
+              {debt.map((line) => (
+                <LineRow key={line.id} line={line} override={null} onSet={null} asOf={today} />
+              ))}
+            </ol>
+          </>
+        )}
 
-      {subscriptions.annualItems?.length > 0 && (
-        <div className="border-t px-4 py-4 sm:px-6">
-          <div className="t-label">Once a year</div>
-          <ul className="mt-2 flex flex-col gap-1 text-[13.5px] text-label-2">
-            {subscriptions.annualItems.map((a) => (
-              <li key={a.id}>
-                {a.label}: {formatCurrencyAbs(a.amount)} — set aside{' '}
-                <b className="num font-semibold text-label">{formatCurrencyAbs(a.setAsidePerCycle)}</b> a cycle
-                {a.nextDate && ` · next ${relative(a.nextDate, today)}`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {collapsible && (
+          <>
+            {!showAll && (
+              <p className="t-caption px-4 py-2.5 text-center sm:px-6">{`${shown.length} of ${lines.length} shown · totals cover all`}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowAll((s) => !s)}
+              className="press min-h-11 w-full border-t bg-fill py-2.5 text-xs text-label-2 hover:text-label sm:min-h-0"
+            >
+              {showAll ? 'Show fewer' : `Show all ${lines.length} standing charges`}
+            </button>
+          </>
+        )}
 
-      {priceCreep?.variable?.length > 0 && (
-        <div className="border-t px-4 py-4 sm:px-6">
-          <div className="t-label">Too erratic to price-trend</div>
-          <p className="mt-2 text-[13px] text-label-2" title={priceCreep.variable.map((v) => v.label).join(', ')}>
-            {priceCreep.variableSentence ?? `${plural(priceCreep.variable.length, 'line')} vary too much to compare`}
-            {' — '}
-            <span className="text-label-3">
-              {priceCreep.variable.slice(0, 4).map((v) => v.label).join(', ')}
-              {priceCreep.variable.length > 4 ? '…' : ''}
-            </span>
-          </p>
-        </div>
-      )}
+        {subscriptions.annualItems?.length > 0 && (
+          <div className="border-t px-4 py-4 sm:px-6">
+            <div className="t-label">Once a year</div>
+            <ul className="mt-2 flex flex-col gap-1 text-[13.5px] text-label-2">
+              {subscriptions.annualItems.map((a) => (
+                <li key={a.id}>
+                  {a.label}: {formatCurrencyAbs(a.amount)} — set aside{' '}
+                  <b className="num font-semibold text-label">{formatCurrencyAbs(a.setAsidePerCycle)}</b> a cycle
+                  {a.nextDate && ` · next ${relative(a.nextDate, today)}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-      {subscriptions.assumptions?.length > 0 && (
-        <p className="t-caption border-t px-4 py-4 sm:px-6">{subscriptions.assumptions.join(' ')}</p>
+        {priceCreep?.variable?.length > 0 && (
+          <div className="border-t px-4 py-4 sm:px-6">
+            <div className="t-label">Too erratic to price-trend</div>
+            <p className="mt-2 text-[13px] text-label-2" title={priceCreep.variable.map((v) => v.label).join(', ')}>
+              {priceCreep.variableSentence ?? `${plural(priceCreep.variable.length, 'line')} vary too much to compare`}
+              {' — '}
+              <span className="text-label-3">
+                {priceCreep.variable.slice(0, 4).map((v) => v.label).join(', ')}
+                {priceCreep.variable.length > 4 ? '…' : ''}
+              </span>
+            </p>
+          </div>
+        )}
+
+        {subscriptions.assumptions?.length > 0 && (
+          <p className="t-caption border-t px-4 py-4 sm:px-6">{subscriptions.assumptions.join(' ')}</p>
+        )}
+        </details>
       )}
     </Card>
   );

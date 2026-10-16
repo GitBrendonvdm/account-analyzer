@@ -109,7 +109,7 @@ export function everydayFlow(processed, { cycles = 6 } = {}) {
  * `summary` is `summariseNetWorth`'s result. Each row is the change over one cycle; the last is the
  * cycle in progress, so it says how far it has moved so far rather than a full month's change.
  *
- * @returns {{ now, sinceLast, rows: {month, net, change, partial}[], up, of, complete, missing, estimated }|null}
+ * @returns {{ now, sinceLast, rows: {month, net, change, partial}[], up, of, complete, missing, estimated, owned }|null}
  */
 export function netWorthTrend(summary, { currentMonth = null, cycles = 6 } = {}) {
   const by = summary?.byMonth;
@@ -129,5 +129,6 @@ export function netWorthTrend(summary, { currentMonth = null, cycles = 6 } = {})
     complete: Boolean(summary.complete),
     missing: summary.missing ?? [],
     estimated: summary.estimated ?? [],
+    owned: summary.owned ?? [],
   };
 }

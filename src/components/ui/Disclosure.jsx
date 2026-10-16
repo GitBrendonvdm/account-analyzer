@@ -8,7 +8,7 @@ const InsideDisclosure = createContext(false);
  * every folded section would announce itself twice, once on the bar and once on the card under it.
  */
 export function Heading({ children, className = '' }) {
-  return useContext(InsideDisclosure) ? null : <h2 className={`t-head ${className}`}>{children}</h2>;
+  return useContext(InsideDisclosure) ? null : <h2 className={className ? `t-head ${className}` : 't-head'}>{children}</h2>;
 }
 
 /**
@@ -19,10 +19,12 @@ export function Heading({ children, className = '' }) {
  * the folded content stays in the page so what is inside is measured and searchable the moment it
  * opens. The bar is plain, not a card — the cards inside are the surfaces, and a card on a card turns
  * both to mud. `merge` says the one card inside is this section, so its own title is not repeated.
+ * `forceOpen` opens it for as long as something inside needs to be seen — a draft rule, say — and
+ * lets go of it after, so the reader can still fold it by hand in between.
  */
-export function Disclosure({ title, summary, merge = false, defaultOpen = false, className = '', children }) {
+export function Disclosure({ title, summary, merge = false, defaultOpen = false, forceOpen = false, className = '', children }) {
   return (
-    <details open={defaultOpen || undefined} className={`group ${className}`}>
+    <details open={forceOpen || defaultOpen || undefined} className={`group ${className}`}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-2 py-3 select-none hover:bg-fill/50 max-md:min-h-11 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
           <span className="t-head block">{title}</span>

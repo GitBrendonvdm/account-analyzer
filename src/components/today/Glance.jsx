@@ -73,8 +73,11 @@ export function NetWorthTile({ trend, onOpenAccounts, className = '' }) {
         </p>
       )}
       <Bars rows={trend.rows.map((r) => ({ month: r.month, value: r.change, partial: r.partial }))} label="Change in net worth each cycle" />
-      {trend.estimated.length > 0 && (
-        <p className="t-caption mt-2">Includes an estimate for {trend.estimated.join(', ')}.</p>
+      {(trend.owned?.length > 0 || trend.estimated?.length > 0) && (
+        <p className="t-caption mt-2">
+          {trend.owned?.length > 0 && `Counts ${trend.owned.join(', ')}. `}
+          {trend.estimated?.length > 0 && `Includes an estimate for ${trend.estimated.join(', ')}.`}
+        </p>
       )}
       {!trend.complete && (
         <p className="t-caption mt-2 text-warn">

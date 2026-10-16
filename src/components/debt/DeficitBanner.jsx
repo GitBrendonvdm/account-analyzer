@@ -1,4 +1,4 @@
-import { AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Sparkles } from 'lucide-react';
 import { Card } from '../ui/Surface';
 import { formatCurrencyAbs } from '../../utils/format';
 
@@ -19,6 +19,19 @@ const fmtMonthYear = (d) => {
   const x = toDate(d);
   return x && !Number.isNaN(x.getTime()) ? x.toLocaleDateString('en-ZA', MONTH_YEAR) : null;
 };
+
+/** The reasoning behind the sentence above it: there for whoever asks, folded for whoever does not. */
+function Why({ children }) {
+  return (
+    <details className="group mt-2">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-[13px] text-label-2 select-none hover:text-label max-md:min-h-11 [&::-webkit-details-marker]:hidden">
+        What this means
+        <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  );
+}
 
 function Assumptions({ items }) {
   if (!items?.length) return null;
@@ -57,17 +70,19 @@ export function DeficitBanner({ debtBudget }) {
               <p className="t-sub text-bad">
                 You are {formatCurrencyAbs(deficit)} a cycle short.
               </p>
-              <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
-                That lands on {absorber} and costs about {formatCurrencyAbs(debtBudget.deficitCost12)}{' '}
-                in interest over the next year. The plans below assume no extra payments until the
-                gap closes.
-              </p>
-              <p className="mt-2 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
-                The first {formatCurrencyAbs(breakEven)} of anything extra you find stops the bleed;
-                only what is above it reaches a debt.
-                {limitMonth && ` At this pace ${absorber} reaches its limit in ${limitMonth}.`}
-              </p>
-              <Assumptions items={debtBudget.assumptions} />
+              <Why>
+                <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
+                  That lands on {absorber} and costs about {formatCurrencyAbs(debtBudget.deficitCost12)}{' '}
+                  in interest over the next year. The plans below assume no extra payments until the
+                  gap closes.
+                </p>
+                <p className="mt-2 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
+                  The first {formatCurrencyAbs(breakEven)} of anything extra you find stops the bleed;
+                  only what is above it reaches a debt.
+                  {limitMonth && ` At this pace ${absorber} reaches its limit in ${limitMonth}.`}
+                </p>
+                <Assumptions items={debtBudget.assumptions} />
+              </Why>
             </div>
           </div>
         </div>
@@ -89,10 +104,12 @@ export function DeficitBanner({ debtBudget }) {
                 ? `After the ${formatCurrencyAbs(planned)} you plan to save, ${formatCurrencyAbs(adjusted)} a cycle is available for extra payments.`
                 : `${formatCurrencyAbs(adjusted)} a cycle is available for extra payments.`}
             </p>
-            <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
-              That is the extra slider's starting point; everything above it has to come from cuts.
-            </p>
-            <Assumptions items={debtBudget.assumptions} />
+            <Why>
+              <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
+                That is the extra slider's starting point; everything above it has to come from cuts.
+              </p>
+              <Assumptions items={debtBudget.assumptions} />
+            </Why>
           </div>
         </div>
       </Card>
@@ -102,11 +119,13 @@ export function DeficitBanner({ debtBudget }) {
   return (
     <Card className="materialize p-5 sm:p-7">
       <p className="t-sub">Your cycles close level.</p>
-      <p className="mt-1.5 max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
-        Nothing is available for extra payments until spending changes; the plans below start from
-        the contractual instalments alone.
-      </p>
-      <Assumptions items={debtBudget.assumptions} />
+      <Why>
+        <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-label-2">
+          Nothing is available for extra payments until spending changes; the plans below start from
+          the contractual instalments alone.
+        </p>
+        <Assumptions items={debtBudget.assumptions} />
+      </Why>
     </Card>
   );
 }

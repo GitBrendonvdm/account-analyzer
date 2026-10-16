@@ -29,34 +29,49 @@ explains those — six vitals (savings rate, debt-service ratio, interest burden
 the deficit), what is coming up with a status per bill and the day-by-day cash path to payday, this
 cycle's in and out, and where the money goes — is folded under its own bar, closed until you open it.
 
-**Headlines** — the three to five biggest facts in your data, as sentences, each carrying the
-arithmetic behind it: which payoff order clears everything by when and what it saves, what the
-deficit costs in card interest, debt service as a share of income, what is genuinely overdue.
+**Every screen follows one shape**: the answer it exists for first, the explanation folded under bars
+that stay closed until opened, forms in dialogs rather than on the page, and no more than one table in
+view at a time.
+
+**Headlines** — the biggest fact in your data, as a sentence carrying the arithmetic behind it, above
+every screen but the first two; the other three or four fold under "N more things worth knowing". They
+cover which payoff order clears everything by when and what it saves, what the deficit costs in card
+interest, debt service as a share of income, what is genuinely overdue.
 
 **Ledger** — income and spend per pay cycle, nested under the export's own Spending Group, with a
 forecast to payday. Columns left of the divider are what happened; everything right of it is a
-projection, and the header says so.
+projection, and the header says so. Anything counted twice is raised above the table; finding a
+payment, the providers and the rules are folded (a draft rule opens its bar by itself).
 
-**Trends** — running net total and per-period net, projected to the next payday.
+**Trends** — net worth, month by month: one bar per pay cycle, green up and red down, the cycle in
+progress faint. The running net total and per-period net are folded under it.
 
-**Habits** — where money can be found. The Savings Finder (cancellable spend separated from
-behavioural potential; card interest reported, never counted as found), standing charges with
-cadence and annual cost, price increases as steps, what changed (median + MAD drift), new and
-lapsed charges, trips versus tickets, then the merchants and the weekday shape.
+**Habits** — where money can be found. Standing charges first (the totals by kind, the lines behind
+them folded: cadence, annual cost, price increases as steps), then folded: new and stopped charges,
+what changed (median + MAD drift) with trips versus tickets, the merchants, and the weekday shape.
 
 **Plan** — safe to spend, a direction table (three cycles against twelve), "what would it take" to
 be debt-free by a date, per-category targets judged against where the cycle is *heading*, a
 twelve-cycle trajectory, a ranked way to close the gap, every standing charge, and goals.
 
-**Debt** — each liability's rate, instalment, fees and remaining term read off its own ledger
-(typed values win and are labelled), the deficit and what it costs, payoff strategies — minimum,
-avalanche, snowball, lifetime, short-term effect, custom — with the cascade of freed instalments,
-the balance chart, the freed-cash timeline, what R1 000 extra is worth on each debt, a lump-sum
-what-if, the cards, and rate sensitivity.
+**Debt** — what you owe, what it costs a cycle and when it is gone, then each liability's rate,
+instalment, fees and remaining term read off its own ledger (typed values win and are labelled; the
+pencil opens them in a dialog) and the deficit in one line. Folded under it: the plan and its payoff
+strategies — minimum, avalanche, snowball, lifetime, short-term effect, custom — with the cascade of
+freed instalments, the balance chart and freed-cash timeline, what R1 000 extra is worth on each debt,
+a lump-sum what-if, and rate sensitivity.
 
-**Accounts** — balances with their as-of date and where they came from, external accounts the
-export never sees, per-cycle positions, what the debt costs with the fees audit, and per-account
-movement.
+**Accounts** — one list of balances with their as-of date and where they came from, then what you
+own, then the folded detail: per-cycle positions, what the debt costs with the fees audit, cash in and
+out, and per-account movement.
+
+**What you own.** A house or a car is worth money no bank statement shows. Add one under **Accounts →
+What you own** with a name, a kind, what it is worth and the day (and, optionally, the loans taken out
+against it, so the list can say how much of it is yours once they are paid). It counts towards net
+worth. Changing what it is worth adds a valuation on the day you give rather than overwriting the old
+one, so net worth month by month shows the change in the month it happened; before its first valuation
+an asset is worth that first figure, so adding one today does not make net worth leap. Stored in the
+settings (`assets`); no schema.
 
 Every chart is interactive: drag to zoom, hover for the readout, click a legend entry to hide it.
 

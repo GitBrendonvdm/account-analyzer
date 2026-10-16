@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
+import { Heading } from '../ui/Disclosure';
 import {
   BAD,
   ChartFrame,
@@ -91,7 +92,7 @@ export function PeriodNetChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="t-head">Net Per Month</h2>
+          <Heading>Net Per Month</Heading>
           <p className="text-sm text-label-2">
             Income minus expense per pay month · transfers excluded
           </p>

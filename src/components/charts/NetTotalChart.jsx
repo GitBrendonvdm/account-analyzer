@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
+import { Heading } from '../ui/Disclosure';
 import {
   ChartFrame,
   ChartLegend,
@@ -112,7 +113,7 @@ export function NetTotalChart({ chartData }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="t-head">Net total over time</h2>
+          <Heading>Net total over time</Heading>
           <p className="t-label mt-1.5">
             Running net total ({granularityLabel[granularity]} buckets) · transfers excluded
           </p>

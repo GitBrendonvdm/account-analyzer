@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatCurrencyAbs } from '../utils/format';
 import { Card, CardHead } from './ui/Surface';
+import { Disclosure } from './ui/Disclosure';
 import { SubscriptionsCard } from './habits/SubscriptionsCard';
 import { DriftCard } from './habits/DriftCard';
 import { WinsCard } from './habits/WinsCard';
@@ -126,8 +127,11 @@ export function HabitsView({
   // explanation instead of two independent — and occasionally contradicting — rankings.
   const driftFlaggedCategories = drift?.flagged?.map((row) => row.category) ?? [];
 
+  const hasChanges = Boolean(drift || basket);
+  const hasNew = Boolean(subscriptions);
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
       <SubscriptionsCard
         subscriptions={subscriptions}
         priceCreep={priceCreep}
@@ -135,84 +139,91 @@ export function HabitsView({
         onSetLineOverride={onSetLineOverride}
         asOf={asOf}
       />
-      <WinsCard subscriptions={subscriptions} />
-      <DriftCard drift={drift} />
-      <BasketCard basket={basket} flaggedCategories={driftFlaggedCategories} />
 
-      {habits && (
-        <Card className="materialize overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
-            <CardHead
-              title="Where the money goes"
-              subtitle="By merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so one shop reads as one line."
-            />
-            {/* Below `sm` the sort control spans the card and its two halves are 44px tall. */}
-            <div className="glass-chip flex w-full shrink-0 gap-1 p-1 sm:w-auto">
-              {[
-                { id: 'spend', label: 'By amount' },
-                { id: 'count', label: 'By frequency' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSortBy(opt.id)}
-                  aria-pressed={sortBy === opt.id}
-                  className={`press min-h-11 flex-1 rounded-full px-3.5 py-1.5 text-[12.5px] sm:min-h-0 sm:flex-none ${
-                    sortBy === opt.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <MerchantList merchants={merchants} months={months} />
-        </Card>
-      )}
+      <div className="mt-2 flex flex-col gap-1 border-t pt-2">
+        {hasNew && (
+          <Disclosure title="New and stopped" summary="Charges that started lately, and the ones you have stopped or cut">
+            <WinsCard subscriptions={subscriptions} />
+          </Disclosure>
+        )}
 
-      {habits && weekday.length > 0 && (
-        <Card className="materialize overflow-hidden">
-          <div className="border-b px-4 py-5 sm:px-6">
-            <CardHead
-              title="When you spend"
-              subtitle={`${habits.busiest.day} is the heaviest day of the week, ${habits.quietest.day} the lightest.`}
-            />
-          </div>
-          <div className="p-4 sm:p-6">
-            {/*
-              Each column is the full height of the strip and the bar is absolutely positioned at
-              its foot: a percentage height on a block inside an auto-height flex column resolves
-              to nothing, which is how the bars went missing. The strip is 7 × (gap + column) wide
-              at 360px — the gap is the narrow one there so the label "Wed" never wraps.
-            */}
-            <div className="flex h-44 items-stretch gap-2 sm:gap-3">
-              {weekday.map((w) => (
-                <div key={w.day} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                  <span className="num text-[12px] text-label-3 sm:text-[11px]">
-                    {Math.round(w.perCycle / 1000)}k
-                  </span>
-                  <div className="relative w-full flex-1">
-                    <div
-                      className="absolute inset-x-0 bottom-0 rounded-t-md"
-                      style={{
-                        height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%`,
-                        background:
-                          w.day === habits.busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
-                        transition: 'height 700ms var(--ease-out)',
-                      }}
-                      title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
-                    />
-                  </div>
-                  <span className="text-[12px] font-medium text-label-2 sm:text-[11px]">{w.day}</span>
+        {hasChanges && (
+          <Disclosure title="Changes in what you spend" summary="Where spending moved outside its usual range, and whether it was more visits or bigger baskets">
+            <DriftCard drift={drift} />
+            <BasketCard basket={basket} flaggedCategories={driftFlaggedCategories} />
+          </Disclosure>
+        )}
+
+        {habits && (
+          <Disclosure title="Where the money goes" summary="By merchant, largest first" merge>
+            <Card className="materialize overflow-hidden">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b px-4 py-5 sm:px-6">
+                <CardHead subtitle="By merchant rather than category — descriptions are stripped of card masks, references, billing dates and the trailing town so one shop reads as one line." />
+                {/* Below `sm` the sort control spans the card and its two halves are 44px tall. */}
+                <div className="glass-chip flex w-full shrink-0 gap-1 p-1 sm:w-auto">
+                  {[
+                    { id: 'spend', label: 'By amount' },
+                    { id: 'count', label: 'By frequency' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSortBy(opt.id)}
+                      aria-pressed={sortBy === opt.id}
+                      className={`press min-h-11 flex-1 rounded-full px-3.5 py-1.5 text-[12.5px] sm:min-h-0 sm:flex-none ${
+                        sortBy === opt.id ? 'bg-fill-2 font-semibold' : 'text-label-2 hover:text-label'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <p className="t-caption mt-5 border-t pt-4">
-              Average spend per cycle by day of week. Transfers and loan-internal rows excluded.
-            </p>
-          </div>
-        </Card>
-      )}
+              </div>
+              <MerchantList merchants={merchants} months={months} />
+            </Card>
+          </Disclosure>
+        )}
+
+        {habits && weekday.length > 0 && (
+          <Disclosure title="When you spend" summary={`${habits.busiest.day} is the heaviest day of the week, ${habits.quietest.day} the lightest`} merge>
+            <Card className="materialize overflow-hidden">
+              <div className="p-4 sm:p-6">
+                {/*
+                  Each column is the full height of the strip and the bar is absolutely positioned at
+                  its foot: a percentage height on a block inside an auto-height flex column resolves
+                  to nothing, which is how the bars went missing. The strip is 7 × (gap + column) wide
+                  at 360px — the gap is the narrow one there so the label "Wed" never wraps.
+                */}
+                <div className="flex h-44 items-stretch gap-2 sm:gap-3">
+                  {weekday.map((w) => (
+                    <div key={w.day} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                      <span className="num text-[12px] text-label-3 sm:text-[11px]">
+                        {Math.round(w.perCycle / 1000)}k
+                      </span>
+                      <div className="relative w-full flex-1">
+                        <div
+                          className="absolute inset-x-0 bottom-0 rounded-t-md"
+                          style={{
+                            height: `${Math.max(4, (w.perCycle / weekMax) * 100)}%`,
+                            background:
+                              w.day === habits.busiest.day ? 'var(--color-info)' : 'var(--color-fill-2)',
+                            transition: 'height 700ms var(--ease-out)',
+                          }}
+                          title={`${w.day}: ${formatCurrencyAbs(w.perCycle)} a cycle over ${w.count} transactions`}
+                        />
+                      </div>
+                      <span className="text-[12px] font-medium text-label-2 sm:text-[11px]">{w.day}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="t-caption mt-5 border-t pt-4">
+                  Average spend per cycle by day of week. Transfers and loan-internal rows excluded.
+                </p>
+              </div>
+            </Card>
+          </Disclosure>
+        )}
+      </div>
     </div>
   );
 }
