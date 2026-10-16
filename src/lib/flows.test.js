@@ -104,11 +104,14 @@ describe('buildFullTransfers', () => {
     expect(spend).not.toContain(loanLeg);
   });
 
-  it('never pairs a settlement with the transfer that paid the debt off', () => {
+  it('counts the payment that cleared a debt as a payment, and the facility that funded it as money in', () => {
     const data = withIds([
       ...anchors(),
+      // A revolving facility drawn into the card, which then paid the personal loan off.
+      row('2026-10-15', 'Transfer', LOAN, -360000, { Category: 'Cash', 'Spending Group': 'Transfer' }),
+      row('2026-10-15', 'Transfer', BANK, 360000, { Category: 'Cash', 'Spending Group': 'Transfer' }),
       row('2026-10-15', '1sa Transfer', BANK, -167013.82, { Category: 'Cash', 'Spending Group': 'Transfer' }),
-      row('2026-10-15', 'Paid off — recorded when the account was closed', LOAN, 167013.82, {
+      row('2026-10-15', 'Paid off — recorded when the account was closed', 'FNB Loan *1143', 167013.82, {
         Category: 'Personal Loan',
         'Spending Group': 'Debt',
         Source: 'settlement',
@@ -116,25 +119,11 @@ describe('buildFullTransfers', () => {
     ]);
     const t = buildFullTransfers(data);
     const payment = data.find((r) => r.Description === '1sa Transfer');
-    expect(t.loanPairs).toHaveLength(0);
-    expect(t.loanInstalmentIds.has(payment.id)).toBe(false);
-    // Still a movement, by its own wording and category — not spending.
-    expect(t.transferIds.has(payment.id)).toBe(true);
-    expect(spendRows(data, { transfers: t })).not.toContain(payment);
-  });
-
-  it('keeps a loan drawdown a movement: borrowed money is not income', () => {
-    const data = withIds([
-      ...anchors(),
-      row('2026-05-25', 'Transfer', LOAN, -360000, { Category: 'Cash', 'Spending Group': 'Transfer' }),
-      row('2026-05-25', 'Transfer', BANK, 360000, { Category: 'Cash', 'Spending Group': 'Transfer' }),
-    ]);
-    const t = buildFullTransfers(data);
     const proceeds = data.find((r) => r.Account === BANK && r.AmountNum === 360000);
-    expect(t.loanPairs).toHaveLength(1);
-    expect(t.transferIds.has(proceeds.id)).toBe(true);
-    expect(t.loanInstalmentIds.has(proceeds.id)).toBe(false);
-    expect(incomeRows(data, { transfers: t })).not.toContain(proceeds);
+    // The payment is cash gone, like any instalment; the facility's draw is what paid for it.
+    expect(t.loanInstalmentIds.has(payment.id)).toBe(true);
+    expect(spendRows(data, { transfers: t })).toContain(payment);
+    expect(incomeRows(data, { transfers: t })).toContain(proceeds);
   });
 
   it("keeps a 'Transfer'-labelled Groceries row as spend", () => {
@@ -282,13 +271,9 @@ describe.skipIf(!real)('flows on the real export', () => {
       expect(r.date).toBeInstanceOf(Date);
       expect(r.amount).toBeGreaterThan(0);
     });
-    // Released loan legs never remain in the transfer set — except a drawdown, the lender putting
-    // money into another account, which is borrowed rather than earned and stays a movement.
+    // Released loan legs never remain in the transfer set.
     transfers.loanPairs.forEach((pair) =>
-      pair.items.forEach((t) => {
-        const drawdown = !transfers.loanAccounts.has(t.Account) && t.AmountNum > 0;
-        expect(transfers.transferIds.has(t.id)).toBe(drawdown);
-      }),
+      pair.items.forEach((t) => expect(transfers.transferIds.has(t.id)).toBe(false)),
     );
   });
 

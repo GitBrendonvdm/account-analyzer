@@ -98,10 +98,6 @@ export function buildFullTransfers(data, { accounts = null } = {}) {
   const loanInstalmentIds = new Set();
   loanPairs.forEach((pair) =>
     pair.items.forEach((t) => {
-      // Money the lender PUT INTO another account — a drawdown, a disbursement — is borrowed, not
-      // earned. Released like an instalment it would read as income, and a R360 000 facility drawn
-      // to settle other debts made the cycle look like a R360 000 pay day.
-      if (!loanAccounts.has(t.Account) && t.AmountNum > 0) return;
       transferIds.delete(t.id);
       if (!loanAccounts.has(t.Account)) loanInstalmentIds.add(t.id);
     }),
