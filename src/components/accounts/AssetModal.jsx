@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
-import { ASSET_KINDS, makeAsset, valueOn, withValuation } from '../../lib/assets';
+import { Plus, Trash2, X } from 'lucide-react';
+import { ASSET_KINDS, makeAsset, valueOn } from '../../lib/assets';
 import { formatCurrencyAbs } from '../../utils/format';
 import { Field } from '../ui/Field';
 import { Sheet } from '../ui/Sheet';
-import { fmtIso, parseAmount } from './accountBits';
+import { parseAmount } from './accountBits';
 
 const PRIMARY =
   'press flex items-center justify-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50 max-md:min-h-11 max-md:flex-1';
@@ -13,40 +13,53 @@ const SECONDARY =
 const TOUCH_FIELD =
   '[&_input:not([type=checkbox])]:min-h-11 [&_input:not([type=checkbox])]:w-full [&_input:not([type=checkbox])]:min-w-0 [&_input:not([type=checkbox])]:text-base';
 
+/** The valuations as rows to edit: the day, and the worth as typed. */
+const rowsOf = (asset, today) =>
+  asset ? asset.valuations.map((v) => ({ date: v.date, value: String(Math.round(v.value)) })) : [{ date: today, value: '' }];
+
 /**
- * Add what you own, or change what you said it is worth.
+ * Add what you own, or look after what you said it is worth.
  *
- * Changing the worth does not overwrite the old figure: it adds a valuation on the day you give, so
- * net worth month by month shows the change in the month it happened. The loans ticked are the ones
- * taken out against it — they are already counted as debt, and ticking them only lets the list say
- * what is left of the asset once they are paid.
+ * An asset is the days you looked and what you saw: the first is the day you got it and what it was
+ * worth then, each later one a day you checked. Net worth moves in a straight line between them, so a
+ * year's gain arrives a little each month. Rows can be added, changed or taken away; the loans ticked
+ * are the ones taken out against it — they are already counted as debt, and ticking them only lets the
+ * list say what is left of the asset once they are paid.
  */
 export function AssetModal({ asset, loans, loanOwed, today, onSave, onDelete, onDone }) {
   const adding = !asset;
   const [name, setName] = useState(asset?.name ?? '');
   const [kind, setKind] = useState(asset?.kind ?? 'house');
-  const [value, setValue] = useState(asset ? String(valueOn(asset, today) ?? '') : '');
-  const [date, setDate] = useState(today);
+  const [rows, setRows] = useState(() => rowsOf(asset, today));
   const [loanIds, setLoanIds] = useState(asset?.loanIds ?? []);
   const [confirming, setConfirming] = useState(false);
 
-  const amount = parseAmount(value);
-  const ready = name.trim() && amount != null;
+  // Rows with a real day and a real worth; where two share a day the later one wins.
+  const valuations = [
+    ...new Map(
+      rows
+        .map((r) => ({ date: r.date, value: parseAmount(r.value) }))
+        .filter((v) => v.date && v.date <= today && v.value != null)
+        .map((v) => [v.date, v]),
+    ).values(),
+  ].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const ready = name.trim() && valuations.length > 0;
 
   const submit = (e) => {
     e.preventDefault();
     if (!ready) return;
-    const day = date && date <= today ? date : today;
-    if (adding) {
-      onSave(makeAsset({ name, kind, value: amount, date: day, loanIds }));
-    } else {
-      let next = { ...asset, name: name.trim(), kind, loanIds };
-      if (amount !== valueOn(asset, day)) next = withValuation(next, { date: day, value: amount });
-      onSave(next);
-    }
+    onSave(
+      adding
+        ? { ...makeAsset({ name, kind, value: valuations[0].value, date: valuations[0].date, loanIds }), valuations }
+        : { ...asset, name: name.trim(), kind, loanIds, valuations },
+    );
     onDone();
   };
 
+  const setRow = (i, patch) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const addRow = () =>
+    setRows((rs) => [...rs, { date: today, value: String(Math.round((asset ? valueOn(asset, today) : parseAmount(rs[rs.length - 1]?.value)) ?? 0)) }]);
+  const removeRow = (i) => setRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs));
   const toggleLoan = (id) => setLoanIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
   return (
@@ -54,8 +67,8 @@ export function AssetModal({ asset, loans, loanOwed, today, onSave, onDelete, on
       title={adding ? 'Add something you own' : asset.name}
       subtitle={
         adding
-          ? 'A house, a car — anything worth money that is not in a bank account. It counts towards net worth.'
-          : 'Change what it is worth and net worth shows the change from that day.'
+          ? 'A house, a car — anything worth money that is not in a bank account. It counts towards net worth from the day you got it.'
+          : 'Add the days you checked what it is worth. Net worth moves smoothly from one to the next.'
       }
       onClose={onDone}
       footer={
@@ -129,10 +142,55 @@ export function AssetModal({ asset, loans, loanOwed, today, onSave, onDelete, on
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Worth" prefix="R" value={value} onChange={setValue} placeholder="0" width="w-full" className="min-w-0" />
-          <Field label="As of" type="date" inputMode="none" value={date} onChange={setDate} max={today} width="w-full" className="min-w-0" />
-        </div>
+        <fieldset>
+          <legend className="t-label">What it was worth</legend>
+          <ul className="mt-1.5 flex flex-col gap-2">
+            {rows.map((r, i) => (
+              <li key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3">
+                <Field
+                  label={i === 0 ? 'Received on' : 'Checked on'}
+                  type="date"
+                  inputMode="none"
+                  value={r.date}
+                  onChange={(v) => setRow(i, { date: v })}
+                  max={today}
+                  width="w-full"
+                  className="min-w-0"
+                />
+                <Field
+                  label={i === 0 ? 'Worth then' : 'Worth'}
+                  prefix="R"
+                  value={r.value}
+                  onChange={(v) => setRow(i, { value: v })}
+                  placeholder="0"
+                  width="w-full"
+                  className="min-w-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  disabled={rows.length === 1}
+                  aria-label={`Remove value ${i + 1}`}
+                  className="press mb-0.5 flex h-8 w-8 items-center justify-center rounded-full text-label-3 hover:bg-fill hover:text-label disabled:opacity-30 max-md:mb-0 max-md:h-11 max-md:w-11"
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={addRow}
+            className="press mt-2 flex items-center gap-1.5 rounded-full px-2 py-1.5 text-[12.5px] font-medium text-info hover:bg-fill max-md:min-h-11"
+          >
+            <Plus size={13} />
+            {adding ? 'Add a later value' : 'Log what it is worth now'}
+          </button>
+          <p className="t-caption mt-1">
+            Between two days it moves in a straight line, so a gain over a year is spread across its months. After the last it stays
+            there; before the first you did not own it yet.
+          </p>
+        </fieldset>
 
         {loans.length > 0 && (
           <fieldset>
@@ -150,20 +208,6 @@ export function AssetModal({ asset, loans, loanOwed, today, onSave, onDelete, on
             </ul>
             <p className="t-caption mt-1.5">Already counted as debt; ticking one only shows how much of this is yours once it is paid.</p>
           </fieldset>
-        )}
-
-        {!adding && asset.valuations.length > 1 && (
-          <div>
-            <span className="t-label">What it has been worth</span>
-            <ul className="mt-1.5 flex flex-col text-sm text-label-2">
-              {[...asset.valuations].reverse().map((v) => (
-                <li key={v.date} className="flex justify-between gap-4 border-b py-1.5 last:border-0">
-                  <span>{fmtIso(v.date)} {v.date.slice(0, 4)}</span>
-                  <span className="num text-label">{formatCurrencyAbs(v.value)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
         )}
       </form>
     </Sheet>

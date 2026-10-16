@@ -3,13 +3,19 @@
  *
  * Net worth is what you hold minus what you owe, and until now the "hold" side was only what sits in
  * accounts. A bond on a house with no house against it reads as a debt with nothing behind it. An
- * asset here is a name, a kind, and what it is worth — and what it was worth, because a car loses
- * value and a house gains it, and net worth month by month has to show that happening in the month it
- * was valued rather than rewriting every month before it.
+ * asset here is a name, a kind, the day you got it, and what it was worth on the days you looked — and
+ * things go up and down, so what it is worth in between is worked out, not guessed.
  *
- *   valuations   [{ date, value }] — each time the reader said what it is worth. An asset is worth the
- *                latest valuation on or before a day; before the first it is worth the first (an asset
- *                added today does not make net worth leap by its whole value in the current cycle).
+ *   valuations   [{ date, value }] — the first is the day it was received and what it was worth then;
+ *                each later one is a day the reader checked. Between two of them the worth moves in a
+ *                straight line, day by day, so a house that went from R600k to R630k over a year adds
+ *                R2.5k to net worth each month rather than R30k in the month it was looked at. After
+ *                the last it holds that figure until told otherwise. Before the first, it was not yet
+ *                owned and is worth nothing.
+ *
+ *                A car bought at R400k that is R300k a year later, R100k the year after and R150k the
+ *                year after that falls for two years and then rises, and net worth follows it month by
+ *                month.
  *   loanIds      the loans that were taken out against it, so the page can say what is left of it once
  *                they are paid: its equity. Display only — the loans are already counted as debt.
  *
@@ -24,6 +30,11 @@ export const ASSET_KINDS = [
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const KIND_IDS = new Set(ASSET_KINDS.map((k) => k.id));
+const DAY_MS = 86400000;
+const dayNumber = (iso) => {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
+};
 
 /** The kind's label, and "Something else" for one this version does not know. */
 export const kindLabel = (kind) => ASSET_KINDS.find((k) => k.id === kind)?.label ?? 'Something else';
@@ -50,27 +61,43 @@ export function normaliseAssets(raw) {
     .filter((a) => a.valuations.length);
 }
 
-/** A new asset, valued once. */
-export function makeAsset({ name, kind, value, date, loanIds = [] }, id = `asset-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`) {
+/** A new asset: received on a day, worth something then. */
+export function makeAsset(
+  { name, kind, value, date, loanIds = [] },
+  id = `asset-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+) {
   return { id, name: String(name).trim(), kind: KIND_IDS.has(kind) ? kind : 'other', valuations: [{ date, value }], loanIds };
 }
 
-/** The asset with one more valuation; a valuation on a day it already has replaces that day's. */
-export function withValuation(asset, { date, value }) {
-  const rest = asset.valuations.filter((v) => v.date !== date);
-  return { ...asset, valuations: [...rest, { date, value }].sort((a, b) => (a.date < b.date ? -1 : 1)) };
-}
-
-/** What it is worth on a day: the latest valuation on or before it, or the first if the day is earlier. */
+/**
+ * What it is worth on a day: nothing before it was received, a straight line between the two
+ * valuations either side of the day, and the last valuation from then on.
+ */
 export function valueOn(asset, iso) {
   const list = asset?.valuations;
   if (!list?.length) return null;
-  let out = list[0].value;
-  for (const v of list) {
-    if (v.date <= iso) out = v.value;
-    else break;
+  if (iso < list[0].date) return 0;
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    const b = list[i + 1];
+    if (iso >= a.date && iso < b.date) {
+      const span = dayNumber(b.date) - dayNumber(a.date);
+      return a.value + ((b.value - a.value) * (dayNumber(iso) - dayNumber(a.date))) / span;
+    }
   }
-  return out;
+  return list[list.length - 1].value;
+}
+
+/**
+ * How far it has moved since it was received, up or down.
+ *
+ * @returns {{ change, since }|null} null when it has not moved by a rand
+ */
+export function movedSince(asset, iso) {
+  const first = asset?.valuations?.[0];
+  if (!first || iso < first.date) return null;
+  const change = (valueOn(asset, iso) ?? first.value) - first.value;
+  return Math.abs(change) >= 1 ? { change, since: first.date } : null;
 }
 
 /**

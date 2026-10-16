@@ -65,13 +65,15 @@ a lump-sum what-if, and rate sensitivity.
 own, then the folded detail: per-cycle positions, what the debt costs with the fees audit, cash in and
 out, and per-account movement.
 
-**What you own.** A house or a car is worth money no bank statement shows. Add one under **Accounts →
-What you own** with a name, a kind, what it is worth and the day (and, optionally, the loans taken out
-against it, so the list can say how much of it is yours once they are paid). It counts towards net
-worth. Changing what it is worth adds a valuation on the day you give rather than overwriting the old
-one, so net worth month by month shows the change in the month it happened; before its first valuation
-an asset is worth that first figure, so adding one today does not make net worth leap. Stored in the
-settings (`assets`); no schema.
+**What you own.** A house or a car is worth money no bank statement shows, and it goes up and down. Add
+one under **Accounts → What you own** with a name, a kind, the day you received it and what it was worth
+then, and (optionally) the loans taken out against it so the list can say how much of it is yours once
+they are paid. Whenever you check what it is worth, log it with the day: net worth moves in a straight
+line from one logged value to the next, so a house bought at R600k and worth R630k a year later adds
+R2.5k to net worth each month rather than R30k in the month you looked, and a car at R400k, R300k, R100k
+and then R150k falls for two years and rises in the third, month by month. After the last value it
+holds that figure; before the day you received it, it is not counted. Stored in the settings
+(`assets`); no schema.
 
 Every chart is interactive: drag to zoom, hover for the readout, click a legend entry to hide it.
 

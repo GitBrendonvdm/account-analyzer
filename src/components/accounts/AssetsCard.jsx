@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Car, Home, Package, Pencil, Plus } from 'lucide-react';
 import { accountLabel } from '../../db/accountIdentity';
-import { equityOf, kindLabel, valueOn } from '../../lib/assets';
+import { equityOf, kindLabel, movedSince, valueOn } from '../../lib/assets';
 import { formatCurrencyAbs } from '../../utils/format';
 import { AssetModal } from './AssetModal';
 import { fmtIso } from './accountBits';
@@ -16,6 +16,8 @@ function Row({ asset, today, owedById, loanLabel, onEdit }) {
   const value = valueOn(asset, today);
   const last = asset.valuations[asset.valuations.length - 1];
   const equity = equityOf(asset, today, owedById);
+  const moved = movedSince(asset, today);
+  const first = asset.valuations[0];
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 last:border-0 md:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -23,8 +25,15 @@ function Row({ asset, today, owedById, loanLabel, onEdit }) {
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-label">{asset.name}</div>
           <div className="t-caption truncate">
-            {`${kindLabel(asset.kind)} · valued ${fmtIso(last.date)} ${last.date.slice(0, 4)}`}
+            {`${kindLabel(asset.kind)} · received ${fmtIso(first.date)} ${first.date.slice(0, 4)}${
+              asset.valuations.length > 1 ? ` · last valued ${fmtIso(last.date)} ${last.date.slice(0, 4)}` : ''
+            }`}
           </div>
+          {moved && (
+            <div className={`t-caption truncate ${moved.change > 0 ? 'text-good' : 'text-bad'}`}>
+              {`${moved.change > 0 ? 'Up' : 'Down'} ${formatCurrencyAbs(moved.change)} since ${fmtIso(moved.since)} ${moved.since.slice(0, 4)}`}
+            </div>
+          )}
           {equity && (
             <div className="t-caption truncate">
               {`${formatCurrencyAbs(equity.owed)} owed on it · `}

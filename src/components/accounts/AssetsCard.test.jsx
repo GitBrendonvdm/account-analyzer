@@ -15,6 +15,7 @@ const render = (el) =>
     .replace(/&amp;/g, '&')
     .replace(/[\u00a0\u202f]/g, ' ');
 
+const house = (extra = {}) => ({ ...HOUSE, ...extra });
 const HOUSE = {
   id: 'asset-house',
   name: 'Our house',
@@ -36,7 +37,7 @@ describe('AssetsCard', () => {
     expect(html).toContain('What you own');
     expect(html).toContain('R 3 780 000 in 2 things, counted in net worth.');
     expect(html).toContain('Our house');
-    expect(html).toMatch(/House · valued 0?1 Sept 2026/);
+    expect(html).toMatch(/House · received 0?1 Mar 2026 · last valued 0?1 Sept 2026/);
     expect(html).toContain('R 3 600 000');
     expect(html).toContain('R 2 747 083 owed on it');
     expect(html).toContain('R 852 917 yours');
@@ -50,10 +51,22 @@ describe('AssetsCard', () => {
     expect(html).toContain('no balance for fnb|9999');
   });
 
-  it('shows a car losing value as the date moves on, not only the latest figure', () => {
+  it('shows what it is worth today, worked out between the days it was checked', () => {
     const car = { ...CAR, valuations: [{ date: '2026-01-01', value: 200_000 }, { date: '2026-10-01', value: 180_000 }] };
     expect(card({ assets: [car] })).toContain('R 180 000');
-    expect(render(<AssetsCard today="2026-06-01" onSave={() => {}} accounts={[]} assets={[car]} />)).toContain('R 200 000');
+    expect(render(<AssetsCard today="2026-06-01" onSave={() => {}} accounts={[]} assets={[car]} />)).toContain('R 188 938');
+    expect(render(<AssetsCard today="2025-12-31" onSave={() => {}} accounts={[]} assets={[car]} />)).toContain('R 0');
+  });
+
+  it('says whether a thing has gained or lost value since it was received', () => {
+    const up = card({ assets: [house({ valuations: [{ date: '2025-03-01', value: 600_000 }, { date: '2026-03-01', value: 630_000 }] })] });
+    expect(up).toMatch(/Up R 30 000 since 0?1 Mar 2025/);
+    expect(up).toMatch(/received 0?1 Mar 2025 · last valued 0?1 Mar 2026/);
+    const car = { ...CAR, valuations: [{ date: '2024-01-01', value: 400_000 }, { date: '2025-01-01', value: 300_000 }] };
+    expect(card({ assets: [car] })).toMatch(/Down R 100 000 since 0?1 Jan 2024/);
+    // Valued once, nothing has moved, so nothing is claimed.
+    expect(card({ assets: [CAR] })).not.toMatch(/Up R|Down R/);
+    expect(card({ assets: [CAR] })).toMatch(/Car · received 0?1 Oct 2026/);
   });
 
   it('is one line that says why it is worth adding when there is nothing yet', () => {
