@@ -1,4 +1,5 @@
 import { amountCents } from '../utils/amount';
+import { parseAccount } from './accounts';
 import {
   isBudgetFacilityDescription,
   isBudgetFacilityTransferDescription,
@@ -215,7 +216,17 @@ function buildPairMap(rawMatches) {
  */
 export function detectTransferPairs(transactions, visibleMonths) {
   const transferIds = new Set();
-  const scoped = transactions.filter((t) => t.AmountNum !== 0 && inVisibleWindow(t, visibleMonths));
+  // A settlement on a card or a cash account is the app's own row that takes it to nothing when it
+  // closes — one side of a payment recorded elsewhere. Paired with that payment it would turn a real
+  // payment into a transfer between accounts, so it is left out of pairing. A LOAN's settlement is
+  // different: it pairs with the payment that cleared it, which is how that payment becomes the
+  // instalment it is (cash gone, counted as debt service).
+  const scoped = transactions.filter(
+    (t) =>
+      t.AmountNum !== 0 &&
+      !(t.Source === 'settlement' && parseAccount(t.Account).type !== 'Loan') &&
+      inVisibleWindow(t, visibleMonths),
+  );
   const buckets = bucketTransactions(scoped, visibleMonths);
   const rawMatches = [];
 

@@ -126,6 +126,24 @@ describe('buildFullTransfers', () => {
     expect(incomeRows(data, { transfers: t })).toContain(proceeds);
   });
 
+  it('does not let a closed card’s settlement turn the payment that cleared it into a transfer', () => {
+    const CARD = 'Nedbank Credit Card *4714';
+    const data = withIds([
+      ...anchors(),
+      row('2026-10-15', 'Nedbank card paid off', BANK, -110827.44, { Category: 'Debt Consolidation Payment', 'Spending Group': 'Debt' }),
+      row('2026-10-15', 'Paid off — recorded when the account was closed', CARD, 110827.44, {
+        Category: 'Credit Card Repayment',
+        'Spending Group': 'Transfer',
+        Source: 'settlement',
+      }),
+    ]);
+    const t = buildFullTransfers(data);
+    const payment = data.find((r) => r.Description === 'Nedbank card paid off');
+    expect(t.pairs).toHaveLength(0);
+    expect(t.transferIds.has(payment.id)).toBe(false);
+    expect(spendRows(data, { transfers: t })).toContain(payment);
+  });
+
   it("keeps a 'Transfer'-labelled Groceries row as spend", () => {
     const data = withIds([
       ...anchors(),
