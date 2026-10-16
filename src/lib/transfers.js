@@ -215,7 +215,13 @@ function buildPairMap(rawMatches) {
  */
 export function detectTransferPairs(transactions, visibleMonths) {
   const transferIds = new Set();
-  const scoped = transactions.filter((t) => t.AmountNum !== 0 && inVisibleWindow(t, visibleMonths));
+  // A settlement is the app's own bookkeeping — the row that takes a closed account to nothing — not
+  // cash that moved between two accounts. Paired with whatever transfer paid the debt off, it would turn
+  // that transfer into spending (a loan instalment is cash gone), and a payoff funded by borrowing would
+  // read as a month of overspending.
+  const scoped = transactions.filter(
+    (t) => t.AmountNum !== 0 && t.Source !== 'settlement' && inVisibleWindow(t, visibleMonths),
+  );
   const buckets = bucketTransactions(scoped, visibleMonths);
   const rawMatches = [];
 

@@ -104,6 +104,25 @@ describe('buildFullTransfers', () => {
     expect(spend).not.toContain(loanLeg);
   });
 
+  it('never pairs a settlement with the transfer that paid the debt off', () => {
+    const data = withIds([
+      ...anchors(),
+      row('2026-10-15', '1sa Transfer', BANK, -167013.82, { Category: 'Cash', 'Spending Group': 'Transfer' }),
+      row('2026-10-15', 'Paid off — recorded when the account was closed', LOAN, 167013.82, {
+        Category: 'Personal Loan',
+        'Spending Group': 'Debt',
+        Source: 'settlement',
+      }),
+    ]);
+    const t = buildFullTransfers(data);
+    const payment = data.find((r) => r.Description === '1sa Transfer');
+    expect(t.loanPairs).toHaveLength(0);
+    expect(t.loanInstalmentIds.has(payment.id)).toBe(false);
+    // Still a movement, by its own wording and category — not spending.
+    expect(t.transferIds.has(payment.id)).toBe(true);
+    expect(spendRows(data, { transfers: t })).not.toContain(payment);
+  });
+
   it('keeps a loan drawdown a movement: borrowed money is not income', () => {
     const data = withIds([
       ...anchors(),
