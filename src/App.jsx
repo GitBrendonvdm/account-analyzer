@@ -204,10 +204,6 @@ export default function App() {
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);
-  // TEMPORARY: a read-only handle for diagnosing how the pipeline classified a month. Removed with the fix.
-  useEffect(() => {
-    window.__mv = { processed, data, selectedAccounts, accounts, txnOverrides };
-  }, [processed, data, selectedAccounts, accounts, txnOverrides]);
   const chartData = useChartData(data, selectedAccounts, processed);
   const summary = useMemo(() => deriveCycleSummary(processed), [processed]);
 
