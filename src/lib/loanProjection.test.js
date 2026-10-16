@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addInferredLoanRows, payeeSignature, payMonthRuleOf } from './loanProjection';
 import { buildLiabilityTerms } from './inferRates';
 import { accountRows, balanceAt } from './ledger';
+import { settlementFor } from './closure';
 
 /**
  * A bond simulated month by month the way the real one behaves — interest on the daily balance at
@@ -86,6 +87,20 @@ function scenario(hide) {
   const rows = [...loanRows, ...sim.cheque].map((r, i) => ({ ...r, id: i }));
   return { sim, rows, lastReal, truth: sim.owedAfter.slice(sim.owedAfter.length - hide) };
 }
+
+const settlementRowOf = (s, date) => ({
+  Date: date,
+  DateObj: dt(date),
+  Description: s.description,
+  Account: LOAN,
+  Category: s.category,
+  'Spending Group': s.group,
+  'Pay Month': s.payMonth,
+  AmountNum: s.amount,
+  Amount: String(s.amount),
+  Status: 'Completed',
+  Source: 'settlement',
+});
 
 describe('payeeSignature', () => {
   it('names the payee whatever the bank or the aggregator wrote around it', () => {
@@ -182,6 +197,39 @@ describe('addInferredLoanRows', () => {
     const { rows, lastReal } = scenario(2);
     const acc = account({ currentBalance: -lastReal.owed, balanceAsOf: lastReal.date, closedOn: '2026-10-01' });
     expect(addInferredLoanRows(rows, [acc, cheque]).rows.filter((r) => r.inferred)).toHaveLength(0);
+  });
+
+  it('keeps estimating a closed loan up to the day it closed, and the settlement then takes it to nothing', () => {
+    const { rows, lastReal } = scenario(2);
+    const open = account({ currentBalance: -lastReal.owed, balanceAsOf: lastReal.date });
+    const closedOn = '2026-10-25';
+
+    // Before closing: the estimate runs, and the settlement is sized from it.
+    const before = addInferredLoanRows(rows, [open, cheque]);
+    const owedOnTheDay = -balanceAt(accountRows(before.rows, { accountId: open.id }).filter((r) => r.Date <= closedOn), open, closedOn);
+    const settlement = settlementFor({ account: open, data: before.rows, closedOn, payMonthOf: () => '2026-11' });
+    expect(settlement.amount).toBeCloseTo(owedOnTheDay, 2);
+
+    // After closing: the server has stored the settlement and restated the account at nothing.
+    const row = { ...settlementRowOf(settlement, closedOn), id: rows.length };
+    const closed = {
+      ...open,
+      closedOn,
+      currentBalance: 0,
+      balanceAsOf: closedOn,
+      preClosure: { currentBalance: open.currentBalance, balanceAsOf: open.balanceAsOf },
+    };
+    const after = addInferredLoanRows([...rows, row], [closed, cheque]);
+
+    // The same estimate up to the closing day, and none beyond it.
+    const inferred = after.rows.filter((r) => r.inferred);
+    expect(inferred.map((r) => r.Date).sort()).toEqual(before.rows.filter((r) => r.inferred && r.Date <= closedOn).map((r) => r.Date).sort());
+    expect(after.rows.some((r) => r.Source === 'settlement')).toBe(true);
+    // A closed loan is finished, not an estimate to show.
+    expect(after.summary).toEqual([]);
+    // And measured the way it was before it was closed, the loan ends at exactly nothing.
+    const ledger = accountRows(after.rows, { accountId: open.id });
+    expect(balanceAt(ledger, open, closedOn)).toBeCloseTo(0, 2);
   });
 
   it('claims a payment for the loan that has a name for it, not a loan that only matches the amount', () => {

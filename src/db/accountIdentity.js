@@ -62,6 +62,8 @@ export function buildAccountRecord(rawNames, existing = null, seenThrough = null
     // Set by the user (or a confirmed suggestion) when the account is paid off or closed. An import
     // must never reopen it, so it is carried like every other thing the user said.
     closedOn: existing?.closedOn ?? null,
+    // What the account stated before it was closed, so reopening can put it back.
+    preClosure: existing?.preClosure ?? null,
     // The liability terms the Debt view lets the user type. Every one is named here explicitly
     // rather than spread from `existing`, so that the legacy Dexie path and the server path agree
     // field for field on what an import preserves — a field missing from this list would survive

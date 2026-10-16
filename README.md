@@ -114,9 +114,13 @@ Cheque/savings layouts only; a card or loan statement says it is not read yet.
 **Paid off or closed.** Nothing in a bank's data says a loan was cleared, so the app *suggests*: a loan
 whose estimated balance is met (within 15%) by one large settlement-like payment out of another
 account, or an account that has been quiet for a month with nothing still arriving and no balance
-held. Confirm under **Accounts** and the balance becomes nothing from that day, payments expected of
-it stop, its estimate stops, and the bills it used to pay carry on from the account that took over, as
-one line with their whole history. History is untouched and **Reopen** undoes it.
+held. Confirm under **Accounts** and the account ends at exactly nothing: closing records the one
+transaction that gets it there (a payment in for a debt, a withdrawal out for money held — filed as a
+movement between your own accounts, so it is neither income nor spending), sized from what the ledger
+says it holds that day, or for a loan from what the loan engine says is owed. Earlier months keep the
+balance they had. Payments expected of it stop, its estimate stops, and the bills it used to pay carry
+on from the account that took over, as one line with their whole history. **Reopen** deletes the
+settlement and restores the balance the account stated before.
 
 **Account-summary PDFs.** The *Account summary* button takes the "account overview" PDF that FNB
 and Nedbank online banking print. FNB's has a text layer; Nedbank's is an image and is read by OCR

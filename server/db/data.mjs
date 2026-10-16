@@ -135,6 +135,12 @@ export async function transactionsByKey(conn, keys) {
   return found;
 }
 
+/** Removes one row by key. Used only for rows the app wrote itself (an account's settlement). */
+export async function deleteTransactionByKey(conn, key) {
+  const { rowCount } = await conn.query('delete from transactions where key = $1', [key]);
+  return rowCount > 0;
+}
+
 export async function countTransactions(conn) {
   const { rows } = await conn.query('select count(*)::int as n from transactions');
   return rows[0].n;

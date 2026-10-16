@@ -164,11 +164,23 @@ function learnSignature(loanRows, feed) {
  *   the shape listTransactions gives. `summary` has one entry per loan that was projected.
  */
 export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) {
-  const stored = (rows ?? []).filter((t) => !t.inferred);
-  const loans = (accounts ?? []).filter((a) => isLoan(a) && !a.closedOn && !a.external);
+  // The rows the projection reads. A settlement is the app's own row, written when an account was
+  // closed: it is not evidence of anything the loan charged or was paid, so it is kept in the result
+  // but never read as history.
+  const real = (rows ?? []).filter((t) => !t.inferred);
+  const stored = real.filter((t) => t.Source !== 'settlement');
+  // A loan that has been closed is still projected — up to the day it closed. Its settlement takes it
+  // to nothing from there, and what it owed on that day is what the settlement was sized to clear. It
+  // is read as it stood BEFORE it was closed: the zero balance closing states would otherwise read as
+  // "nothing is owed" and there would be nothing to project.
+  const closedOn = new Map((accounts ?? []).filter((a) => a.closedOn).map((a) => [a.id, a.closedOn]));
+  const open = (a) =>
+    a.closedOn ? { ...a, closedOn: null, currentBalance: a.preClosure?.currentBalance ?? null, balanceAsOf: a.preClosure?.balanceAsOf ?? null } : a;
+  const asOpen = (accounts ?? []).map(open);
+  const loans = asOpen.filter((a) => isLoan(a) && !a.external);
   if (!stored.length || !loans.length) return { rows: rows ?? [], summary: [] };
 
-  const loanIds = new Set((accounts ?? []).filter(isLoan).map((a) => a.id));
+  const loanIds = new Set(asOpen.filter(isLoan).map((a) => a.id));
   const feed = stored.filter((t) => !loanIds.has(accountIdOf(t.Account)));
   if (!feed.length) return { rows: rows ?? [], summary: [] };
 
@@ -180,7 +192,7 @@ export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) 
   });
 
   const monthRule = payMonthOf ?? payMonthRuleOf(stored);
-  const terms = buildLiabilityTerms(stored, accounts, { asOf: new Date() });
+  const terms = buildLiabilityTerms(stored, asOpen, { asOf: new Date() });
   const claimed = new Set();
   const added = [];
   const summary = [];
@@ -230,6 +242,10 @@ export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) 
       const last = lastOfAccount.get(id);
       if (last && (!through || last > through)) through = last;
     });
+    if (closedOn.has(account.id)) {
+      const limit = midnight(parseTransactionDate(closedOn.get(account.id)) ?? through);
+      if (limit < through) through = limit;
+    }
     if (!through || through <= from) return;
 
     // ---- the posting days ------------------------------------------------------------------
@@ -247,7 +263,8 @@ export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) 
     // statement, or a typed balance, whichever the engine trusted.
     let owed = t.balanceOwed;
     if (!(owed > 0)) return;
-    const payments = [...matches].sort((a, b) => dateOf(a) - dateOf(b));
+    // Nothing after the day it closed is the loan's: a payment made then was for something else.
+    const payments = matches.filter((f) => midnight(dateOf(f)) <= through).sort((a, b) => dateOf(a) - dateOf(b));
     const out = [];
     const make = (date, description, amount, category, group, payMonth, extra = {}) => ({
       Date: iso(date),
@@ -320,6 +337,8 @@ export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) 
     if (!out.length) return;
 
     added.push(...out);
+    // A loan that is closed is not an estimate to show: it is finished.
+    if (closedOn.has(account.id)) return;
     summary.push({
       accountId: account.id,
       label: account.label ?? account.rawName,
@@ -337,7 +356,7 @@ export function addInferredLoanRows(rows, accounts, { payMonthOf = null } = {}) 
   });
 
   if (!added.length) return { rows: rows ?? [], summary };
-  const merged = [...stored, ...added]
+  const merged = [...real, ...added]
     .map((row, i) => ({ row, i }))
     .sort((a, b) => (a.row.Date < b.row.Date ? -1 : a.row.Date > b.row.Date ? 1 : a.i - b.i))
     .map(({ row }, id) => ({ ...row, id }));

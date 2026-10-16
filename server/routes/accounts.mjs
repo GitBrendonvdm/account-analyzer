@@ -1,5 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { bumpVersion, deleteAccount, getAccount, putAccounts } from '../db/data.mjs';
+import {
+  bumpVersion,
+  deleteAccount,
+  deleteTransactionByKey,
+  getAccount,
+  putAccounts,
+  upsertTransactions,
+} from '../db/data.mjs';
 
 /**
  * What the user says about an account, and accounts that exist only because the user said so.
@@ -67,8 +74,129 @@ export function applyPatch(existing, patch) {
   return next;
 }
 
+/** The key of the one row an account's closing writes. One per account, so closing twice replaces it. */
+export const settlementKey = (accountId) => `settlement|${accountId}`;
+
+const GROUPS = new Set(['Transfer', 'Debt']);
+
+/**
+ * The row that takes a closed account to exactly nothing, built from a few validated facts rather than
+ * from whatever the client sent: the amount, what to call it, the category and group it files under
+ * and the cycle it falls in. Everything else about the row is fixed here.
+ */
+function settlementRow(record, closedOn, s) {
+  const amount = Math.round(Number(s.amount) * 100) / 100;
+  const now = new Date().toISOString();
+  return {
+    key: settlementKey(record.id),
+    accountId: record.id,
+    Date: closedOn,
+    date: closedOn,
+    Description: s.description,
+    Account: record.rawName,
+    'Spending Group': s.group,
+    Category: s.category,
+    'Pay Month': s.payMonth,
+    payMonth: s.payMonth,
+    'Split Transaction': 'No',
+    Currency: 'ZAR',
+    Amount: String(amount),
+    'Original Currency': '',
+    'Original Amount': '',
+    Type: amount < 0 ? 'Expense' : 'Income',
+    Status: 'Completed',
+    Tags: '',
+    Notes: '',
+    AmountNum: amount,
+    // Marks the row as the app's own: it is the one kind of row a reopen may delete.
+    Source: 'settlement',
+    firstSeen: now,
+    lastSeen: now,
+    observedThrough: closedOn,
+  };
+}
+
+function validateSettlement(s) {
+  if (s === null || s === undefined) return null;
+  if (typeof s !== 'object' || Array.isArray(s)) return 'settlement must be an object or null';
+  const amount = Number(s.amount);
+  if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 1e10) return 'settlement.amount must be a non-zero number';
+  if (typeof s.description !== 'string' || !s.description.trim() || s.description.length > 200) return 'settlement.description is required';
+  if (typeof s.category !== 'string' || !s.category.trim() || s.category.length > 80) return 'settlement.category is required';
+  if (!GROUPS.has(s.group)) return "settlement.group must be 'Transfer' or 'Debt'";
+  if (typeof s.payMonth !== 'string' || !/^\d{4}-\d{2}$/.test(s.payMonth)) return 'settlement.payMonth must look like 2026-10';
+  return null;
+}
+
 export default async function accountRoutes(app) {
   const { store } = app;
+
+  /**
+   * Close an account: paid off, or shut. Everything happens together or not at all —
+   *   · the row that takes its balance to nothing on that day (when it holds or owes anything),
+   *   · the closing date, and a balance of nothing from it,
+   *   · what the account stated before, kept so a reopen can put it back.
+   * The settlement is what keeps HISTORY honest: without it, anchoring a zero balance on the closing day
+   * would re-base every earlier month and make the debt look as if it had never been owed.
+   */
+  app.post('/accounts/:id/close', async (request, reply) => {
+    const { closedOn, settlement } = request.body ?? {};
+    if (typeof closedOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(closedOn)) {
+      return reply.code(400).send({ error: 'Send { closedOn: "YYYY-MM-DD", settlement }' });
+    }
+    const problem = validateSettlement(settlement);
+    if (problem) return reply.code(400).send({ error: problem });
+    const record = await store.transaction(async (tx) => {
+      const existing = await getAccount(tx, request.params.id);
+      if (!existing) return null;
+      if (settlement) await upsertTransactions(tx, [settlementRow(existing, closedOn, settlement)]);
+      else await deleteTransactionByKey(tx, settlementKey(existing.id));
+      const next = {
+        ...existing,
+        closedOn,
+        currentBalance: 0,
+        balanceAsOf: closedOn,
+        source: 'manual',
+        // Closing an account that is already closed (to move the date) keeps the ORIGINAL pre-closure state.
+        preClosure: existing.closedOn
+          ? (existing.preClosure ?? null)
+          : {
+              currentBalance: existing.currentBalance ?? null,
+              balanceAsOf: existing.balanceAsOf ?? null,
+              source: existing.source ?? null,
+            },
+      };
+      await putAccounts(tx, [next]);
+      await bumpVersion(tx);
+      return next;
+    });
+    if (!record) return reply.code(404).send({ error: 'No such account' });
+    return record;
+  });
+
+  /** Undo a closing: the settlement row goes, and the account says again what it said before. */
+  app.post('/accounts/:id/reopen', async (request, reply) => {
+    const record = await store.transaction(async (tx) => {
+      const existing = await getAccount(tx, request.params.id);
+      if (!existing) return null;
+      await deleteTransactionByKey(tx, settlementKey(existing.id));
+      const before = existing.preClosure ?? {};
+      const { preClosure: _gone, ...rest } = existing;
+      const next = {
+        ...rest,
+        closedOn: null,
+        currentBalance: before.currentBalance ?? null,
+        balanceAsOf: before.balanceAsOf ?? null,
+        source: before.source ?? existing.source,
+        preClosure: null,
+      };
+      await putAccounts(tx, [next]);
+      await bumpVersion(tx);
+      return next;
+    });
+    if (!record) return reply.code(404).send({ error: 'No such account' });
+    return record;
+  });
 
   app.patch('/accounts/:id', async (request, reply) => {
     const patch = request.body?.patch;

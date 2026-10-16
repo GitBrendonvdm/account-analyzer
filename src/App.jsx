@@ -6,7 +6,7 @@ import { Headlines } from './components/Headlines';
 import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
 import { ImportSummary } from './components/ImportSummary';
-import { closurePatch, closureSuggestions, reopenPatch } from './lib/closure';
+import { closureSuggestions, loanOwedBy } from './lib/closure';
 import { todayIso } from './lib/statements/amounts';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
@@ -91,6 +91,8 @@ export default function App() {
     toggleAccount,
     handleFileUpload,
     updateAccount,
+    closeAccounts,
+    reopenAccount,
     lastImport,
     statementFiles,
     clearStatementFiles,
@@ -164,8 +166,16 @@ export default function App() {
   const storedDismissed = settings.get('closureDismissed', null);
   const closureDismissed = useMemo(() => (Array.isArray(storedDismissed) ? storedDismissed : []), [storedDismissed]);
   const suggestions = useMemo(
-    () => closureSuggestions({ accounts, stored: storedData ?? [], inferred: inferredLoans, dismissed: closureDismissed }),
-    [accounts, storedData, inferredLoans, closureDismissed],
+    () =>
+      closureSuggestions({
+        accounts,
+        stored: storedData ?? [],
+        inferred: inferredLoans,
+        dismissed: closureDismissed,
+        data: rawData,
+        owed: loanOwedBy(rawData ?? [], accounts),
+      }),
+    [accounts, storedData, inferredLoans, closureDismissed, rawData],
   );
   const closedAccounts = useMemo(() => accounts.filter((a) => a.closedOn), [accounts]);
   const closure = useMemo(
@@ -173,13 +183,11 @@ export default function App() {
       suggestions,
       closed: closedAccounts,
       today: todayIso(today),
-      onClose: async (items) => {
-        for (const { accountId, closedOn } of items) await updateAccount(accountId, closurePatch(closedOn));
-      },
+      onClose: closeAccounts,
       onDismiss: (ids) => settings.set('closureDismissed', [...new Set([...closureDismissed, ...ids])]),
-      onReopen: (id) => updateAccount(id, reopenPatch()),
+      onReopen: reopenAccount,
     }),
-    [suggestions, closedAccounts, today, updateAccount, settings, closureDismissed],
+    [suggestions, closedAccounts, today, closeAccounts, reopenAccount, settings, closureDismissed],
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);

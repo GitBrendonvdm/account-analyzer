@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { accountLabel } from '../../db/accountIdentity';
+import { formatCurrency } from '../../utils/format';
 import { Card, CardHead } from '../ui/Surface';
 
 /**
@@ -29,6 +30,12 @@ function Suggestion({ s, picked, onToggle, date, onDate, today }) {
           <div className="t-caption truncate">
             {s.kind === 'paid-off' ? 'Looks paid off' : 'Looks closed'} — {s.reason}
           </div>
+          {s.settlement !== 0 && (
+            <div className="t-caption truncate">
+              Closing records {s.settlement > 0 ? 'a payment of' : 'a withdrawal of'} {formatCurrency(Math.abs(s.settlement))} so it ends at
+              nothing
+            </div>
+          )}
         </div>
       </label>
       <input
@@ -65,7 +72,7 @@ export function ClosedAccounts({ suggestions, closed, onClose, onDismiss, onReop
     <Card className="p-5">
       <CardHead
         title="Paid off or closed?"
-        subtitle="Confirm the ones that are finished and the app stops expecting payments to them, and stops carrying a balance for them. Your history stays."
+        subtitle="Confirm the ones that are finished. Each ends at exactly nothing — the payment (or withdrawal) that gets it there is recorded on the day it closed — and the app stops expecting payments to it. Your history stays."
       />
       {suggestions.length > 0 && (
         <>

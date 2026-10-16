@@ -105,6 +105,11 @@ export const exportUrl = () => '/api/export.csv';
 export const patchAccount = (id, patch) =>
   request('PATCH', `/api/accounts/${encodeURIComponent(id)}`, { patch }).then((r) => r.data);
 export const createAccount = (record) => request('POST', '/api/accounts', { record }).then((r) => r.data);
+/** Close an account: the settlement row that takes it to nothing, and the day it ended. */
+export const closeAccount = (id, body) =>
+  request('POST', `/api/accounts/${encodeURIComponent(id)}/close`, body).then((r) => r.data);
+export const reopenAccount = (id) =>
+  request('POST', `/api/accounts/${encodeURIComponent(id)}/reopen`).then((r) => r.data);
 export const deleteAccount = (id) =>
   request('DELETE', `/api/accounts/${encodeURIComponent(id)}`).then((r) => r.data);
 

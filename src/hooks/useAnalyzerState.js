@@ -5,7 +5,8 @@ import * as api from '../api/client';
 import { parseTransactionDate } from '../utils/date';
 import { expandUploads } from '../utils/zip';
 import { looksLikeFnbHistory } from '../lib/statements/history';
-import { addInferredLoanRows } from '../lib/loanProjection';
+import { addInferredLoanRows, payMonthRuleOf } from '../lib/loanProjection';
+import { loanOwedBy, settlementFor } from '../lib/closure';
 
 /**
  * Loans start switched off.
@@ -318,6 +319,33 @@ export function useAnalyzerState() {
     setAccounts((prev) => prev.map((a) => (a.id === id ? record : a)));
   }, []);
 
+  /**
+   * Close accounts that are paid off or shut. Each closing records the one transaction that takes the
+   * account to exactly nothing — sized from what the ledger says it holds on that day, estimated loan
+   * rows included — and the server writes it, the date and the zero balance together.
+   */
+  const closeAccounts = useCallback(
+    async (items) => {
+      const monthOf = payMonthRuleOf(storedData ?? []);
+      const owed = loanOwedBy(data ?? [], accounts);
+      for (const { accountId, closedOn } of items) {
+        const account = accounts.find((a) => a.id === accountId);
+        const settlement = settlementFor({ account, data, closedOn, payMonthOf: monthOf, owed: owed.get(accountId) });
+        await api.closeAccount(accountId, { closedOn, settlement });
+      }
+      await refresh();
+    },
+    [accounts, data, storedData, refresh],
+  );
+
+  const reopenAccount = useCallback(
+    async (id) => {
+      await api.reopenAccount(id);
+      await refresh();
+    },
+    [refresh],
+  );
+
   /** An account with no transactions behind it — a retirement annuity, a card the export never sees. */
   const createAccount = useCallback(
     async (record) => {
@@ -353,6 +381,8 @@ export function useAnalyzerState() {
     toggleAccount,
     handleFileUpload,
     updateAccount,
+    closeAccounts,
+    reopenAccount,
     createAccount,
     deleteAccount,
     imports,
