@@ -189,24 +189,16 @@ export default function App() {
       }),
     [accounts, storedData, inferredLoans, closureDismissed, rawData],
   );
-  const tidy = useMemo(
-    () => ({
-      dormant: dormantAccounts(accounts, storedData ?? []),
-      shown: shownAccounts,
-      hidden: hiddenAccounts,
-      onHide: (ids) => Promise.all(ids.map((id) => updateAccount(id, { hidden: true }))),
-      onShow: (id) => updateAccount(id, { hidden: false }),
-    }),
-    [accounts, storedData, shownAccounts, hiddenAccounts, updateAccount],
-  );
   const closedAccounts = useMemo(() => accounts.filter((a) => a.closedOn && !a.hidden), [accounts]);
-  const closure = useMemo(
+  // Everything the Balances table needs to look after accounts: close one (with a preview of what that
+  // records), hide or show one, reopen a closed one, and which ones the app thinks are finished.
+  const manage = useMemo(
     () => ({
       suggestions,
+      dormant: dormantAccounts(accounts, storedData ?? []),
       closed: closedAccounts,
+      hidden: hiddenAccounts,
       today: todayIso(today),
-      // Any open account can be closed by hand, whether or not the app noticed it had finished.
-      openAccounts: shownAccounts.filter((a) => !a.closedOn && !a.external),
       preview: (accountId, closedOn) => {
         const account = accounts.find((a) => a.id === accountId);
         return settlementFor({
@@ -220,8 +212,10 @@ export default function App() {
       onClose: closeAccounts,
       onDismiss: (ids) => settings.set('closureDismissed', [...new Set([...closureDismissed, ...ids])]),
       onReopen: reopenAccount,
+      onHide: (ids) => Promise.all(ids.map((id) => updateAccount(id, { hidden: true }))),
+      onShow: (id) => updateAccount(id, { hidden: false }),
     }),
-    [suggestions, closedAccounts, accounts, shownAccounts, today, closeAccounts, reopenAccount, settings, closureDismissed, rawData, storedData],
+    [suggestions, accounts, storedData, closedAccounts, hiddenAccounts, today, closeAccounts, reopenAccount, updateAccount, settings, closureDismissed, rawData],
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);
@@ -698,8 +692,7 @@ export default function App() {
                   fees={fees}
                   onDeleteAccount={deleteAccount}
                   inferredLoans={inferredLoans}
-                  closure={closure}
-                  tidy={tidy}
+                  manage={manage}
                 />
               )}
             </Suspense>

@@ -4,8 +4,6 @@ import { AccountsTable } from './tables/AccountsTable';
 import { BalancesEditor } from './BalancesEditor';
 import { CostOfDebtPanel } from './CostOfDebtPanel';
 import { Card, CardHead } from './ui/Surface';
-import { ClosedAccounts } from './accounts/ClosedAccounts';
-import { TidyAccounts } from './accounts/TidyAccounts';
 import { formatCurrency } from '../utils/format';
 
 const dayLabel = (iso) =>
@@ -51,7 +49,8 @@ function EstimatedLoans({ loans }) {
  * The balances editor leads because everything below it is re-based from those numbers; the fees
  * audit lives inside the cost panel because it is the same money read by kind. External records
  * (from a statement upload) are listed and deletable inside the editor — nothing else on this page
- * can see them, since they have no rows.
+ * can see them, since they have no rows. Closing and hiding accounts live there too, as buttons on
+ * each row (`manage`), rather than as cards of their own.
  */
 export function AccountsView({
   series,
@@ -66,8 +65,7 @@ export function AccountsView({
   costOfDebt,
   fees,
   inferredLoans,
-  closure,
-  tidy,
+  manage,
 }) {
   const list = positions ?? [];
   // A loan account showing a positive position is almost always a revolving or budget facility
@@ -77,21 +75,20 @@ export function AccountsView({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* A closed account holds nothing and is listed (with its Reopen) in the card above, so it is not
+      {/* A closed account holds nothing and is listed (with its Reopen) under the table, so it is not
           a row to type a balance into. */}
       <BalancesEditor
         accounts={(accounts ?? []).filter((a) => !a.closedOn)}
         onSave={onSaveAccount}
         onDeleteAccount={onDeleteAccount}
         dataThrough={dataThrough}
+        manage={manage}
         typeOverrideHint={
           suspicious.length > 0
             ? `${suspicious.map((p) => p.account).join(', ')} moves like an asset, not a loan — its draws are signed the other way round. Worth checking the balance you enter, because it flips the sign of your net worth.`
             : null
         }
       />
-      {closure && <ClosedAccounts {...closure} />}
-      {tidy && <TidyAccounts {...tidy} />}
       <EstimatedLoans loans={inferredLoans} />
       <AccountPositionsTable positions={list} months={months ?? []} currentMonth={currentMonth} />
       <CostOfDebtPanel cost={costOfDebt} fees={fees} />

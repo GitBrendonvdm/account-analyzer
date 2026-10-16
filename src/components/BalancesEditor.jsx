@@ -1,10 +1,12 @@
 import { useState, useSyncExternalStore } from 'react';
-import { Landmark, Check } from 'lucide-react';
+import { Landmark, Check, Archive, EyeOff } from 'lucide-react';
 import { accountLabel } from '../db/accountIdentity';
 import { compareAccountTypes } from '../lib/accounts';
 import { formatCurrencyAbs } from '../utils/format';
 import { Field } from './ui/Field';
 import { ExternalAccounts } from './accounts/ExternalAccounts';
+import { CloseAccountModal } from './accounts/CloseAccountModal';
+import { ShelvedAccounts } from './accounts/ShelvedAccounts';
 
 const DAY_MS = 86400000;
 const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -240,7 +242,42 @@ function Stored({ account, draft, dataThrough, align }) {
   );
 }
 
-function AccountRow({ account, onSave, dataThrough, todayIso }) {
+const ACTION =
+  'press flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] text-label-3 hover:bg-fill hover:text-label max-md:min-h-11 max-md:px-3';
+
+/**
+ * What can be done with an account besides typing its balance: close it (paid off, shut) or hide it
+ * (put it away without ending it). Closing opens a dialog, because it needs a day and says what it
+ * will record; hiding is one click and is undone from the "Closed and hidden" list under the table.
+ * The Close button is lit when the app noticed the account had finished.
+ */
+function RowActions({ account, suggested, onClose, onHide }) {
+  const label = accountLabel(account);
+  return (
+    <div className="-ml-1.5 flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={`Close ${label}`}
+        className={`${ACTION} ${suggested ? 'bg-info/15 font-semibold text-info hover:bg-info/25 hover:text-info' : ''}`}
+      >
+        <Archive size={13} />
+        Close
+      </button>
+      <button type="button" onClick={onHide} aria-label={`Hide ${label}`} className={ACTION}>
+        <EyeOff size={13} />
+        Hide
+      </button>
+    </div>
+  );
+}
+
+/** Why the app is pointing at an account, when it is: it looks finished, or it has gone quiet for good. */
+function Hint({ hint }) {
+  return hint ? <div className="px-1.5 text-[11px] text-warn">{hint}</div> : null;
+}
+
+function AccountRow({ account, onSave, dataThrough, todayIso, actions, hint }) {
   const draft = useAccountDraft({ account, onSave, dataThrough, todayIso });
   return (
     <tr className="border-b last:border-0">
@@ -250,6 +287,8 @@ function AccountRow({ account, onSave, dataThrough, todayIso }) {
           {account.rawName}
           {account.seenNames?.length > 1 && ' · renamed by the export'}
         </div>
+        <Hint hint={hint} />
+        {actions && <div className="mt-1">{actions}</div>}
       </td>
       <td className="px-4 py-2.5 text-xs text-label-2">{account.type}</td>
       <td className="px-4 py-2.5">
@@ -281,7 +320,7 @@ function AccountRow({ account, onSave, dataThrough, todayIso }) {
 const TOUCH_FIELD =
   '[&_input]:min-h-11 [&_input]:w-full [&_input]:min-w-0 [&_input]:text-base [&_label_span]:whitespace-nowrap';
 
-function AccountCard({ account, onSave, dataThrough, todayIso }) {
+function AccountCard({ account, onSave, dataThrough, todayIso, actions, hint }) {
   const draft = useAccountDraft({ account, onSave, dataThrough, todayIso });
   const limitLabel = draft.isCard ? 'Credit limit' : draft.isBank ? 'Overdraft limit' : null;
   return (
@@ -295,6 +334,7 @@ function AccountCard({ account, onSave, dataThrough, todayIso }) {
             {account.seenNames?.length > 1 && ' · renamed by the export'}
           </span>
         </div>
+        <Hint hint={hint} />
       </div>
       {/* Two to a row: a balance and a date are short, and twelve accounts of one-per-line is a
           long way to scroll. The date column is the wider, because a native date input at 16px
@@ -308,13 +348,30 @@ function AccountCard({ account, onSave, dataThrough, todayIso }) {
       <div className="flex min-h-5 items-center">
         <Stored account={account} draft={draft} dataThrough={dataThrough} align="start" />
       </div>
+      {actions}
     </li>
   );
 }
 
-export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough, typeOverrideHint }) {
+const hintOf = (suggestion, quiet) =>
+  suggestion
+    ? `${suggestion.kind === 'paid-off' ? 'Looks paid off' : 'Looks closed'} — ${suggestion.reason}`
+    : quiet
+      ? 'No activity for over a year'
+      : null;
+
+/**
+ * `manage`, when given, is what turns the table into the place accounts are looked after: a Close and
+ * a Hide on every row, the accounts the app thinks are finished lit up, one line to hide what has
+ * been quiet for good, and a list of what is already closed or hidden. Without it the table is just
+ * balances.
+ */
+export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough, typeOverrideHint, manage }) {
   const todayIso = isoOf(new Date());
   const narrow = useNarrow();
+  const [closing, setClosing] = useState(null);
+  const [shelf, setShelf] = useState(false);
+  const [hiding, setHiding] = useState(false);
   const list = (accounts ?? []).filter((a) => a && !a.external);
   const sorted = [...list].sort(
     (a, b) => compareAccountTypes(a.type, b.type) || (a.rawName ?? '').localeCompare(b.rawName ?? ''),
@@ -323,6 +380,24 @@ export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough,
   const empty = (
     <span className="t-caption">No accounts yet — import an export or upload an account summary.</span>
   );
+
+  const suggestionOf = new Map((manage?.suggestions ?? []).map((s) => [s.accountId, s]));
+  const quietIds = new Set((manage?.dormant ?? []).map((a) => a.id));
+  const quiet = sorted.filter((a) => quietIds.has(a.id));
+  const closingAccount = closing ? sorted.find((a) => a.id === closing) : null;
+  const closedCount = manage?.closed?.length ?? 0;
+  const hiddenCount = manage?.hidden?.length ?? 0;
+  const rowProps = (a) => ({
+    hint: manage ? hintOf(suggestionOf.get(a.id), quietIds.has(a.id)) : null,
+    actions: manage ? (
+      <RowActions
+        account={a}
+        suggested={suggestionOf.has(a.id)}
+        onClose={() => setClosing(a.id)}
+        onHide={() => manage.onHide([a.id])}
+      />
+    ) : null,
+  });
 
   return (
     <div className="glass overflow-hidden">
@@ -340,10 +415,34 @@ export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough,
           <span className="block text-label-3">Upload your bank's account summary PDF to fill these in one go.</span>
         </p>
       </div>
+      {quiet.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-fill/40 px-4 py-3 md:px-6">
+          <span className="text-sm text-label-2">
+            <b className="font-semibold text-label">{quiet.length}</b> account{quiet.length === 1 ? ' has' : 's have'} had no
+            activity for over a year and {quiet.length === 1 ? 'holds' : 'hold'} nothing.
+          </span>
+          <button
+            type="button"
+            disabled={hiding}
+            onClick={async () => {
+              setHiding(true);
+              try {
+                await manage.onHide(quiet.map((a) => a.id));
+              } finally {
+                setHiding(false);
+              }
+            }}
+            className="press flex items-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50 max-md:min-h-11 max-md:w-full max-md:justify-center"
+          >
+            <EyeOff size={15} />
+            Hide {quiet.length === 1 ? 'it' : 'them'}
+          </button>
+        </div>
+      )}
       {narrow ? (
         <ul className="flex flex-col">
           {sorted.map((a) => (
-            <AccountCard key={a.id} account={a} onSave={onSave} dataThrough={dataThrough} todayIso={todayIso} />
+            <AccountCard key={a.id} account={a} onSave={onSave} dataThrough={dataThrough} todayIso={todayIso} {...rowProps(a)} />
           ))}
           {sorted.length === 0 && <li className="px-4 py-4">{empty}</li>}
         </ul>
@@ -362,7 +461,7 @@ export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough,
             </thead>
             <tbody>
               {sorted.map((a) => (
-                <AccountRow key={a.id} account={a} onSave={onSave} dataThrough={dataThrough} todayIso={todayIso} />
+                <AccountRow key={a.id} account={a} onSave={onSave} dataThrough={dataThrough} todayIso={todayIso} {...rowProps(a)} />
               ))}
               {sorted.length === 0 && (
                 <tr>
@@ -375,9 +474,37 @@ export function BalancesEditor({ accounts, onSave, onDeleteAccount, dataThrough,
           </table>
         </div>
       )}
+      {manage && closedCount + hiddenCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-xs text-label-3 md:px-6">
+          <span>{[closedCount > 0 && `${closedCount} closed`, hiddenCount > 0 && `${hiddenCount} hidden`].filter(Boolean).join(' · ')}</span>
+          <button type="button" onClick={() => setShelf(true)} className="press text-info hover:brightness-110 max-md:min-h-11 max-md:px-3">
+            Manage
+          </button>
+        </div>
+      )}
       <ExternalAccounts accounts={accounts} onDeleteAccount={onDeleteAccount} className="border-t px-4 py-4 md:px-6 md:py-5" />
       {typeOverrideHint && (
         <p className="border-t bg-warn/10 px-4 py-3 text-xs text-warn md:px-6">{typeOverrideHint}</p>
+      )}
+      {manage && closingAccount && (
+        <CloseAccountModal
+          account={closingAccount}
+          suggestion={suggestionOf.get(closingAccount.id)}
+          today={manage.today}
+          preview={manage.preview}
+          onClose={manage.onClose}
+          onDismiss={manage.onDismiss}
+          onDone={() => setClosing(null)}
+        />
+      )}
+      {manage && shelf && (
+        <ShelvedAccounts
+          closed={manage.closed}
+          hidden={manage.hidden}
+          onReopen={manage.onReopen}
+          onShow={manage.onShow}
+          onDone={() => setShelf(false)}
+        />
       )}
     </div>
   );
