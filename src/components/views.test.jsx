@@ -70,7 +70,7 @@ const padLines = (subscriptions, n = 51) => ({
 const VIEWS = [
   { name: 'TodayView', View: TodayView, props: todayProps, keys: NEW_PROPS.today, keep: ['Safe to spend before payday', 'Came in', 'Went out', 'Where it goes'] },
   { name: 'HabitsView', View: HabitsView, props: habitsProps, keys: NEW_PROPS.habits, keep: ['Where the money goes', 'When you spend'] },
-  { name: 'AccountsView', View: AccountsView, props: accountsProps, keys: NEW_PROPS.accounts, keep: ['Balances', 'What the debt costs'] },
+  { name: 'AccountsView', View: AccountsView, props: accountsProps, keys: NEW_PROPS.accounts, keep: ['Your accounts', 'What the debt costs'] },
 ];
 
 describe.each(VIEWS)('$name', ({ View, props, keys, keep }) => {
@@ -90,6 +90,77 @@ describe.each(VIEWS)('$name', ({ View, props, keys, keep }) => {
     const html = render(View, without(props(), keys));
     for (const h of keep) expect(html, h).toContain(h);
     expectClean(html);
+  });
+});
+
+describe('TodayView at a glance', () => {
+  const trend = {
+    now: -12447,
+    sinceLast: 9120,
+    rows: [
+      { month: '2026-08', net: -30000, change: -4000, partial: false },
+      { month: '2026-09', net: -21567, change: 8433, partial: false },
+      { month: '2026-10', net: -12447, change: 9120, partial: true },
+    ],
+    up: 1,
+    of: 2,
+    complete: true,
+    missing: [],
+    estimated: ['Nedbank Loan *2801'],
+  };
+  const everyday = {
+    rows: [
+      { month: '2026-08', income: 90000, spend: 100000, net: -10000, partial: false },
+      { month: '2026-09', income: 90000, spend: 98000, net: -8000, partial: false },
+      { month: '2026-10', income: 20000, spend: 15000, net: 5000, partial: true },
+    ],
+    typical: { income: 90000, spend: 99000, net: -9000 },
+    verdict: 'short',
+    cycles: 2,
+    shortCycles: 2,
+  };
+  const accounts = [{ id: 'fnb|9986', rawName: 'FNB Bank *9986', label: 'FNB Cheque *9986' }];
+
+  it('leads with whether net worth is up or down and whether the everyday accounts spend more than they take in', () => {
+    const html = render(TodayView, todayProps({ trend, everyday, everydayAccounts: accounts }));
+    expect(html).toContain('Up R 9 120 so far this cycle');
+    expect(html).toContain('Up in 1 of the last 2 full cycles');
+    expect(html).toContain('Includes an estimate for Nedbank Loan *2801.');
+    expect(html).toContain('Spending more than comes in');
+    expect(html).toContain('R 9 000 short in a typical cycle');
+    expect(html).toContain('2 of the last 2 ended short');
+    expect(html).toContain('FNB Cheque *9986');
+    const order = ['Net worth', 'Everyday accounts', 'Safe to spend before payday'].map((h) => html.indexOf(h));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expectClean(html);
+  });
+
+  it('says down when it is down, and ahead when the everyday accounts have room', () => {
+    const html = render(
+      TodayView,
+      todayProps({
+        trend: { ...trend, sinceLast: -2500 },
+        everyday: { ...everyday, verdict: 'ahead', typical: { income: 90000, spend: 80000, net: 10000 }, shortCycles: 0 },
+      }),
+    );
+    expect(html).toContain('Down R 2 500 so far this cycle');
+    expect(html).toContain('Spending less than comes in');
+    expect(html).toContain('R 10 000 to spare in a typical cycle');
+  });
+
+  it('folds the explanations away: each is a closed bar until it is opened', () => {
+    const html = render(TodayView, todayProps({ trend, everyday }));
+    for (const title of ['Health check', 'Bills and cash path', 'This cycle so far', 'Where it goes']) {
+      expect(html).toMatch(new RegExp(`<details class="group[^"]*"><summary[^>]*>.*?${title}`));
+    }
+    expect(html).not.toMatch(/<details[^>]* open/);
+  });
+
+  it('is the old page, minus the new cards, when there is nothing to say about net worth or everyday money', () => {
+    const html = render(TodayView, todayProps({ trend: null, everyday: null }));
+    expect(html).not.toContain('Everyday accounts');
+    expect(html).toContain('Safe to spend before payday');
   });
 });
 
@@ -225,16 +296,25 @@ describe('HabitsView blocks', () => {
 });
 
 describe('AccountsView blocks', () => {
-  it('shows the as-of date, overdraft field and provenance chips', () => {
+  it('is a list you read: each account says what it holds and where that came from, with an Edit to change it', () => {
     const html = render(AccountsView, accountsProps());
-    expect(html).toMatch(/type="date"[^>]*value="2026-08-22"/);
-    expect(html).toContain('Overdraft limit for Example Cheque');
-    expect(html).toContain('Credit limit for Example Card');
+    expect(html).not.toContain('type="date"');
+    expect(html).not.toContain('<input');
+    expect(html).toContain('aria-label="Edit Example Cheque"');
+    expect(html).toContain('aria-label="Edit Example Card"');
     expect(html).toContain('as of 22 Aug · from your Example summary');
     expect(html).toContain('typed 10 Aug');
-    expect(html).toContain('not set');
+    expect(html).toContain('Not set');
     expect(html).toContain('days older than the data');
     expect(html).toContain("Upload your bank's account summary PDF to fill these in one go.");
+  });
+
+  it('folds every explanation under its own closed bar', () => {
+    const html = render(AccountsView, accountsProps());
+    for (const title of ['Balance at each pay cycle', 'What the debt costs', 'Cash in and out, by account', 'Account movement']) {
+      expect(html).toMatch(new RegExp(`<details class="group[^"]*"><summary[^>]*>.*?${title}`));
+    }
+    expect(html).not.toMatch(/<details[^>]* open/);
   });
 
   it('lists external accounts with a delete control and none for CSV-backed accounts', () => {

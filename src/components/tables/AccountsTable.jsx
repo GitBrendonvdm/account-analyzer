@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format';
 import { SwipeHint } from './AccountPositionsTable';
+import { Heading } from '../ui/Disclosure';
 
 const fmtDate = (d) => (d ? d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '—');
 
@@ -25,7 +26,7 @@ export function AccountsTable({ summaries, currentMonth, dataThrough }) {
   return (
     <div className="glass overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b p-4">
-        <h2 className="t-head">Cash in and out, by account</h2>
+        <Heading>Cash in and out, by account</Heading>
         <p className="t-label">
           This cycle ({currentMonth}) against the typical cycle in range. Transfers included.
         </p>

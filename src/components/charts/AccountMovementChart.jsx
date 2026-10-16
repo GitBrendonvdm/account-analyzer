@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '../../utils/format';
+import { Heading } from '../ui/Disclosure';
 import {
   BAD,
   ChartFrame,
@@ -119,7 +120,7 @@ export function AccountMovementChart({ series }) {
   if (accounts.length === 0) {
     return (
       <div className="glass p-4 md:p-6">
-        <h2 className="t-head">Account movement</h2>
+        <Heading>Account movement</Heading>
         <div className="flex h-40 items-center justify-center text-sm text-label-2">
           No account activity in the selected range.
         </div>
@@ -130,7 +131,7 @@ export function AccountMovementChart({ series }) {
   return (
     <div className="glass p-4 md:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="t-head">Account movement</h2>
+        <Heading>Account movement</Heading>
         <p className="t-label">
           Cumulative change per account, each on its own scale. Transfers included.
         </p>

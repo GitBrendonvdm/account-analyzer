@@ -1,3 +1,5 @@
+import { Heading } from './Disclosure';
+
 /**
  * The material vocabulary, in three weights.
  *
@@ -37,7 +39,7 @@ export function CardHead({ title, subtitle, right, className = '' }) {
   return (
     <div className={`flex flex-wrap items-start justify-between gap-4 ${className}`}>
       <div className="min-w-0">
-        <h2 className="t-head">{title}</h2>
+        <Heading>{title}</Heading>
         {subtitle && <p className="t-label mt-1.5 max-w-prose">{subtitle}</p>}
       </div>
       {right}

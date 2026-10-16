@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { ArrowDownRight, ArrowUpRight, ChevronsRight, Minus } from 'lucide-react';
 import { formatCurrency } from '../../utils/format';
 import { ACCOUNT_TYPE_ORDER } from '../../lib/accounts';
+import { Heading } from '../ui/Disclosure';
 
 /**
  * Position per pay cycle, grouped by account type with cards first.
@@ -91,7 +92,7 @@ export function AccountPositionsTable({
   return (
     <div className="glass overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-4 md:px-6 md:py-5">
-        <h2 className="t-head">{title}</h2>
+        <Heading>{title}</Heading>
         <p className="t-label">{subtitle}</p>
       </div>
       <SwipeHint>Swipe sideways for more cycles</SwipeHint>

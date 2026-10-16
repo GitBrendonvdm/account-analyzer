@@ -17,6 +17,7 @@ import {
   buildAccountSummaries,
 } from './lib/accountSeries';
 import { applyBalances, cardHeadroom, summariseNetWorth } from './lib/netWorth';
+import { everydayAccounts, everydayFlow, netWorthTrend } from './lib/glance';
 import { buildCostOfDebt } from './lib/costOfDebt';
 import { buildHabits } from './lib/habits';
 import { buildHeadlines } from './lib/headlines';
@@ -252,11 +253,15 @@ export default function App() {
     () => (processed ? applyBalances(accountPositions, accountsById, processed.months, { data }) : []),
     [accountPositions, accountsById, processed, data],
   );
-  const netWorth = useMemo(
-    () => (processed ? summariseNetWorth(balanced, processed.months) : null),
-    [balanced, processed],
-  );
   const headroom = useMemo(() => cardHeadroom(balanced), [balanced]);
+
+  // The front page's second answer: the everyday accounts — the cheque account and the card in use —
+  // read through the same pipeline as the rest of the app, scoped to just them, so the in and out are
+  // real income and real spending.
+  const everydayList = useMemo(() => everydayAccounts(shownAccounts, data ?? []), [shownAccounts, data]);
+  const everydayNames = useMemo(() => [...namesOf(everydayList)], [everydayList]);
+  const everydayProcessed = useTransactionData(data, everydayNames, monthRange, txnOverrides);
+  const everyday = useMemo(() => (everydayNames.length ? everydayFlow(everydayProcessed) : null), [everydayNames, everydayProcessed]);
 
   // Over EVERY account: loans are switched off by default, and a cost-of-debt figure that
   // silently drops the bond's R21k a cycle is the single most misleading number the app can show.
@@ -317,6 +322,33 @@ export default function App() {
     [data, accounts, today, primeRate, transfers],
   );
   const debts = useMemo(() => terms.map(toDebt).filter(Boolean), [terms]);
+
+  // Net worth counts EVERYTHING the household holds and owes, the loans included — the account chips
+  // switch loans off by default, and a net worth without them reads a refinance as a leap instead of
+  // debt moving from one place to another. A loan with no balance of its own is valued at what the
+  // loan engine says is owed, and the page says so.
+  const wholeNetWorth = useMemo(() => {
+    if (!processed) return null;
+    const owed = new Map(terms.filter((t) => Number.isFinite(t.balanceOwed)).map((t) => [t.accountId, t.balanceOwed]));
+    const estimated = [];
+    const byId = new Map(
+      shownAccounts.map((a) => {
+        const isLoan = (a.typeOverride ?? a.type) === 'Loan';
+        if (isLoan && !a.closedOn && !Number.isFinite(a.currentBalance) && owed.has(a.id)) {
+          estimated.push(a.label || a.rawName);
+          return [a.id, { ...a, currentBalance: -owed.get(a.id), balanceAsOf: todayIso(today), source: 'estimate' }];
+        }
+        return [a.id, a];
+      }),
+    );
+    const positions = buildAccountPositions(data, [...namesOf(shownAccounts)], processed.months);
+    const summary = summariseNetWorth(applyBalances(positions, byId, processed.months, { data }), processed.months);
+    return { ...summary, estimated };
+  }, [processed, terms, shownAccounts, data, today]);
+  const trend = useMemo(
+    () => netWorthTrend(wholeNetWorth, { currentMonth: processed?.currentMonth }),
+    [wholeNetWorth, processed],
+  );
   const rateStepList = useMemo(() => terms.flatMap((t) => buildRateSteps(t)), [terms]);
   const debtBudget = useMemo(
     () => (processed ? buildDebtBudget(processed, { monthlySaving, cuts: 0, debts, balanced }) : null),
@@ -472,10 +504,10 @@ export default function App() {
   const headlines = useMemo(
     () =>
       buildHeadlines({
-        summary, processed, positions: balanced, netWorth, costOfDebt, headroom, habits,
+        summary, processed, positions: balanced, netWorth: wholeNetWorth, costOfDebt, headroom, habits,
         vitals, plans, debtBudget, rateSteps: rateStepList, upcoming, subscriptions, drift, quickWin,
       }),
-    [summary, processed, balanced, netWorth, costOfDebt, headroom, habits, vitals, plans, debtBudget, rateStepList, upcoming, subscriptions, drift, quickWin],
+    [summary, processed, balanced, wholeNetWorth, costOfDebt, headroom, habits, vitals, plans, debtBudget, rateStepList, upcoming, subscriptions, drift, quickWin],
   );
 
 
@@ -485,7 +517,7 @@ export default function App() {
     if (import.meta.env.DEV) {
       window.__mv = {
         data, processed, chartData, summary, accountSeries, accountSummaries, accountPositions,
-        balanced, netWorth, costOfDebt, habits, headlines, safe, balances, curve,
+        balanced, wholeNetWorth, costOfDebt, habits, headlines, safe, balances, curve,
         calendar, transfers, terms, debts, debtBudget, plans, marginal, sensitivity, rateSteps: rateStepList,
         recurring, lines, incomeProfile, upcoming, processedLong, costOfDebtLong, vitals,
         cashPath, subscriptions, priceCreep, drift, basket, fees, quickWin,
@@ -605,9 +637,10 @@ export default function App() {
                   safe={safe}
                   curve={curve}
                   balances={balances}
-                  netWorth={netWorth}
+                  trend={trend}
+                  everyday={everyday}
+                  everydayAccounts={everydayList}
                   costOfDebt={costOfDebt}
-                  positions={balanced.map((p) => ({ ...p, currentMonthKey: processed.currentMonth }))}
                   habits={habits}
                   onOpenLedger={() => setActiveTab('table')}
                   vitals={vitals}
@@ -693,6 +726,7 @@ export default function App() {
                   onDeleteAccount={deleteAccount}
                   inferredLoans={inferredLoans}
                   manage={manage}
+                  trend={trend}
                 />
               )}
             </Suspense>

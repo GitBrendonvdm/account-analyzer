@@ -1,5 +1,6 @@
 import { formatCurrencyAbs } from '../utils/format';
 import { FeesAudit } from './accounts/FeesAudit';
+import { Heading } from './ui/Disclosure';
 
 /**
  * What the debt costs — the largest thing happening to this money, and the one figure the spending
@@ -24,7 +25,7 @@ export function CostOfDebtPanel({ cost, fees }) {
     <div className="glass p-4 md:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h2 className="t-head">What the debt costs</h2>
+          <Heading>What the debt costs</Heading>
           <p className="t-label mt-1.5 max-w-prose">
             What's actually been charged, read off the ledger itself — every account, including the
             loans. Kept out of the spending table because it is already inside the instalments —

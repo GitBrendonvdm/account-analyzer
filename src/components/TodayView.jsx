@@ -4,6 +4,8 @@ import { CycleDial } from './today/CycleDial';
 import { ChartSwitcher } from './today/ChartSwitcher';
 import { VitalsRow } from './today/VitalsRow';
 import { UpcomingCard } from './today/UpcomingCard';
+import { EverydayTile, NetWorthTile } from './today/Glance';
+import { Disclosure, Heading } from './ui/Disclosure';
 import { formatCurrency, formatCurrencyAbs } from '../utils/format';
 
 const DAY_MONTH = { day: 'numeric', month: 'short' };
@@ -66,12 +68,12 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
   return (
     <Card className={`materialize p-5 sm:p-8 ${className}`}>
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="t-head">Where it goes</h2>
+        <Heading>Where it goes</Heading>
         {/* The padding is negative-margined away so the 44px hit area does not move the text. */}
         <button
           type="button"
           onClick={onOpenLedger}
-          className="press -my-3 -mr-2 flex min-h-11 items-center gap-1.5 py-3 pr-2 pl-2 text-[13px] font-medium text-info hover:brightness-125"
+          className="press -my-3 -mr-2 ml-auto flex min-h-11 items-center gap-1.5 py-3 pr-2 pl-2 text-[13px] font-medium text-info hover:brightness-125"
         >
           All transactions
           <ArrowRight size={13} />
@@ -115,30 +117,28 @@ function WhereItGoes({ rows, onOpenLedger, className = '' }) {
 /**
  * Today — the screen the app opens on.
  *
- * One question first, in the largest type on the page: how much is safe to spend before payday.
- * Everything else is supporting evidence, and the full ledger is one deliberate click away rather
- * than being the front page. That inversion is the point of the rework — the table answers "what
- * exactly", which is a question you go looking for, not one you need answered on arrival.
+ * It answers three questions in the order they matter, and nothing else is on the page until asked
+ * for. Is my net worth going up or down? Do my everyday accounts spend more than they take in? How
+ * much is safe to spend before payday? Each is one card readable in a second.
  *
- * Below the hero, in order: the six vitals (the year's health, not the cycle's), then the bills
- * calendar beside a chart switcher — cash path, spend pace, balance change, one at a time rather
- * than three stacked charts arguing for attention — then the three figures and where the money
- * goes. Every new block renders nothing — never a crash — when its data is not there yet, so the
- * page degrades to the old one.
+ * The reasons behind those answers — the year's health, the bills still due and where cash is
+ * heading, this cycle's in and out, where the money goes — are folded under their own bars, closed
+ * until wanted. Every block renders nothing — never a crash — when its data is not there yet.
  */
 export function TodayView({
   summary,
   safe,
   curve,
   balances,
-  netWorth,
   costOfDebt,
-  positions,
   habits,
   vitals,
   upcoming,
   cashPath,
   incomeProfile,
+  trend = null,
+  everyday = null,
+  everydayAccounts = [],
   currentCycle = null,
   lineOverrides = null,
   lineSettled = null,
@@ -150,9 +150,6 @@ export function TodayView({
   if (!summary) return null;
 
   const negative = (safe?.safe ?? 0) <= 0;
-  const cards = (positions ?? []).filter((p) => p.type === 'Credit Card');
-  const cardDebt = cards.reduce((s, p) => s + Math.min(0, p.positionByMonth?.[p.currentMonthKey] ?? 0), 0);
-  const cardChange = cards.reduce((s, p) => s + (p.windowChange ?? 0), 0);
   const caption = salaryCaption(incomeProfile);
 
   const spendRows = [];
@@ -171,6 +168,12 @@ export function TodayView({
     /* On an ultrawide a column of full-width bands strands the content in empty space, so past
        1800px the page becomes a 12-track grid and the blocks pair up instead of stacking. */
     <div className="grid flex-grow grid-cols-1 gap-5 3xl:grid-cols-12">
+      {(trend || everyday) && (
+        <div className="grid gap-5 lg:grid-cols-2 3xl:col-span-12">
+          <NetWorthTile trend={trend} onOpenAccounts={onOpenAccounts} />
+          <EverydayTile flow={everyday} accounts={everydayAccounts} />
+        </div>
+      )}
       {/* hero */}
       <Card className="materialize grid items-center gap-8 p-6 sm:gap-10 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] 3xl:col-span-12 3xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
@@ -225,80 +228,80 @@ export function TodayView({
       </Card>
 
       {vitals !== undefined && (
-        <VitalsRow vitals={vitals} onOpenAccounts={onOpenAccounts} className="3xl:col-span-12" />
+        <Disclosure
+          title="Health check"
+          summary="Savings rate, debt service, interest, runway, card use and the deficit"
+          className="3xl:col-span-12"
+        >
+          <VitalsRow vitals={vitals} onOpenAccounts={onOpenAccounts} />
+        </Disclosure>
       )}
 
       {showTimeline && (
-        <div className="grid gap-5 lg:grid-cols-2 3xl:col-span-12">
-          <UpcomingCard
-            upcoming={upcoming}
-            dataThrough={summary.dataThrough}
-            currentCycle={currentCycle}
-            lineOverrides={lineOverrides}
-            lineSettled={lineSettled}
-            onSettleLine={onSettleLine}
-            onEndLine={onEndLine}
-          />
-          <ChartSwitcher
-            cashPath={cashPath}
-            incomeProfile={incomeProfile}
-            curve={curve}
-            balances={balances}
-            onOpenAccounts={onOpenAccounts}
-            className={upcoming ? '3xl:col-span-2' : 'lg:col-span-2'}
-          />
-        </div>
+        <Disclosure
+          title="Bills and cash path"
+          summary="What is still due before payday, and where cash is heading"
+          className="3xl:col-span-12"
+        >
+          <div className="grid gap-5 lg:grid-cols-2">
+            <UpcomingCard
+              upcoming={upcoming}
+              dataThrough={summary.dataThrough}
+              currentCycle={currentCycle}
+              lineOverrides={lineOverrides}
+              lineSettled={lineSettled}
+              onSettleLine={onSettleLine}
+              onEndLine={onEndLine}
+            />
+            <ChartSwitcher
+              cashPath={cashPath}
+              incomeProfile={incomeProfile}
+              curve={curve}
+              balances={balances}
+              onOpenAccounts={onOpenAccounts}
+              className={upcoming ? '3xl:col-span-2' : 'lg:col-span-2'}
+            />
+          </div>
+        </Disclosure>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3 3xl:col-span-12">
-        <Tile className="rise p-5 sm:p-6">
-          <Figure
-            label="Came in"
-            value={formatCurrencyAbs(summary.income.received)}
-            tone="text-good"
-            note={
-              Math.abs(summary.income.remaining) > 1
-                ? `${formatCurrencyAbs(summary.income.remaining)} still expected`
-                : 'All expected income received'
-            }
-          />
-        </Tile>
-        <Tile className="rise p-5 sm:p-6">
-          <Figure
-            label="Went out"
-            value={formatCurrencyAbs(summary.expense.spent)}
-            note={
-              summary.expense.pace == null
-                ? `of ${formatCurrencyAbs(summary.expense.projected)} expected`
-                : summary.expense.pace > 1.05
-                  ? `${Math.round((summary.expense.pace - 1) * 100)}% above typical pace`
-                  : summary.expense.pace < 0.95
-                    ? `${Math.round((1 - summary.expense.pace) * 100)}% below typical pace`
-                    : 'Tracking typical pace'
-            }
-          />
-        </Tile>
-        <Tile className="rise p-5 sm:p-6">
-          <Figure
-            label={netWorth?.knownCount > 0 ? 'Net worth' : 'Owed on cards'}
-            value={
-              netWorth?.knownCount > 0
-                ? formatCurrency(netWorth.net)
-                : formatCurrencyAbs(cardDebt)
-            }
-            tone={netWorth?.knownCount > 0 ? (netWorth.net < 0 ? 'text-bad' : 'text-label') : 'text-bad'}
-            note={
-              netWorth?.knownCount > 0
-                ? `${netWorth.change >= 0 ? 'Up' : 'Down'} ${formatCurrencyAbs(netWorth.change)} over the window`
-                : cardChange < 0
-                  ? `Up ${formatCurrencyAbs(cardChange)} over the window`
-                  : 'Add balances to see net worth'
-            }
-          />
-        </Tile>
-      </div>
+      <Disclosure title="This cycle so far" summary="What came in, what went out" className="3xl:col-span-12">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Tile className="rise p-5 sm:p-6">
+            <Figure
+              label="Came in"
+              value={formatCurrencyAbs(summary.income.received)}
+              tone="text-good"
+              note={
+                Math.abs(summary.income.remaining) > 1
+                  ? `${formatCurrencyAbs(summary.income.remaining)} still expected`
+                  : 'All expected income received'
+              }
+            />
+          </Tile>
+          <Tile className="rise p-5 sm:p-6">
+            <Figure
+              label="Went out"
+              value={formatCurrencyAbs(summary.expense.spent)}
+              note={
+                summary.expense.pace == null
+                  ? `of ${formatCurrencyAbs(summary.expense.projected)} expected`
+                  : summary.expense.pace > 1.05
+                    ? `${Math.round((summary.expense.pace - 1) * 100)}% above typical pace`
+                    : summary.expense.pace < 0.95
+                      ? `${Math.round((1 - summary.expense.pace) * 100)}% below typical pace`
+                      : 'Tracking typical pace'
+              }
+            />
+          </Tile>
+        </div>
+      </Disclosure>
 
-      <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} className="3xl:col-span-12" />
+      {spendRows.length > 0 && (
+        <Disclosure title="Where it goes" summary="Interest and fees, then the biggest categories" merge className="3xl:col-span-12">
+          <WhereItGoes rows={spendRows} onOpenLedger={onOpenLedger} />
+        </Disclosure>
+      )}
     </div>
   );
 }
