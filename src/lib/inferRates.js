@@ -1076,7 +1076,8 @@ function fmt(x) {
 export function buildLiabilityTerms(data, accounts, { asOf = null, primeRate = null, transfers = null } = {}) {
   const rows = data ?? [];
   // A loan that has been paid off has no terms to read: nothing is owed and nothing more is charged.
-  const liabilities = (accounts ?? []).filter((a) => LIABILITY_TYPES.has(a.typeOverride ?? a.type) && !a.closedOn);
+  // One the reader has put away is not shown either.
+  const liabilities = (accounts ?? []).filter((a) => LIABILITY_TYPES.has(a.typeOverride ?? a.type) && !a.closedOn && !a.hidden);
   const liabilityIds = new Set(liabilities.map((a) => a.id));
   const liabilityNames = new Set();
   new Set(rows.map((t) => t.Account)).forEach((name) => {

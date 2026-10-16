@@ -7,6 +7,7 @@ import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
 import { ImportSummary } from './components/ImportSummary';
 import { closureSuggestions, loanOwedBy, settlementFor } from './lib/closure';
+import { dormantAccounts, namesOf } from './lib/hiddenAccounts';
 import { payMonthRuleOf } from './lib/loanProjection';
 import { todayIso } from './lib/statements/amounts';
 import { deriveCycleSummary } from './lib/cycleSummary';
@@ -161,6 +162,16 @@ export default function App() {
     [settings],
   );
 
+  // Accounts the reader has put away leave every list, chart and total; their rows stay.
+  const shownAccounts = useMemo(() => accounts.filter((a) => !a.hidden), [accounts]);
+  const hiddenAccounts = useMemo(() => accounts.filter((a) => a.hidden), [accounts]);
+  const hiddenNames = useMemo(() => namesOf(hiddenAccounts), [hiddenAccounts]);
+  const viewAccounts = useMemo(
+    () => (hiddenNames.size ? selectedAccounts.filter((n) => !hiddenNames.has(n)) : selectedAccounts),
+    [selectedAccounts, hiddenNames],
+  );
+  const shownIds = useMemo(() => selectedIds.filter((id) => !accounts.find((a) => a.id === id)?.hidden), [selectedIds, accounts]);
+
   // Accounts that look paid off or closed, offered for the reader to confirm. Read off the stored rows
   // (not the estimated ones) and the loans' estimates; what the reader has said is not finished is
   // remembered so it is not asked again.
@@ -178,14 +189,24 @@ export default function App() {
       }),
     [accounts, storedData, inferredLoans, closureDismissed, rawData],
   );
-  const closedAccounts = useMemo(() => accounts.filter((a) => a.closedOn), [accounts]);
+  const tidy = useMemo(
+    () => ({
+      dormant: dormantAccounts(accounts, storedData ?? []),
+      shown: shownAccounts,
+      hidden: hiddenAccounts,
+      onHide: (ids) => Promise.all(ids.map((id) => updateAccount(id, { hidden: true }))),
+      onShow: (id) => updateAccount(id, { hidden: false }),
+    }),
+    [accounts, storedData, shownAccounts, hiddenAccounts, updateAccount],
+  );
+  const closedAccounts = useMemo(() => accounts.filter((a) => a.closedOn && !a.hidden), [accounts]);
   const closure = useMemo(
     () => ({
       suggestions,
       closed: closedAccounts,
       today: todayIso(today),
       // Any open account can be closed by hand, whether or not the app noticed it had finished.
-      openAccounts: accounts.filter((a) => !a.closedOn && !a.external),
+      openAccounts: shownAccounts.filter((a) => !a.closedOn && !a.external),
       preview: (accountId, closedOn) => {
         const account = accounts.find((a) => a.id === accountId);
         return settlementFor({
@@ -200,7 +221,7 @@ export default function App() {
       onDismiss: (ids) => settings.set('closureDismissed', [...new Set([...closureDismissed, ...ids])]),
       onReopen: reopenAccount,
     }),
-    [suggestions, closedAccounts, accounts, today, closeAccounts, reopenAccount, settings, closureDismissed, rawData, storedData],
+    [suggestions, closedAccounts, accounts, shownAccounts, today, closeAccounts, reopenAccount, settings, closureDismissed, rawData, storedData],
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);
@@ -210,27 +231,27 @@ export default function App() {
   const accountSeries = useMemo(
     () =>
       processed
-        ? buildAccountMovementSeries(data, selectedAccounts, {
+        ? buildAccountMovementSeries(data, viewAccounts, {
             // Honour the month slider: start at the beginning of the earliest visible pay cycle.
             from: processed.cycleStarts[processed.months[0]],
           })
         : null,
-    [data, selectedAccounts, processed],
+    [data, viewAccounts, processed],
   );
   const accountPositions = useMemo(
-    () => (processed ? buildAccountPositions(data, selectedAccounts, processed.months) : []),
-    [data, selectedAccounts, processed],
+    () => (processed ? buildAccountPositions(data, viewAccounts, processed.months) : []),
+    [data, viewAccounts, processed],
   );
   const accountSummaries = useMemo(
     () =>
       processed
-        ? buildAccountSummaries(data, selectedAccounts, processed.months, processed.currentMonth)
+        ? buildAccountSummaries(data, viewAccounts, processed.months, processed.currentMonth)
         : [],
-    [data, selectedAccounts, processed],
+    [data, viewAccounts, processed],
   );
 
   // ---- balances turn positions into money -------------------------------------------------
-  const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  const accountsById = useMemo(() => new Map(shownAccounts.map((a) => [a.id, a])), [shownAccounts]);
   // `data` lets a typed or uploaded balance anchor on its as-of date rather than the latest cycle,
   // and brings external (transaction-less) accounts into the picture.
   const balanced = useMemo(
@@ -505,8 +526,8 @@ export default function App() {
         <TopBar
           activeView={activeTab}
           onViewChange={setActiveTab}
-          accounts={accounts}
-          selectedIds={selectedIds}
+          accounts={shownAccounts}
+          selectedIds={shownIds}
           onToggleAccount={toggleAccount}
           onFileUpload={handleFileUpload}
           importing={importing}
@@ -671,13 +692,14 @@ export default function App() {
                   months={processed.months}
                   currentMonth={processed.currentMonth}
                   dataThrough={processed.dataThrough}
-                  accounts={accounts}
+                  accounts={shownAccounts}
                   onSaveAccount={updateAccount}
                   costOfDebt={costOfDebt}
                   fees={fees}
                   onDeleteAccount={deleteAccount}
                   inferredLoans={inferredLoans}
                   closure={closure}
+                  tidy={tidy}
                 />
               )}
             </Suspense>

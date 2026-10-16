@@ -29,6 +29,15 @@ function termsOf(fixture, { accountOverrides = {}, primeRate = null, asOf = ASOF
   return buildLiabilityTerms(rows, accounts, { asOf, primeRate, transfers });
 }
 
+describe('accounts the reader has put away or closed', () => {
+  it('have no terms: they are not in the debt table', () => {
+    const fx = loanFixture();
+    expect(termsOf(fx)).toHaveLength(1);
+    expect(termsOf(fx, { accountOverrides: { hidden: true } })).toEqual([]);
+    expect(termsOf(fx, { accountOverrides: { closedOn: '2026-10-15' } })).toEqual([]);
+  });
+});
+
 describe('inferRates on the synthetic loan', () => {
   it('reads balance, rate, instalment, fees and term off a self-anchored loan', () => {
     const fx = loanFixture();

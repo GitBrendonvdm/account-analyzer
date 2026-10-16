@@ -5,6 +5,7 @@ import { BalancesEditor } from './BalancesEditor';
 import { CostOfDebtPanel } from './CostOfDebtPanel';
 import { Card, CardHead } from './ui/Surface';
 import { ClosedAccounts } from './accounts/ClosedAccounts';
+import { TidyAccounts } from './accounts/TidyAccounts';
 import { formatCurrency } from '../utils/format';
 
 const dayLabel = (iso) =>
@@ -66,6 +67,7 @@ export function AccountsView({
   fees,
   inferredLoans,
   closure,
+  tidy,
 }) {
   const list = positions ?? [];
   // A loan account showing a positive position is almost always a revolving or budget facility
@@ -75,8 +77,10 @@ export function AccountsView({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* A closed account holds nothing and is listed (with its Reopen) in the card above, so it is not
+          a row to type a balance into. */}
       <BalancesEditor
-        accounts={accounts ?? []}
+        accounts={(accounts ?? []).filter((a) => !a.closedOn)}
         onSave={onSaveAccount}
         onDeleteAccount={onDeleteAccount}
         dataThrough={dataThrough}
@@ -87,6 +91,7 @@ export function AccountsView({
         }
       />
       {closure && <ClosedAccounts {...closure} />}
+      {tidy && <TidyAccounts {...tidy} />}
       <EstimatedLoans loans={inferredLoans} />
       <AccountPositionsTable positions={list} months={months ?? []} currentMonth={currentMonth} />
       <CostOfDebtPanel cost={costOfDebt} fees={fees} />

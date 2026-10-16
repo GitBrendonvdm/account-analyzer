@@ -74,7 +74,7 @@ export function closureSuggestions({ accounts, stored, inferred = [], dismissed 
 
   const out = [];
   accounts.forEach((account) => {
-    if (account.external || account.closedOn || skip.has(account.id)) return;
+    if (account.external || account.closedOn || account.hidden || skip.has(account.id)) return;
     const last = lastOf.get(account.id);
     if (!last) return;
     const label = account.label || account.rawName;

@@ -110,7 +110,11 @@ function Movement({ account }) {
 }
 
 export function AccountMovementChart({ series }) {
-  const accounts = series?.accounts ?? [];
+  // An account with nothing in the range is a card that says "Not enough activity to plot": it
+  // takes a place in the grid and tells the reader nothing, so it is counted and left out.
+  const all = series?.accounts ?? [];
+  const accounts = all.filter((a) => a.count > 0);
+  const quiet = all.length - accounts.length;
 
   if (accounts.length === 0) {
     return (
@@ -163,6 +167,11 @@ export function AccountMovementChart({ series }) {
         ))}
       </div>
 
+      {quiet > 0 && (
+        <p className="t-caption mt-4">
+          {quiet} account{quiet === 1 ? '' : 's'} with no activity in this range {quiet === 1 ? 'is' : 'are'} not shown.
+        </p>
+      )}
       <ZoomHint zoomed={false} hint="Drag across any chart to zoom in" className="mt-4" />
     </div>
   );

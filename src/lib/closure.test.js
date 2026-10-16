@@ -53,6 +53,11 @@ describe('closureSuggestions', () => {
     expect(closureSuggestions({ accounts: [ancient], stored })).toEqual([]);
   });
 
+  it('does not suggest closing what the reader has put away', () => {
+    const hidden = { ...OLD_CARD, hidden: true };
+    expect(closureSuggestions({ accounts: [hidden], stored: STORED })).toEqual([]);
+  });
+
   it('leaves alone what is dismissed, closed or external', () => {
     const accounts = [OLD_CARD, { ...SAVINGS, currentBalance: null, closedOn: '2026-08-04' }, acct('ext|x', 'Savings', { external: true })];
     expect(closureSuggestions({ accounts, stored: STORED, dismissed: ['nedbank|4714'] })).toEqual([]);
