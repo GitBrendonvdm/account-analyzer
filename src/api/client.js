@@ -94,6 +94,8 @@ export function forgetBootstrap() {
 }
 
 export const importFile = (text, fileName) => request('POST', '/api/import', { text, fileName }).then((r) => r.data);
+/** FNB's own transaction-history files, together: the files of one account overlap and are merged server-side. */
+export const importBankFiles = (files) => request('POST', '/api/import/bank', { files }).then((r) => r.data);
 export const migrate = (dump) => request('POST', '/api/migrate', dump).then((r) => r.data);
 export const wipe = () => request('DELETE', '/api/data', { confirm: 'DELETE' }).then((r) => r.data);
 export const exportUrl = () => '/api/export.csv';

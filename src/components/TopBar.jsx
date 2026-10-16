@@ -181,7 +181,8 @@ export function TopBar({
               {importing ? 'Importing' : 'Import'}
               <input
                 type="file"
-                accept=".csv,.txt,.ofx,.qif"
+                multiple
+                accept=".csv,.txt,.ofx,.qif,.zip,.pdf"
                 className="hidden"
                 onChange={(e) => {
                   setMenuOpen(false);

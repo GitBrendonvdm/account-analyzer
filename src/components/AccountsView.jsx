@@ -3,6 +3,44 @@ import { AccountPositionsTable } from './tables/AccountPositionsTable';
 import { AccountsTable } from './tables/AccountsTable';
 import { BalancesEditor } from './BalancesEditor';
 import { CostOfDebtPanel } from './CostOfDebtPanel';
+import { Card, CardHead } from './ui/Surface';
+import { ClosedAccounts } from './accounts/ClosedAccounts';
+import { formatCurrency } from '../utils/format';
+
+const dayLabel = (iso) =>
+  iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '';
+
+/**
+ * The loans whose books were not uploaded this time. Their balance is carried forward from what
+ * the app can see — the payments leaving the cheque and card accounts — and the interest and fee
+ * it has learned the loan charges, and it says so here rather than letting an estimate pass for a
+ * statement. Uploading the loan's own file or typing its balance replaces the estimate at once.
+ */
+function EstimatedLoans({ loans }) {
+  if (!loans?.length) return null;
+  return (
+    <Card className="p-5">
+      <CardHead
+        title="Carried forward from your payments"
+        subtitle="These loans were not in what you uploaded. Their balance is last month's, less the payments the app can see leaving your other accounts, plus the interest and fee they usually charge."
+      />
+      <ul className="mt-3">
+        {loans.map((l) => (
+          <li key={l.accountId} className="flex flex-wrap items-baseline justify-between gap-x-4 border-b py-2 last:border-0">
+            <div className="min-w-0">
+              <div className="truncate text-sm text-label">{l.label}</div>
+              <div className="t-caption truncate">
+                from {dayLabel(l.from)} to {dayLabel(l.through)} · {l.payments} payment{l.payments === 1 ? '' : 's'} matched ({l.matchedBy}) ·
+                interest at {(l.rate * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className="num shrink-0 text-sm text-label">owes {formatCurrency(l.owed)}</div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
 
 /**
  * Accounts — the balance sheet: what you told the app each account holds (and when), the
@@ -26,6 +64,8 @@ export function AccountsView({
   onDeleteAccount,
   costOfDebt,
   fees,
+  inferredLoans,
+  closure,
 }) {
   const list = positions ?? [];
   // A loan account showing a positive position is almost always a revolving or budget facility
@@ -46,6 +86,8 @@ export function AccountsView({
             : null
         }
       />
+      {closure && <ClosedAccounts {...closure} />}
+      <EstimatedLoans loans={inferredLoans} />
       <AccountPositionsTable positions={list} months={months ?? []} currentMonth={currentMonth} />
       <CostOfDebtPanel cost={costOfDebt} fees={fees} />
       <AccountsTable summaries={summaries ?? []} currentMonth={currentMonth} dataThrough={dataThrough} />

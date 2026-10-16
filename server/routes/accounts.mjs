@@ -31,6 +31,9 @@ const PATCHABLE = {
   label: text,
   typeOverride: text,
   hidden: (v) => typeof v === 'boolean',
+  // The day the account was settled or closed: its balance is nothing from then, and nothing more
+  // is expected of it. null reopens it.
+  closedOn: isoDay,
   interestRate: number,
   minimumPayment: number,
   termMonths: integer,
@@ -38,7 +41,7 @@ const PATCHABLE = {
   feesMonthly: number,
   // Where the balance came from, so the UI can say "from your FNB summary, 22 Aug" rather than
   // implying the user typed it.
-  source: (v) => v === null || ['csv', 'statement', 'manual'].includes(v),
+  source: (v) => v === null || ['csv', 'statement', 'history', 'manual'].includes(v),
   statementName: text,
 };
 

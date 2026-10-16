@@ -297,7 +297,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
   const historyCycles = completeMonths(calendar).slice(-CASH_HISTORY_CYCLES);
 
   // Liquid accounts: Bank or Savings by the record's type, not hidden, with rows or external.
-  const liquid = accounts.filter((a) => LIQUID.has(typeOfRecord(a)) && !a.hidden);
+  const liquid = accounts.filter((a) => LIQUID.has(typeOfRecord(a)) && !a.hidden && !a.closedOn);
   const liquidIds = new Set(liquid.map((a) => a.id));
 
   // Income the profile will place: a salary on its usual day of the cycle (a calendar-month step
@@ -417,7 +417,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
     });
     if (known) {
       assumptions.push(
-        `${a.label || a.rawName}: balance as of ${a.balanceAsOf ?? iso(dataThrough)}${a.source === 'statement' ? ' (from your bank summary)' : a.source === 'manual' ? ' (typed)' : ''}.`,
+        `${a.label || a.rawName}: balance as of ${a.balanceAsOf ?? iso(dataThrough)}${a.source === 'statement' || a.source === 'history' ? ' (from your bank summary)' : a.source === 'manual' ? ' (typed)' : ''}.`,
       );
     } else {
       assumptions.push(`${a.label || a.rawName}: no balance entered — its line shows change since ${iso(dataThrough)}.`);
@@ -427,7 +427,7 @@ function buildPath(options, { salaryShiftDays = 0 } = {}) {
   const anchored = accountPaths.some((p) => p.known);
 
   // Cards: their own path, floored at the limit; repayments arrive from the repayment lines.
-  const cards = accounts.filter((a) => typeOfRecord(a) === 'Credit Card' && !a.hidden && isKnown(a));
+  const cards = accounts.filter((a) => typeOfRecord(a) === 'Credit Card' && !a.hidden && !a.closedOn && isKnown(a));
   const cardPaths = cards.map((card) => {
     const rows = accountRows(data, { accountId: card.id });
     const start = overrides?.start?.[card.id] ?? balanceAt(rows, card, dataThrough);

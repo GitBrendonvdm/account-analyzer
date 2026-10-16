@@ -6,6 +6,8 @@ import { Headlines } from './components/Headlines';
 import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
 import { ImportSummary } from './components/ImportSummary';
+import { closurePatch, closureSuggestions, reopenPatch } from './lib/closure';
+import { todayIso } from './lib/statements/amounts';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
   buildAccountMovementSeries,
@@ -53,6 +55,9 @@ const ChartsView = lazy(() => import('./components/ChartsView').then((m) => ({ d
 const HabitsView = lazy(() => import('./components/HabitsView').then((m) => ({ default: m.HabitsView })));
 const DebtView = lazy(() => import('./components/DebtView').then((m) => ({ default: m.DebtView })));
 const AccountsView = lazy(() => import('./components/AccountsView').then((m) => ({ default: m.AccountsView })));
+const StatementCheck = lazy(() =>
+  import('./components/StatementCheck').then((m) => ({ default: m.StatementCheck })),
+);
 const StatementUpload = lazy(() =>
   import('./components/StatementUpload').then((m) => ({ default: m.StatementUpload })),
 );
@@ -73,6 +78,8 @@ export default function App() {
   const {
     ready,
     data: rawData,
+    storedData,
+    inferredLoans,
     accounts,
     createAccount,
     deleteAccount,
@@ -85,6 +92,9 @@ export default function App() {
     handleFileUpload,
     updateAccount,
     lastImport,
+    statementFiles,
+    clearStatementFiles,
+    addStatementLines,
     dismissLastImport,
     importing,
     importError,
@@ -146,6 +156,30 @@ export default function App() {
       settings.set('txnOverrides', next);
     },
     [settings],
+  );
+
+  // Accounts that look paid off or closed, offered for the reader to confirm. Read off the stored rows
+  // (not the estimated ones) and the loans' estimates; what the reader has said is not finished is
+  // remembered so it is not asked again.
+  const storedDismissed = settings.get('closureDismissed', null);
+  const closureDismissed = useMemo(() => (Array.isArray(storedDismissed) ? storedDismissed : []), [storedDismissed]);
+  const suggestions = useMemo(
+    () => closureSuggestions({ accounts, stored: storedData ?? [], inferred: inferredLoans, dismissed: closureDismissed }),
+    [accounts, storedData, inferredLoans, closureDismissed],
+  );
+  const closedAccounts = useMemo(() => accounts.filter((a) => a.closedOn), [accounts]);
+  const closure = useMemo(
+    () => ({
+      suggestions,
+      closed: closedAccounts,
+      today: todayIso(today),
+      onClose: async (items) => {
+        for (const { accountId, closedOn } of items) await updateAccount(accountId, closurePatch(closedOn));
+      },
+      onDismiss: (ids) => settings.set('closureDismissed', [...new Set([...closureDismissed, ...ids])]),
+      onReopen: (id) => updateAccount(id, reopenPatch()),
+    }),
+    [suggestions, closedAccounts, today, updateAccount, settings, closureDismissed],
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);
@@ -470,6 +504,14 @@ export default function App() {
                 onCreateAccount={createAccount}
                 onDone={setStatementDone}
               />
+              <StatementCheck
+                data={storedData}
+                accounts={accounts}
+                incoming={statementFiles}
+                onIncomingHandled={clearStatementFiles}
+                onAddLines={addStatementLines}
+                onPatchAccount={updateAccount}
+              />
             </Suspense>
           }
         />
@@ -505,6 +547,20 @@ export default function App() {
             </div>
           )}
           <ImportSummary summary={lastImport} onDismiss={dismissLastImport} />
+          {suggestions.length > 0 && activeTab !== 'accounts' && (
+            <div className="glass-tile flex flex-wrap items-center justify-between gap-4 px-5 py-3 text-[13px]">
+              <span className="text-label-2">
+                <b className="font-semibold text-label">
+                  {suggestions.length} account{suggestions.length === 1 ? '' : 's'}
+                </b>{' '}
+                {suggestions.length === 1 ? 'looks' : 'look'} paid off or closed — the app is still expecting payments to{' '}
+                {suggestions.length === 1 ? 'it' : 'them'}.
+              </span>
+              <button type="button" onClick={() => setActiveTab('accounts')} className="press text-info hover:brightness-110 max-md:min-h-11 max-md:px-3">
+                Review
+              </button>
+            </div>
+          )}
           {processed ? (
             <Suspense fallback={<div className="t-caption px-2 py-6">Loading…</div>}>
               {activeTab === 'today' && (
@@ -599,6 +655,8 @@ export default function App() {
                   costOfDebt={costOfDebt}
                   fees={fees}
                   onDeleteAccount={deleteAccount}
+                  inferredLoans={inferredLoans}
+                  closure={closure}
                 />
               )}
             </Suspense>

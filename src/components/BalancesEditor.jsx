@@ -57,7 +57,9 @@ function Provenance({ account, dataThrough, align = 'end' }) {
   const text =
     account.source === 'statement'
       ? `as of ${date ?? '—'} · from your ${account.bank || 'bank'} summary`
-      : account.source === 'manual'
+      : account.source === 'history'
+        ? `as of ${date ?? '—'} · from your ${account.bank || 'bank'} history`
+        : account.source === 'manual'
         ? `typed${date ? ` ${date}` : ''}`
         : date
           ? `as of ${date}`

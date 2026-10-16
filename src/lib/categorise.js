@@ -26,6 +26,16 @@ import { merchantKeyOf } from './merchants';
 
 /** Fallbacks for merchants with no history at all. Deliberately small — the data does the work. */
 const KEYWORD_RULES = [
+  // Money to your own loans and cards, in the bank's own words. These come first because they are
+  // the lines a first-ever statement from the bank itself is full of, and the aggregator's wording
+  // for them ("Fnb Home * Xx0725 Fnb Home *6996") is never the bank's ("FNB HOME 3000021106996").
+  [/\b(fnb ?home|home ?loan|nedbhl|nedbank ?home)\b/i, 'Home Loan / Bond', 'Debt'],
+  [/\b(toyota_? ?fin|wesbank|vw ?fin|bmw ?fin|car ?payoff|vehicle (loan|finance))\b/i, 'Vehicle Loan / Car Loan', 'Debt'],
+  [/\b(fnb ?ploan|personal ?loan|settlement)\b/i, 'Personal Loan', 'Debt'],
+  [/\b(fnb ?card|fnbcc|credit ?card (payment|repayment))\b/i, 'Credit Card Repayment', 'Debt'],
+  [/fnb ?st ?ins(?![a-z])|short.?term ?ins|surelife/i, 'Other Insurance'],
+  [/\b(rates (and|&) taxes|municipal)\b/i, 'Home Utility & Service'],
+  [/\b(domestic ?worker|housekeep|maid|gardener)\b/i, 'Housekeeping'],
   [/\b(engen|shell|sasol|bp|total|caltex|astron)\b/i, 'Transport & Fuel'],
   [/\b(uber|bolt|taxify|gautrain)\b/i, 'Transport & Fuel'],
   [/\b(checkers|woolworths|pick ?n ?pay|pnp|spar|shoprite|makro|food ?lovers)\b/i, 'Groceries'],
@@ -70,10 +80,20 @@ function mode(values) {
 export function trainCategoriser(rows, { minShare = 0.6 } = {}) {
   const byDescription = new Map();
   const byMerchant = new Map();
+  const groupsOfCategory = new Map();
 
   rows.forEach((t) => {
     const category = (t.Category ?? '').trim();
-    if (!category || /^uncategori[sz]ed$/i.test(category)) return;
+    if (!category) return;
+    // A row left Uncategorised can still carry a telling group: "Pay From Nedbank" is
+    // Uncategorised / Transfer in twenty-six rows, and "Transfer" is exactly what a new one is.
+    // Plain day-to-day Uncategorised teaches nothing, so only a group that says something counts.
+    if (/^uncategori[sz]ed$/i.test(category) && (!t['Spending Group'] || t['Spending Group'] === 'Day-to-day')) return;
+    if (t['Spending Group']) {
+      const g = groupsOfCategory.get(category) ?? [];
+      g.push(t['Spending Group']);
+      groupsOfCategory.set(category, g);
+    }
 
     const description = normaliseDescription(t.Description);
     if (description) {
@@ -107,8 +127,33 @@ export function trainCategoriser(rows, { minShare = 0.6 } = {}) {
   return {
     descriptions: settle(byDescription),
     merchants: settle(byMerchant),
+    // The group a category usually sits in, for a keyword hit that has no group of its own.
+    groups: new Map([...groupsOfCategory].map(([category, groups]) => [category, mode(groups).value])),
     trainedOn: rows.length,
   };
+}
+
+/**
+ * A key that is a whole-word prefix of a learned key, or the other way round. The aggregator wrote
+ * "Toyota_Fin *0727 Toyota_Fin *1001", which keys to "toyota fin"; the bank writes
+ * "TOYOTA_FIN86133574081001260927", whose reference is welded on and which keys to "toyota". Neither
+ * equals the other and both mean the same lender. The first word must agree and the shorter key must
+ * be at least six characters — "spar" is a prefix of every Spar in the country — and the most-seen
+ * learned key wins.
+ */
+function prefixLookup(key, learned) {
+  if (!key || !learned) return null;
+  const first = key.split(' ')[0];
+  let best = null;
+  learned.forEach((entry, other) => {
+    if (other.split(' ')[0] !== first) return;
+    const [short, long] = key.length <= other.length ? [key, other] : [other, key];
+    // Whole words ("toyota" → "toyota fin"), or a word the bank cut short ("checkershyper brack" →
+    // "checkershyper brackenf"); either way the shorter is specific enough to be a name.
+    if (short.length < 6 || !long.startsWith(short)) return;
+    if (!best || entry.observations > best.observations) best = entry;
+  });
+  return best;
 }
 
 /**
@@ -130,9 +175,14 @@ export function categorise(row, model) {
     return { category: learned.category, group: learned.group, confidence: learned.share, source: 'merchant' };
   }
 
-  for (const [pattern, category] of KEYWORD_RULES) {
+  const near = prefixLookup(merchant, model?.merchants);
+  if (near) {
+    return { category: near.category, group: near.group, confidence: near.share * 0.8, source: 'merchant' };
+  }
+
+  for (const [pattern, category, group] of KEYWORD_RULES) {
     if (pattern.test(row.Description ?? '')) {
-      return { category, group: null, confidence: 0.5, source: 'keyword' };
+      return { category, group: group ?? model?.groups?.get(category) ?? null, confidence: 0.5, source: 'keyword' };
     }
   }
 

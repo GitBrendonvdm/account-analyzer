@@ -200,7 +200,7 @@ export function buildVitals(options) {
   const seriesOf = (f) => longCycles.map((m) => ({ month: m, value: f(m), incomeShifted: shifted(m) }));
 
   // Balances, from the records: liquid assets, card and overdraft headroom.
-  const liquid = balanced.filter((b) => LIQUID.has(b.type) && !b.hidden);
+  const liquid = balanced.filter((b) => LIQUID.has(b.type) && !b.hidden && !b.closed);
   const liquidKnown = liquid.filter((b) => b.known);
   const liquidAssets = liquidKnown.length ? sum(liquidKnown.map((b) => Math.max(0, b.balance))) : null;
   const cardRows = balanced.filter((b) => b.type === 'Credit Card' && b.known);

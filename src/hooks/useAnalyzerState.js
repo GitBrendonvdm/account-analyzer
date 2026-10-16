@@ -3,6 +3,9 @@ import Dexie from 'dexie';
 import { db } from '../db/db';
 import * as api from '../api/client';
 import { parseTransactionDate } from '../utils/date';
+import { expandUploads } from '../utils/zip';
+import { looksLikeFnbHistory } from '../lib/statements/history';
+import { addInferredLoanRows } from '../lib/loanProjection';
 
 /**
  * Loans start switched off.
@@ -69,16 +72,28 @@ export function useAnalyzerState() {
     busy: false,
     error: null,
   });
-  const [data, setData] = useState(null);
+  const [storedData, setData] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [monthRange, setMonthRangeState] = useState(6);
   const [imports, setImports] = useState([]);
   const [lastImport, setLastImport] = useState(null);
+  // PDFs that arrived through the Import button. They are statements, not transactions, so they are
+  // handed to the statement checker rather than to the importer.
+  const [statementFiles, setStatementFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState(null);
   const [localDump, setLocalDump] = useState(null);
   const [migrating, setMigrating] = useState(false);
+
+  // The loans nobody uploaded this month. Their payments are in the cheque and card history, their
+  // interest and fee are arithmetic on terms learned from their own past rows, so the rows they
+  // would have shown are written here, on every load, and never stored. See lib/loanProjection.js.
+  const projection = useMemo(
+    () => (storedData ? addInferredLoanRows(storedData, accounts) : null),
+    [storedData, accounts],
+  );
+  const data = projection?.rows ?? storedData;
 
   const refresh = useCallback(async () => {
     const payload = await api.bootstrap();
@@ -213,35 +228,86 @@ export function useAnalyzerState() {
     });
   }, []);
 
-  /** The file is read here and parsed on the server, with the same parser and the same rules. */
+  /**
+   * Whatever was chosen: CSVs, zips of CSVs, or PDFs. Zips are opened here, FNB's own history files
+   * go to the server together (the files of one account overlap and are merged there), any other
+   * CSV goes the way it always has, and a PDF is a statement and is kept for the checker.
+   * Each is read here and parsed on the server, with the same parser and the same rules.
+   */
   const handleFileUpload = useCallback(
     (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const files = [...(e.target.files ?? [])];
+      if (files.length === 0) return;
       setImporting(true);
       setImportError(null);
       e.target.value = '';
       (async () => {
         try {
-          const text = await file.text();
-          const summary = await api.importFile(text, file.name);
-          const { accountRows } = await refresh();
-          // Newly-seen accounts start switched on — unless they're loans, which follow the same
-          // rule as on a first run. Anything already chosen stays chosen either way.
-          setSelectedIds((prev) => {
-            const known = new Set(prev);
-            const arriving = defaultSelection(accountRows).filter((id) => !known.has(id));
-            const next = [...prev, ...arriving];
-            api.putSetting('selectedAccountIds', next).catch(() => {});
-            return next;
-          });
-          setLastImport(summary);
+          const { files: expanded, ignored } = await expandUploads(files);
+          const csvs = expanded.filter((f) => f.kind === 'csv');
+          const history = csvs.filter((f) => looksLikeFnbHistory(f.text));
+          const others = csvs.filter((f) => !looksLikeFnbHistory(f.text));
+          const pdfs = expanded.filter((f) => f.kind === 'pdf');
+
+          const items = [];
+          const failures = [];
+          if (history.length) {
+            try {
+              items.push(await api.importBankFiles(history.map(({ name, from, text }) => ({ name, from, text }))));
+            } catch (err) {
+              failures.push(err.message);
+            }
+          }
+          for (const f of others) {
+            try {
+              items.push(await api.importFile(f.text, f.name));
+            } catch (err) {
+              failures.push(`${f.name}: ${err.message}`);
+            }
+          }
+          if (pdfs.length) setStatementFiles(pdfs);
+
+          if (items.length) {
+            const { accountRows } = await refresh();
+            // Newly-seen accounts start switched on — unless they're loans, which follow the same
+            // rule as on a first run. Anything already chosen stays chosen either way.
+            setSelectedIds((prev) => {
+              const known = new Set(prev);
+              const arriving = defaultSelection(accountRows).filter((id) => !known.has(id));
+              const next = [...prev, ...arriving];
+              api.putSetting('selectedAccountIds', next).catch(() => {});
+              return next;
+            });
+            setLastImport({ items, ignored });
+          } else if (!pdfs.length) {
+            failures.push(
+              ignored.length
+                ? `${ignored[0].name}: ${ignored[0].reason}`
+                : 'Nothing in that upload could be read',
+            );
+          }
+          if (failures.length) setImportError(failures.join(' · '));
         } catch (err) {
           setImportError(err.message);
         } finally {
           setImporting(false);
         }
       })();
+    },
+    [refresh],
+  );
+
+  /**
+   * Lines the reader chose to add from an official statement. They go through the bank-history door
+   * as a one-account file, so they are paired against what is held, categorised and keyed exactly
+   * like any other bank line — and cannot be counted twice.
+   */
+  const addStatementLines = useCallback(
+    async (file) => {
+      const summary = await api.importBankFiles([file]);
+      await refresh();
+      setLastImport({ items: [summary], ignored: [] });
+      return summary;
     },
     [refresh],
   );
@@ -275,6 +341,8 @@ export function useAnalyzerState() {
   return {
     ready,
     data,
+    storedData,
+    inferredLoans: projection?.summary ?? [],
     accounts,
     selectedIds,
     selectedAccounts,
@@ -289,6 +357,9 @@ export function useAnalyzerState() {
     deleteAccount,
     imports,
     lastImport,
+    addStatementLines,
+    statementFiles,
+    clearStatementFiles: useCallback(() => setStatementFiles([]), []),
     dismissLastImport: useCallback(() => setLastImport(null), []),
     importing,
     importError,

@@ -124,15 +124,7 @@ async function recognisePages(pages, report) {
   }
 }
 
-/**
- * @param {File} file            the uploaded PDF
- * @param {object} options       `onProgress(message)` for the UI
- * @returns {Promise<{ lines: string[], method: 'text' | 'ocr', pages: number }>}
- */
-export default async function extractLines(file, { onProgress } = {}) {
-  const report = (stage, detail = {}) => onProgress?.({ stage, ...detail });
-  report('text', { status: 'Opening the PDF' });
-
+async function openPdf(file) {
   const data = new Uint8Array(await file.arrayBuffer());
   const pdfjs = await import('pdfjs-dist');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
@@ -151,7 +143,53 @@ export default async function extractLines(file, { onProgress } = {}) {
     standardFontDataUrl: `${ASSETS}pdfjs/standard_fonts/`,
     isEvalSupported: false,
   });
-  const doc = await task.promise;
+  return { task, doc: await task.promise };
+}
+
+/**
+ * Positioned text items, page by page — for a document whose meaning is in its COLUMNS.
+ *
+ * A bank statement's table cannot be read as lines of text: a description may contain an amount
+ * ("POS Purchase 199.99 Apple.Com/Bi") and an amount's Cr suffix is the only thing that says which
+ * way money moved. What separates the description's 199.99 from the amount's is where it sits on
+ * the page, so the statement parser takes the items with their x and y and decides by column.
+ *
+ * Text-layer only. A scan has no items to position, and OCR does not give coordinates this
+ * dependably, so a page with no text says so (`scanned`) and the caller asks for the real PDF.
+ *
+ * @param {File} file
+ * @returns {Promise<{ pages: { items: { str: string, x: number, y: number, width: number }[] }[], scanned: boolean }>}
+ */
+export async function extractItems(file) {
+  const { task, doc } = await openPdf(file);
+  try {
+    const pages = [];
+    for (let n = 1; n <= doc.numPages; n += 1) {
+      const page = await doc.getPage(n);
+      const content = await page.getTextContent();
+      pages.push({
+        items: content.items
+          .filter((i) => typeof i?.str === 'string' && i.str.trim() && Array.isArray(i.transform))
+          .map((i) => ({ str: i.str, x: i.transform[4], y: i.transform[5], width: i.width ?? 0 })),
+      });
+    }
+    const ink = pages.reduce((sum, p) => sum + p.items.reduce((n, i) => n + i.str.replace(/\s+/g, '').length, 0), 0);
+    return { pages, scanned: ink < TEXT_MIN_CHARS };
+  } finally {
+    await task.destroy();
+  }
+}
+
+/**
+ * @param {File} file            the uploaded PDF
+ * @param {object} options       `onProgress(message)` for the UI
+ * @returns {Promise<{ lines: string[], method: 'text' | 'ocr', pages: number }>}
+ */
+export default async function extractLines(file, { onProgress } = {}) {
+  const report = (stage, detail = {}) => onProgress?.({ stage, ...detail });
+  report('text', { status: 'Opening the PDF' });
+
+  const { task, doc } = await openPdf(file);
 
   try {
     const pages = [];

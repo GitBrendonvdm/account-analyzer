@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRecurringLines, EMBEDDED_RE, linesDueBetween } from './recurring';
+import { buildRecurringLines, EMBEDDED_RE, linesDueBetween, successorAccounts } from './recurring';
 import { buildFullTransfers, completeMonths } from './flows';
 import { buildCycleCalendar } from './cycleCurve';
 import { isPersonPayment, mergePrefixKeys, PERSON_LABEL } from './merchants';
@@ -62,7 +62,7 @@ function anchors(through) {
 /** Build lines from fixture rows. Returns the engine's result plus the non-anchor lines. */
 function build(
   rows,
-  { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true, overrides, settled, providers } = {},
+  { through = '2026-08-18', asOf = new Date(2026, 7, 22), includeRepayments = true, overrides, settled, providers, accounts } = {},
 ) {
   const data = [...anchors(through), ...rows].map((r, i) => ({ ...r, id: i, key: r.key ?? `k${i}` }));
   const months = [...new Set(data.map((t) => t['Pay Month']))].sort();
@@ -78,9 +78,34 @@ function build(
     includeRepayments,
     overrides,
     settled,
+    accounts,
   });
   return { ...result, data, calendar, lines: result.lines.filter((l) => l.key !== 'checkers') };
 }
+
+describe('successorAccounts', () => {
+  const data = (account, n) => Array.from({ length: n }, (_, i) => ({ Date: `2026-07-${String(10 + i).padStart(2, '0')}`, Account: account }));
+  it('names the open account of the same kind that carried the rows after the closure', () => {
+    const accounts = [
+      { id: 'nedbank|1825', type: 'Bank', closedOn: '2026-07-01' },
+      { id: 'fnb|2000', type: 'Bank' },
+      { id: 'fnb|9547', type: 'Savings' },
+      { id: 'fnb|0000', type: 'Credit Card' },
+    ];
+    const rows = [...data('FNB Bank *2000', 8), ...data('FNB Savings *9547', 6), ...data('FNB Credit Card *0000', 20)];
+    expect(successorAccounts(accounts, rows).get('nedbank|1825')).toBe('fnb|2000');
+  });
+
+  it('matches a card to a card, and names nobody when nobody carried enough', () => {
+    const accounts = [
+      { id: 'nedbank|4714', type: 'Credit Card', closedOn: '2026-07-01' },
+      { id: 'fnb|0000', type: 'Credit Card' },
+      { id: 'fnb|2000', type: 'Bank' },
+    ];
+    expect(successorAccounts(accounts, [...data('FNB Credit Card *0000', 9), ...data('FNB Bank *2000', 30)]).get('nedbank|4714')).toBe('fnb|0000');
+    expect(successorAccounts(accounts, data('FNB Credit Card *0000', 3)).size).toBe(0);
+  });
+});
 
 describe('merchants additions', () => {
   it('folds truncation variants onto the shortest specific key', () => {
@@ -359,6 +384,42 @@ describe('buildRecurringLines', () => {
     expect(line.category).toBe('Vehicle Loan / Car Loan');
     expect(line.items.every((t) => t.Account === BANK)).toBe(true);
     line.items.forEach((t) => expect(explained.has(t)).toBe(true));
+  });
+
+  it('8a. a loan that has been paid off takes its instalment with it', () => {
+    const rows = monthly('2026-02', 6, { day: 25 }).flatMap((d) => [
+      row(d, 'Wesbank Instalment', BANK, -4990.67, { Category: 'Vehicle Loan / Car Loan' }),
+      row(d, 'Instalment received', LOAN, 4990.67, { Category: 'Vehicle Loan / Car Loan' }),
+    ]);
+    const open = build(rows, { accounts: [{ id: 'fnb|4081', type: 'Loan' }] }).lines[0];
+    expect(open.ended).toBe(false);
+    expect(open.nextDate).not.toBeNull();
+
+    const closed = build(rows, { accounts: [{ id: 'fnb|4081', type: 'Loan', closedOn: '2026-07-27' }] }).lines[0];
+    expect(closed).toMatchObject({ ended: true, endedReason: 'closed', nextDate: null, dueThisCycle: false, cycleStatus: null });
+
+    // A closure far older than the last charge was wrong for this line: it keeps running.
+    const mistaken = build(rows, { accounts: [{ id: 'fnb|4081', type: 'Loan', closedOn: '2026-03-01' }] }).lines[0];
+    expect(mistaken.ended).toBe(false);
+  });
+
+  it('8c. a bill that moves to the account that took over stays one line with its whole history', () => {
+    // Insurance paid from the OLD account for a year, then from the new one for two months.
+    const OLD = 'Nedbank Bank *1825';
+    const old = monthly('2025-06', 12, { day: 27 }).map((d) => row(d, 'Outsurance Premium', OLD, -2218.54, { Category: 'Other Insurance' }));
+    const now = monthly('2026-06', 2, { day: 27 }).map((d) => row(d, 'Outsurance Premium', BANK, -2218.54, { Category: 'Other Insurance' }));
+    const spend = Array.from({ length: 12 }, (_, i) => row(isoOf(2026, 6 + (i % 3), 3 + i), 'Spar', BANK, -100));
+    const accounts = [
+      { id: 'nedbank|1825', type: 'Bank', closedOn: '2026-05-31' },
+      { id: 'fnb|2000', type: 'Bank' },
+    ];
+    const apart = build([...old, ...now, ...spend], { through: '2026-07-28' }).lines.filter((l) => l.key === 'outsurance premium');
+    expect(apart.length).toBeGreaterThan(1); // two lines: the old account's, and a new one-off
+
+    const joined = build([...old, ...now, ...spend], { through: '2026-07-28', accounts }).lines.filter((l) => l.key === 'outsurance premium');
+    expect(joined).toHaveLength(1);
+    expect(joined[0].accountId).toBe('fnb|2000');
+    expect(joined[0].items.length).toBe(14);
   });
 
   it('8b. an instalment whose amount steps keeps one line with two regimes', () => {

@@ -53,6 +53,8 @@ export function typeFromName(name) {
   const n = String(name ?? '');
   if (/credit\s*card|plastic/i.test(n)) return { type: 'Credit Card', kind: 'card' };
   if (/home\s*loan|\bbond?\b|mortgage/i.test(n)) return { type: 'Loan', kind: 'home' };
+  // A revolving facility is borrowed money you can draw again, not an account that holds any.
+  if (/revolving|\bfacility\b/i.test(n)) return { type: 'Loan', kind: 'revolving' };
   // "Load" is the bank's own typo for a vehicle loan — "Mazda Cx5 Load" — and it is in the data.
   if (/\bloan\b|\bload\b|vehicle|\bcar\b/i.test(n)) {
     if (/vehicle|\bcar\b/i.test(n) || MARQUE.test(n)) return { type: 'Loan', kind: 'vehicle' };

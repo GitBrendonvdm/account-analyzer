@@ -74,6 +74,50 @@ silently destroyed history. Instead:
 
 Import order doesn't matter. Any sequence of the same files converges on the same data.
 
+**FNB's own history files.** In FNB online banking, *Transaction history → Download* gives one zip per
+account with a CSV inside. Drop the zips on **Import** exactly as they came — several at once is fine,
+and a zip of zips is not needed. This is the bank's own record rather than an aggregator's reading of it,
+and it carries a running balance on every line, which the app uses three ways:
+
+- **It proves the file.** Each line's balance must be the line below it plus its amount. A line that
+  breaks the chain is reported ("a transaction may be missing — upload a longer window"). A line that
+  never moved the balance (an unpaid debit order's collection attempt is printed as a credit) is left
+  out so it cannot count as income, and eBucks, whose amounts are points, is left out with a reason.
+- **It states the balance.** The header's balance becomes the account's balance on its newest line, so
+  nobody types it in; a limit it implies fills a gap but never overwrites one a statement printed.
+- **It meets what is already held.** Files of one account overlap and are merged first. A line is then
+  recognised as already held either by key (a repeat of an earlier history file) or as the same
+  transaction the old aggregator export described in other words — same account, same amount to the
+  cent, dated within two days, one for one — so the weeks the two sources overlap are not counted twice.
+  Rows you have corrected are never sent again, so a correction survives every re-upload.
+
+You only need to upload the accounts you spend from — cheque and card. Everything else is inferred (below).
+
+**Loans you do not upload.** Once the app has seen a loan's own rows — from its history file, its
+statement, or the old export — it knows the loan: rate (read off the interest postings, ACT/365),
+instalment, posting day, monthly fee. After the loan's last real row it writes the rows the loan would
+have shown, on every load and never stored: each payment it can see leaving another account (matched by
+what the payments were *called* — "fnb home", "toyota fin" — or, failing that, by an amount equal to
+the instalment), the interest the balance would have attracted day by day, and the fee. The estimate
+stops where the paying account's history stops, is labelled under **Accounts**, and disappears the day
+the loan's own rows catch up or you type its balance. A loan whose rate it has only assumed is not
+projected. (`lib/loanProjection.js`; on a simulated bond it reproduces two hidden months to within R3.)
+
+**Checking against the bank's statement.** **Check statement** (or drop the PDF on Import) reads the
+official FNB account statement by its columns and holds the app against it: opening and closing balance
+side by side, then every line. The statement proves itself first — its running balance, closing balance
+and the bank's own turnover count and total must agree, or it says it may have been misread. A line the
+statement has and the app lacks can be added (through the same door as any bank line, so it is paired
+and categorised and cannot be counted twice); the statement's facility limit can replace a derived one.
+Cheque/savings layouts only; a card or loan statement says it is not read yet.
+
+**Paid off or closed.** Nothing in a bank's data says a loan was cleared, so the app *suggests*: a loan
+whose estimated balance is met (within 15%) by one large settlement-like payment out of another
+account, or an account that has been quiet for a month with nothing still arriving and no balance
+held. Confirm under **Accounts** and the balance becomes nothing from that day, payments expected of
+it stop, its estimate stops, and the bills it used to pay carry on from the account that took over, as
+one line with their whole history. History is untouched and **Reopen** undoes it.
+
 **Account-summary PDFs.** The *Account summary* button takes the "account overview" PDF that FNB
 and Nedbank online banking print. FNB's has a text layer; Nedbank's is an image and is read by OCR
 in your browser (nothing leaves it). Each account is matched to a known account by the last four
@@ -111,7 +155,7 @@ holds — so a periodic download is a complete backup of the transactions. Balan
 and goals live in Postgres; back those up with Coolify's database backups.
 
 **Routes**, all JSON, all under `/api`: `auth/status|setup|login|logout`, `bootstrap` (everything,
-with an ETag), `import` (`{ fileName, text }`), `migrate` (a Dexie dump), `accounts` (`POST`, `PATCH
+with an ETag), `import` (`{ fileName, text }`), `import/bank` (`{ files: [{ name, text }] }`, FNB history files), `migrate` (a Dexie dump), `accounts` (`POST`, `PATCH
 /:id`, `DELETE /:id` for external ones), `budgets/:scope/:category`, `goals`, `settings/:key`,
 `export.csv`, `data` (`DELETE` with `{ confirm: 'DELETE' }` to start over), and `health`.
 

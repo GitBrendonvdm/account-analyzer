@@ -745,7 +745,12 @@ function lastDateOf(rows) {
 
 function termsFor(account, data, { asOf, primeRate, transfers, liabilityNames, cycles }) {
   const isCard = account.type === 'Credit Card';
-  const rows = accountRows(data, { accountId: account.id });
+  // The ledger is everything the account holds, including rows loanProjection.js ESTIMATED after the
+  // last real one; the rows the rate, the instalment and the fees are READ from are the real ones —
+  // learning a loan's rate from interest the app itself invented would only confirm itself.
+  const ledger = accountRows(data, { accountId: account.id });
+  const rows = ledger.filter((t) => !t.inferred);
+  const inferredMovement = sum(ledger.filter((t) => t.inferred).map((t) => t.AmountNum));
   const lastRowDate = lastDateOf(rows);
   const assumptions = [];
   const warnings = [];
@@ -769,19 +774,23 @@ function termsFor(account, data, { asOf, primeRate, transfers, liabilityNames, c
   let owedOffset = 0; // owed(date) = −positionAt(rows, date) + owedOffset
   const anchored = draw ?? { anchored: false };
   if (anchored.anchored) {
-    balanceOwed = anchored.balanceOwed;
+    balanceOwed = anchored.balanceOwed - inferredMovement;
     balanceSource = 'ledger';
-    balanceAsOf = lastRowDate;
+    balanceAsOf = lastDateOf(ledger);
     disbursementDate = anchored.disbursementDate;
   } else if (Number.isFinite(account.currentBalance)) {
     const at = account.balanceAsOf ? parseTransactionDate(account.balanceAsOf) : lastRowDate;
-    owedOffset = -account.currentBalance + (at ? positionAt(rows, at) : 0);
-    balanceOwed = lastRowDate ? -positionAt(rows, lastRowDate) + owedOffset : -account.currentBalance;
-    balanceSource = account.source === 'statement' ? 'statement' : 'user';
+    owedOffset = -account.currentBalance + (at ? positionAt(ledger, at) : 0);
+    const through = lastDateOf(ledger);
+    balanceOwed = through ? -positionAt(ledger, through) + owedOffset : -account.currentBalance;
+    balanceSource = account.source === 'statement' || account.source === 'history' ? 'statement' : 'user';
     balanceAsOf = at ?? null;
     assumptions.push(
-      `Balance ${balanceSource === 'statement' ? 'from your statement' : 'typed'}${balanceAsOf ? ` as of ${balanceAsOf.toISOString().slice(0, 10)}` : ''}`,
+      `Balance ${balanceSource === 'statement' ? (account.source === 'history' ? 'from your bank history' : 'from your statement') : 'typed'}${balanceAsOf ? ` as of ${balanceAsOf.toISOString().slice(0, 10)}` : ''}`,
     );
+  }
+  if (ledger.some((t) => t.inferred)) {
+    assumptions.push('Balance carried forward from your payments since the loan was last read — upload its statement to replace the estimate');
   }
   if (anchored.anchored && Number.isFinite(account.currentBalance)) {
     const typed = -account.currentBalance;
@@ -805,10 +814,10 @@ function termsFor(account, data, { asOf, primeRate, transfers, liabilityNames, c
       const last = regression.impliedBalances[regression.impliedBalances.length - 1];
       const lastPosting = midnight(postings[postings.length - 1].date);
       const since = sum(sorted.filter((t) => dateOf(t) >= lastPosting).map((t) => t.AmountNum));
-      balanceOwed = last.balance - since;
+      balanceOwed = last.balance - since - inferredMovement;
       balanceSource = 'regression';
-      balanceAsOf = lastRowDate;
-      owedOffset = balanceOwed + positionAt(rows, lastRowDate);
+      balanceAsOf = lastDateOf(ledger);
+      owedOffset = balanceOwed + positionAt(ledger, lastDateOf(ledger));
       assumptions.push(`Balance fitted from ${postings.length} interest postings (R² ${regression.r2.toFixed(3)})`);
     }
   }
@@ -816,7 +825,7 @@ function termsFor(account, data, { asOf, primeRate, transfers, liabilityNames, c
   const ledgerAt = (date, side) => {
     if (balanceOwed == null) return null;
     const at = side === 'before' ? addDays(midnight(date), -1) : midnight(date);
-    return -positionAt(rows, at) + owedOffset;
+    return -positionAt(ledger, at) + owedOffset;
   };
 
   // ---- rate ----
@@ -1066,7 +1075,8 @@ function fmt(x) {
  */
 export function buildLiabilityTerms(data, accounts, { asOf = null, primeRate = null, transfers = null } = {}) {
   const rows = data ?? [];
-  const liabilities = (accounts ?? []).filter((a) => LIABILITY_TYPES.has(a.typeOverride ?? a.type));
+  // A loan that has been paid off has no terms to read: nothing is owed and nothing more is charged.
+  const liabilities = (accounts ?? []).filter((a) => LIABILITY_TYPES.has(a.typeOverride ?? a.type) && !a.closedOn);
   const liabilityIds = new Set(liabilities.map((a) => a.id));
   const liabilityNames = new Set();
   new Set(rows.map((t) => t.Account)).forEach((name) => {

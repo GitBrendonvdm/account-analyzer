@@ -205,6 +205,53 @@ function candidates(data, { transfers, accounts, includeRepayments }) {
   return out.filter((o) => o.date);
 }
 
+// ---- step 1b: an account that closed hands its bills to the one that took over -----------------
+
+const PAYER_TYPES = {
+  Bank: 'cash',
+  Savings: 'cash',
+  'Credit Card': 'card',
+};
+const SUCCESSOR_LOOKBACK_DAYS = 60;
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const SUCCESSOR_MIN_ROWS = 5;
+
+/**
+ * Which open account took over from each closed one.
+ *
+ * Every line the engine builds is keyed by the account it is paid from, so when a household moves its
+ * bills — the bond, the insurance, the internet — from one bank to another, the engine sees every
+ * one of them stop on the old account and a brand-new, once-seen charge appear on the new one: a wall
+ * of cancellations and a wall of new commitments, none of them true, and the real bills missing from
+ * the calendar for the months it takes to see each three times again.
+ *
+ * Once an account is marked closed the move is no longer a guess. The account that took over is the
+ * open one of the same kind (a card for a card, a cheque or savings account for either of those) that
+ * carried the most rows from the weeks before the closure onward; if no open account of that kind
+ * carries at least a handful, there is no successor and nothing is merged.
+ *
+ * @returns {Map<string, string>} closed account id → open account id
+ */
+export function successorAccounts(accounts, data) {
+  const out = new Map();
+  const closed = (accounts ?? []).filter((a) => a?.closedOn && PAYER_TYPES[a.typeOverride ?? a.type]);
+  if (!closed.length) return out;
+  const open = (accounts ?? []).filter((a) => !a.closedOn && !a.external && PAYER_TYPES[a.typeOverride ?? a.type]);
+  closed.forEach((account) => {
+    const kind = PAYER_TYPES[account.typeOverride ?? account.type];
+    const from = isoOf(new Date(new Date(`${account.closedOn}T00:00:00`).getTime() - SUCCESSOR_LOOKBACK_DAYS * DAY_MS));
+    let best = null;
+    open
+      .filter((a) => PAYER_TYPES[a.typeOverride ?? a.type] === kind)
+      .forEach((candidate) => {
+        const rows = (data ?? []).filter((t) => t.Date >= from && accountIdOf(t.Account) === candidate.id).length;
+        if (rows >= SUCCESSOR_MIN_ROWS && (!best || rows > best.rows)) best = { id: candidate.id, rows };
+      });
+    if (best) out.set(account.id, best.id);
+  });
+  return out;
+}
+
 // ---- step 2: identity and amount clusters -----------------------------------------------------
 
 /**
@@ -464,7 +511,7 @@ function cycleStatusOf({ dates, cadence, dom, shift, currentStart, currentEnd, d
 }
 
 function describeLine(line, group, bandIndex, ctx) {
-  const { calendar, cycles, dataThrough, asOf, currentStart, currentEnd, currentMonth, overrides, settled } = ctx;
+  const { calendar, cycles, dataThrough, asOf, currentStart, currentEnd, currentMonth, overrides, settled, closed } = ctx;
   const regular = line.clusters.flatMap((c) => c.obs);
   const all = [...regular, ...line.outliers].sort((a, b) => a.date - b.date);
   const dates = all.map((o) => o.date);
@@ -563,7 +610,12 @@ function describeLine(line, group, bandIndex, ctx) {
   // reads `override` — but takes it off every forward-looking calendar.
   const id = `${group.identity}|${group.accountId}|${bandIndex}`;
   const override = overrides?.[id] ?? null;
-  const ended = ENDING_OVERRIDES.has(override);
+  // A loan or card that has been paid off takes its payments with it. A charge seen well after the
+  // account closed means the closure was wrong for this line, and the line is left running.
+  const closedAccount = all.map((o) => o.loanAccountId ?? o.cardAccountId).find((accountId) => accountId && closed?.has(accountId));
+  const closedOn = closedAccount ? closed.get(closedAccount) : null;
+  const closedHere = Boolean(closedOn && lastSeen <= new Date(new Date(`${closedOn}T00:00:00`).getTime() + 10 * DAY_MS));
+  const ended = ENDING_OVERRIDES.has(override) || closedHere;
   const settledCycle = settled?.[id] ?? null;
   const settledByUser = Boolean(currentMonth && settledCycle === currentMonth);
   const cycleStatus = ended ? null : settledByUser ? 'landed' : judged.cycleStatus;
@@ -625,7 +677,7 @@ function describeLine(line, group, bandIndex, ctx) {
     dueThisCycle: ended ? false : dueThisCycle,
     status,
     ended,
-    endedReason: ended ? override : null,
+    endedReason: ended ? (override ?? 'closed') : null,
     override,
     settledByUser,
     cycleStatus,
@@ -675,9 +727,20 @@ export function buildRecurringLines(data, options = {}) {
     currentEnd: currentMonth ? calendar.ends[currentMonth] : null,
     overrides,
     settled,
+    closed: new Map((accounts ?? []).filter((a) => a?.closedOn).map((a) => [a.id, a.closedOn])),
   };
 
-  const groups = identify(candidates(data, { transfers, accounts, includeRepayments }), providers);
+  const observed = candidates(data, { transfers, accounts, includeRepayments });
+  // A bill paid from an account that has since closed carries on from the one that took over, as one
+  // line with its whole history, rather than as a lapsed line and a new one.
+  const successors = successorAccounts(accounts, data);
+  if (successors.size) {
+    observed.forEach((o) => {
+      o.accountId = successors.get(o.accountId) ?? o.accountId;
+      if (o.payingAccountId) o.payingAccountId = successors.get(o.payingAccountId) ?? o.payingAccountId;
+    });
+  }
+  const groups = identify(observed, providers);
   const lines = [];
   const explained = new Set();
   groups.forEach((group) => {

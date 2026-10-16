@@ -36,8 +36,20 @@ export async function importRows(store, rows, fileName, meta = {}) {
   if (!rows?.length) {
     return { rowsTotal: 0, added: 0, updated: 0, unchanged: 0, accountsNew: [], accountsRenamed: [] };
   }
+  return store.transaction((tx) => importRowsIn(tx, rows, fileName, meta));
+}
 
-  assignKeys(rows);
+/**
+ * The same import, inside a transaction somebody else opened — so a caller that has more to write
+ * (a balance, a new account) can make it all-or-nothing with the rows.
+ *
+ * `meta.keyed` says the rows already carry their keys, assigned over the WHOLE file before some of
+ * them were set aside as already held. Numbering the survivors again would renumber a group of
+ * identical rows from zero and collide with the ones stored; the keys the caller worked out are
+ * the ones to use.
+ */
+export async function importRowsIn(tx, rows, fileName, meta = {}) {
+  if (!meta.keyed) assignKeys(rows);
   const prepared = rows.map((r) => ({
     ...r,
     accountId: accountIdOf(r.Account),
@@ -64,86 +76,86 @@ export async function importRows(store, rows, fileName, meta = {}) {
     accountsNew: [],
     accountsRenamed: [],
     updatedExamples: [],
+    // Whatever else the caller wants the import log to remember about this file (see bankImport.mjs).
+    ...(meta.extra ?? {}),
   };
 
-  await store.transaction(async (tx) => {
-    const existing = await transactionsByKey(tx, prepared.map((r) => r.key));
-    const toAdd = [];
-    const toUpdate = [];
+  const existing = await transactionsByKey(tx, prepared.map((r) => r.key));
+  const toAdd = [];
+  const toUpdate = [];
 
-    prepared.forEach((row) => {
-      const stored = existing.get(row.key);
-      if (!stored) {
-        toAdd.push({
-          ...row,
-          firstSeen: summary.importedAt,
-          lastSeen: summary.importedAt,
-          observedThrough: vintage,
-        });
-        return;
-      }
-      const changed = changedFields(stored, row);
-      if (changed.length === 0) {
-        summary.unchanged += 1;
-        return;
-      }
-      // This file is older than the one that produced the stored row: it can't know better.
-      if (stored.observedThrough && vintage && vintage <= stored.observedThrough) {
-        summary.superseded += 1;
-        return;
-      }
-      toUpdate.push({
-        ...stored,
+  prepared.forEach((row) => {
+    const stored = existing.get(row.key);
+    if (!stored) {
+      toAdd.push({
         ...row,
-        firstSeen: stored.firstSeen,
+        firstSeen: summary.importedAt,
         lastSeen: summary.importedAt,
         observedThrough: vintage,
       });
-      if (summary.updatedExamples.length < 5) {
-        summary.updatedExamples.push({
-          description: row.Description,
-          date: row.Date,
-          fields: changed.map((f) => `${f}: ${stored[f] || '—'} → ${row[f] || '—'}`),
-        });
-      }
+      return;
+    }
+    const changed = changedFields(stored, row);
+    if (changed.length === 0) {
+      summary.unchanged += 1;
+      return;
+    }
+    // This file is older than the one that produced the stored row: it can't know better.
+    if (stored.observedThrough && vintage && vintage <= stored.observedThrough) {
+      summary.superseded += 1;
+      return;
+    }
+    toUpdate.push({
+      ...stored,
+      ...row,
+      firstSeen: stored.firstSeen,
+      lastSeen: summary.importedAt,
+      observedThrough: vintage,
     });
-
-    summary.added = toAdd.length;
-    summary.updated = toUpdate.length;
-
-    // Accounts: fold every raw name seen onto its stable id, preserving anything the user set.
-    // The file's vintage decides whose name wins, for the same reason as above.
-    const namesById = new Map();
-    prepared.forEach((r) => {
-      if (!namesById.has(r.accountId)) namesById.set(r.accountId, new Set());
-      namesById.get(r.accountId).add(r.Account);
-    });
-    const ids = [...namesById.keys()];
-    const stored = await accountsById(tx, ids);
-    const records = ids.map((id) => {
-      const prior = stored.get(id) ?? null;
-      // Spread the prior record underneath: fields the server added since the browser's schema
-      // (overdraftLimit, interestRate, the statement-sourced ones) are not buildAccountRecord's
-      // to know about, and must not vanish on the next import. An account created by hand that
-      // now has transactions behind it stops being external — its history anchors it from here.
-      const record = { ...prior, ...buildAccountRecord([...namesById.get(id)], prior, vintage) };
-      if (prior?.external) record.external = false;
-      if (!prior) summary.accountsNew.push(record.rawName);
-      else if (record.rawName !== prior.rawName) {
-        summary.accountsRenamed.push(`${prior.rawName} → ${record.rawName}`);
-      }
-      return record;
-    });
-
-    // The import row is written first so the transactions can point back at it.
-    const importId = await addImport(tx, summary);
-    if (toAdd.length || toUpdate.length) await upsertTransactions(tx, [...toAdd, ...toUpdate], importId);
-    await putAccounts(tx, records);
-    // Re-importing a file that changes nothing is a no-op for the data, so the ETag holds.
-    if (toAdd.length || toUpdate.length || summary.accountsNew.length || summary.accountsRenamed.length) {
-      await bumpVersion(tx);
+    if (summary.updatedExamples.length < 5) {
+      summary.updatedExamples.push({
+        description: row.Description,
+        date: row.Date,
+        fields: changed.map((f) => `${f}: ${stored[f] || '—'} → ${row[f] || '—'}`),
+      });
     }
   });
+
+  summary.added = toAdd.length;
+  summary.updated = toUpdate.length;
+
+  // Accounts: fold every raw name seen onto its stable id, preserving anything the user set.
+  // The file's vintage decides whose name wins, for the same reason as above.
+  const namesById = new Map();
+  prepared.forEach((r) => {
+    if (!namesById.has(r.accountId)) namesById.set(r.accountId, new Set());
+    namesById.get(r.accountId).add(r.Account);
+  });
+  const ids = [...namesById.keys()];
+  const stored = await accountsById(tx, ids);
+  const records = ids.map((id) => {
+    const prior = stored.get(id) ?? null;
+    // Spread the prior record underneath: fields the server added since the browser's schema
+    // (overdraftLimit, interestRate, the statement-sourced ones) are not buildAccountRecord's
+    // to know about, and must not vanish on the next import. An account created by hand that
+    // now has transactions behind it stops being external — its history anchors it from here.
+    const record = { ...prior, ...buildAccountRecord([...namesById.get(id)], prior, vintage) };
+    if (prior?.external) record.external = false;
+    if (!prior) summary.accountsNew.push(record.rawName);
+    else if (record.rawName !== prior.rawName) {
+      summary.accountsRenamed.push(`${prior.rawName} → ${record.rawName}`);
+    }
+    return record;
+  });
+
+  // The import row is written first so the transactions can point back at it.
+  const importId = await addImport(tx, summary);
+  if (toAdd.length || toUpdate.length) await upsertTransactions(tx, [...toAdd, ...toUpdate], importId);
+  await putAccounts(tx, records);
+  // Re-importing a file that changes nothing is a no-op for the data, so the ETag holds.
+  if (toAdd.length || toUpdate.length || summary.accountsNew.length || summary.accountsRenamed.length) {
+    await bumpVersion(tx);
+  }
 
   return summary;
 }

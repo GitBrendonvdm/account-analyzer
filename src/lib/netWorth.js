@@ -96,6 +96,7 @@ export function applyBalances(positions, accountsById, months, { data = null } =
       overdraftLimit: account?.overdraftLimit ?? null,
       source: account?.source ?? null,
       balanceAsOf: account?.balanceAsOf ?? null,
+      closed: Boolean(account?.closedOn),
       external: false,
       known,
       offset,
@@ -142,6 +143,7 @@ export function applyBalances(positions, accountsById, months, { data = null } =
       source: account.source ?? null,
       balanceAsOf: account.balanceAsOf ?? null,
       hidden: account.hidden ?? false,
+      closed: Boolean(account.closedOn),
     });
   });
 

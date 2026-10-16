@@ -166,6 +166,9 @@ export function processTransactionData(data, selectedAccounts, monthRange, asOf 
   const loanInstalmentIds = new Set();
   loanPairs.forEach((pair) =>
     pair.items.forEach((t) => {
+      // A drawdown (the lender putting money into another account) stays a movement: it is
+      // borrowed, not earned — see buildFullTransfers.
+      if (!loanAccounts.has(t.Account) && t.AmountNum > 0) return;
       transferIds.delete(t.id);
       if (!loanAccounts.has(t.Account)) loanInstalmentIds.add(t.id);
     }),
