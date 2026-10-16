@@ -14,13 +14,35 @@ const BOND = acct('fnb|6996', 'Loan');
 describe('everydayAccounts', () => {
   const data = [...rows('fnb|9986', 150), ...rows('fnb|0000', 170), ...rows('fnb|4359', 12), ...rows('fnb|2000', 40, '2026-03-01'), ...rows('fnb|6996', 25)];
 
-  it('is the cheque account and the card in use, not savings, loans or what went quiet', () => {
+  it('is the cheque account and the card in use, not a quiet savings account, a loan or what went quiet', () => {
     expect(everydayAccounts([CHEQUE, CARD, EMERGENCY, OLD_CARD, BOND], data).map((a) => a.id)).toEqual(['fnb|9986', 'fnb|0000']);
   });
 
-  it('leaves out what is closed, hidden or external', () => {
-    const accounts = [CHEQUE, { ...CARD, closedOn: '2026-10-15' }, { ...EMERGENCY, hidden: true }, acct('x|1', 'Bank', { external: true })];
+  it('keeps a card that closed lately, because the household did not stop spending when it did', () => {
+    const accounts = [CHEQUE, { ...CARD, closedOn: '2026-10-15' }];
+    expect(everydayAccounts(accounts, data).map((a) => a.id)).toEqual(['fnb|9986', 'fnb|0000']);
+  });
+
+  it('leaves out what is hidden or external, and what closed long ago', () => {
+    const accounts = [CHEQUE, { ...OLD_CARD, closedOn: '2026-03-02' }, { ...EMERGENCY, hidden: true }, acct('x|1', 'Bank', { external: true })];
     expect(everydayAccounts(accounts, data).map((a) => a.id)).toEqual(['fnb|9986']);
+  });
+
+  it('counts a card taken up lately, though its history is short beside the ones it replaced', () => {
+    const NEW_CARD = acct('fnb|7777', 'Credit Card');
+    const more = [
+      ...rows('fnb|9986', 150),
+      ...rows('fnb|2000', 220, '2026-06-01'),
+      ...Array.from({ length: 40 }, () => ({ Date: '2026-10-05', Account: 'FNB Credit Card *7777', AmountNum: -10 })),
+      ...rows('fnb|4359', 3, '2026-09-20'),
+    ];
+    expect(everydayAccounts([CHEQUE, OLD_CARD, NEW_CARD, EMERGENCY], more).map((a) => a.id)).toEqual(['fnb|9986', 'fnb|2000', 'fnb|7777']);
+  });
+
+  it('counts a savings account the money really moves through, whatever it is called', () => {
+    const busySavings = acct('fnb|1825', 'Savings');
+    const more = [...data, ...Array.from({ length: 90 }, () => ({ Date: '2026-10-10', Account: 'FNB Savings *1825', AmountNum: 5 }))];
+    expect(everydayAccounts([CHEQUE, CARD, busySavings, EMERGENCY], more).map((a) => a.id)).toEqual(['fnb|9986', 'fnb|0000', 'fnb|1825']);
   });
 
   it('is empty when there is nothing to go on', () => {

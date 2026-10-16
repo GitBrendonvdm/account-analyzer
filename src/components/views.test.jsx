@@ -129,11 +129,28 @@ describe('TodayView at a glance', () => {
     expect(html).toContain('Spending more than comes in');
     expect(html).toContain('R 9 000 short in a typical cycle');
     expect(html).toContain('2 of the last 2 ended short');
-    expect(html).toContain('FNB Cheque *9986');
+    expect(html).toContain('FNB Cheque *9986; moves between your own accounts are left out.');
     const order = ['Net worth', 'Everyday accounts', 'Safe to spend before payday'].map((h) => html.indexOf(h));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expectClean(html);
+  });
+
+  it('names the accounts it counts, and says how many closed lately are counted with them', () => {
+    const html = render(
+      TodayView,
+      todayProps({
+        trend,
+        everyday,
+        everydayAccounts: [
+          { id: 'a', rawName: 'FNB Bank *9986', label: 'FNB Cheque *9986' },
+          { id: 'b', rawName: 'FNB Credit Card *0000' },
+          { id: 'c', rawName: 'Nedbank Credit Card *4714', closedOn: '2026-10-15' },
+          { id: 'd', rawName: 'FNB Credit Card *2000', closedOn: '2026-08-17' },
+        ],
+      }),
+    );
+    expect(html).toContain('FNB Cheque *9986 and FNB Credit Card *0000, and 2 accounts closed lately; moves between your own accounts');
   });
 
   it('says down when it is down, and ahead when the everyday accounts have room', () => {

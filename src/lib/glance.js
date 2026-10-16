@@ -10,15 +10,24 @@ import { accountIdOf, parseAccount } from './accounts';
  *
  * "Everyday" means the accounts money moves through: a cheque or current account and the card
  * that is actually used. Not loans (their instalments show up as money out of the cheque account),
- * not savings, and not a card or account that has gone quiet. It is found, not configured: of the
- * open bank accounts and cards, the ones with a good share of the busiest one's recent activity.
+ * and not an account that is only a place to keep money. It is found, not configured: of the bank
+ * accounts, savings accounts and cards, the ones with a good share of the busiest one's recent
+ * activity — which is what separates the account the salary lands in from an emergency fund that
+ * sees a few transactions a month, whatever either is called.
+ *
+ * An account closed recently still counts. A household that swaps its card for another does not stop
+ * spending the day the old one closes, and measuring only the new accounts would read their short
+ * history as the whole story. What closed long ago has no recent activity and falls away by itself.
  */
 
 const DAY_MS = 86400000;
 const RECENT_DAYS = 180;
+// A card taken up last month has little history yet and is already the one in use, so busy lately counts
+// as much as busy over the half year.
+const LATELY_DAYS = 45;
 const BUSY_SHARE = 0.25;
 const EVEN_SHARE = 0.02;
-const EVERYDAY_TYPES = new Set(['Bank', 'Credit Card']);
+const EVERYDAY_TYPES = new Set(['Bank', 'Savings', 'Credit Card']);
 
 const dayNumber = (iso) => {
   const [y, m, d] = String(iso).split('-').map(Number);
@@ -33,7 +42,7 @@ const median = (values) => {
 };
 
 /**
- * The open bank accounts and cards that the household actually uses.
+ * The bank accounts and cards that the household actually uses, or used until lately.
  *
  * @param accounts the account records
  * @param data     every row (`Date` as YYYY-MM-DD, `Account` as the export wrote it)
@@ -43,21 +52,20 @@ export function everydayAccounts(accounts, data) {
   if (!accounts?.length || !data?.length) return [];
   const newest = data.reduce((max, t) => (t.Date > max ? t.Date : max), '');
   if (!newest) return [];
-  const since = dayNumber(newest) - RECENT_DAYS;
-
-  const counts = new Map();
+  const through = dayNumber(newest);
+  const windows = [RECENT_DAYS, LATELY_DAYS].map((days) => ({ since: through - days, counts: new Map() }));
   data.forEach((t) => {
-    if (dayNumber(t.Date) < since) return;
+    const day = dayNumber(t.Date);
     const id = accountIdOf(t.Account);
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    windows.forEach((w) => {
+      if (day >= w.since) w.counts.set(id, (w.counts.get(id) ?? 0) + 1);
+    });
   });
 
-  const candidates = accounts.filter(
-    (a) => !a.closedOn && !a.hidden && !a.external && EVERYDAY_TYPES.has(typeOf(a)),
-  );
-  const busiest = Math.max(0, ...candidates.map((a) => counts.get(a.id) ?? 0));
-  if (!busiest) return [];
-  return candidates.filter((a) => (counts.get(a.id) ?? 0) >= busiest * BUSY_SHARE);
+  const candidates = accounts.filter((a) => !a.hidden && !a.external && EVERYDAY_TYPES.has(typeOf(a)));
+  const busiest = windows.map((w) => Math.max(0, ...candidates.map((a) => w.counts.get(a.id) ?? 0)));
+  if (!busiest[0]) return [];
+  return candidates.filter((a) => windows.some((w, i) => busiest[i] > 0 && (w.counts.get(a.id) ?? 0) >= busiest[i] * BUSY_SHARE));
 }
 
 /**

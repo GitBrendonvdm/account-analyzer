@@ -97,6 +97,14 @@ const HEADLINE = {
 };
 const TONE = { short: 'text-bad', ahead: 'text-good', even: 'text-label' };
 
+/** "A and B", or "A, B and C"; accounts closed lately are counted, not listed. */
+function namesOf(accounts) {
+  const open = accounts.filter((a) => !a.closedOn).map(accountLabel);
+  const closed = accounts.length - open.length;
+  const list = open.length > 1 ? `${open.slice(0, -1).join(', ')} and ${open[open.length - 1]}` : (open[0] ?? 'Your accounts');
+  return closed > 0 ? `${list}, and ${closed} account${closed === 1 ? '' : 's'} closed lately` : list;
+}
+
 export function EverydayTile({ flow, accounts = [], className = '' }) {
   if (!flow) return null;
   const { typical, verdict } = flow;
@@ -123,7 +131,7 @@ export function EverydayTile({ flow, accounts = [], className = '' }) {
       <Bars rows={flow.rows.map((r) => ({ month: r.month, value: r.net, partial: r.partial }))} label="Money in minus money out each cycle" />
       <p className="t-caption mt-2">
         {current && `This cycle so far: in ${formatCurrencyAbs(current.income)}, out ${formatCurrencyAbs(current.spend)}. `}
-        {accounts.length > 0 && `${accounts.map(accountLabel).join(' and ')}; moves between your own accounts are left out.`}
+        {accounts.length > 0 && `${namesOf(accounts)}; moves between your own accounts are left out.`}
       </p>
     </Card>
   );

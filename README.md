@@ -19,11 +19,15 @@ balances and unlocks net worth, the debt trajectory and payoff dates.
 
 ## What it shows
 
-**Today** — safe to spend before payday, six vitals (savings rate, debt-service ratio, interest
-burden, runway, card utilisation, the deficit) pooled over the last three and twelve cycles with a
-direction arrow each, what is coming up in the next 30 days with a status per bill, a day-by-day
-cash path to payday (labelled an estimate until its backtest gate is met), and the two overlaid
-cycle charts.
+**Today** — opens on two answers, then the safe-to-spend figure. *Is net worth going up or down?* The
+number, how far it has moved this cycle, and a bar per month; it counts everything, the loans too, so a
+refinance reads as debt moving rather than a leap, and a loan with no balance of its own is valued at what
+the loan engine says is owed (the card says so). *Do the everyday accounts spend more than they take in?*
+The cheque account(s) and card(s) the money actually moves through (found by activity, including ones
+closed lately), a verdict from the median of the finished cycles, and a bar per cycle. Everything that
+explains those — six vitals (savings rate, debt-service ratio, interest burden, runway, card utilisation,
+the deficit), what is coming up with a status per bill and the day-by-day cash path to payday, this
+cycle's in and out, and where the money goes — is folded under its own bar, closed until you open it.
 
 **Headlines** — the three to five biggest facts in your data, as sentences, each carrying the
 arithmetic behind it: which payoff order clears everything by when and what it saves, what the
@@ -111,10 +115,17 @@ statement has and the app lacks can be added (through the same door as any bank 
 and categorised and cannot be counted twice); the statement's facility limit can replace a derived one.
 Cheque/savings layouts only; a card or loan statement says it is not read yet.
 
+**Accounts** is one list, grouped by type, with net worth above it; each line has an **Edit** that opens a
+dialog (name, balance, the day it was read, limit, **Close this account…**, **Hide**), so there is no form on
+the page. The tables below it (balance at each pay cycle, what the debt costs, cash in and out, account
+movement) are folded. A hidden account leaves every list, chart and total — nothing is deleted — and
+**Manage** under the list shows it again; accounts quiet for over a year with nothing held get one line to
+hide them together.
+
 **Paid off or closed.** Nothing in a bank's data says a loan was cleared, so the app *suggests*: a loan
 whose estimated balance is met (within 15%) by one large settlement-like payment out of another
 account, or an account that has been quiet for a month with nothing still arriving and no balance
-held. Confirm under **Accounts** and the account ends at exactly nothing: closing records the one
+held. Press **Close** on its line under **Accounts** and the account ends at exactly nothing: closing records the one
 transaction that gets it there (a payment in for a debt, a withdrawal out for money held — filed as a
 movement between your own accounts, so it is neither income nor spending), sized from what the ledger
 says it holds that day, or for a loan from what the loan engine says is owed. Earlier months keep the
