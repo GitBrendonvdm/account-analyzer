@@ -50,11 +50,67 @@ function Suggestion({ s, picked, onToggle, date, onDate, today }) {
   );
 }
 
-export function ClosedAccounts({ suggestions, closed, onClose, onDismiss, onReopen, today }) {
+/**
+ * Close any account by hand. The suggestions only find what the data hints at; an account the reader
+ * KNOWS is finished — a card paid off with a transfer from somewhere the app cannot see — is closed
+ * from here, with the same effect: it ends at exactly nothing, and says what it recorded to get there.
+ */
+function CloseByHand({ openAccounts, preview, today, busy, onClose, run }) {
+  const [id, setId] = useState('');
+  const [date, setDate] = useState(today);
+  if (!openAccounts?.length) return null;
+  const settlement = id ? preview(id, date) : null;
+  return (
+    <div className="mt-5">
+      <h3 className="t-label">Close another account</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <select
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+          aria-label="Account to close"
+          className="min-w-0 rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none max-md:min-h-11 max-md:flex-1"
+        >
+          <option value="">Choose an account…</option>
+          {openAccounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {accountLabel(a)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={date}
+          max={today}
+          onChange={(e) => e.target.value && setDate(e.target.value)}
+          aria-label="Date it closed"
+          className="rounded-full border bg-ground-lift px-3 py-1.5 text-[12.5px] text-label focus:border-info/30 focus:outline-none max-md:min-h-11"
+        />
+        <button
+          type="button"
+          disabled={busy || !id}
+          onClick={() => run(async () => { await onClose([{ accountId: id, closedOn: date }]); setId(''); })}
+          className="press flex items-center justify-center gap-2 rounded-full bg-info px-4 py-2 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50 max-md:min-h-11"
+        >
+          <Check size={15} />
+          Close it
+        </button>
+      </div>
+      {id && (
+        <p className="t-caption mt-1.5">
+          {settlement
+            ? `Closing records ${settlement.amount > 0 ? 'a payment of' : 'a withdrawal of'} ${formatCurrency(Math.abs(settlement.amount))} on ${date} so it ends at nothing.`
+            : 'It holds nothing on that day, so closing records no transaction.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function ClosedAccounts({ suggestions, closed, openAccounts, preview, onClose, onDismiss, onReopen, today }) {
   const [unticked, setUnticked] = useState(() => new Set());
   const [dates, setDates] = useState({});
   const [busy, setBusy] = useState(false);
-  if (!suggestions.length && !closed.length) return null;
+  if (!suggestions.length && !closed.length && !openAccounts?.length) return null;
 
   const chosen = suggestions.filter((s) => !unticked.has(s.accountId));
   const dateOf = (s) => dates[s.accountId] ?? s.closedOn;
@@ -117,6 +173,8 @@ export function ClosedAccounts({ suggestions, closed, onClose, onDismiss, onReop
           </div>
         </>
       )}
+
+      <CloseByHand openAccounts={openAccounts} preview={preview} today={today} busy={busy} onClose={onClose} run={run} />
 
       {closed.length > 0 && (
         <div className={suggestions.length ? 'mt-5' : 'mt-3'}>

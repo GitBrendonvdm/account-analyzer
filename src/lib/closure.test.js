@@ -47,6 +47,12 @@ describe('closureSuggestions', () => {
     expect(out[0].closedOn).toBe('2026-08-22');
   });
 
+  it('does not bring up an account that went quiet years ago', () => {
+    const ancient = acct('discovery|2160', 'Credit Card', { rawName: 'Discovery Credit Card *2160' });
+    const stored = [...STORED, row('2023-12-05', 'Discovery Credit Card *2160', -50)];
+    expect(closureSuggestions({ accounts: [ancient], stored })).toEqual([]);
+  });
+
   it('leaves alone what is dismissed, closed or external', () => {
     const accounts = [OLD_CARD, { ...SAVINGS, currentBalance: null, closedOn: '2026-08-04' }, acct('ext|x', 'Savings', { external: true })];
     expect(closureSuggestions({ accounts, stored: STORED, dismissed: ['nedbank|4714'] })).toEqual([]);

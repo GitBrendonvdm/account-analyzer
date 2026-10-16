@@ -6,7 +6,8 @@ import { Headlines } from './components/Headlines';
 import { buildCycleCurve } from './lib/cycleCurveSeries';
 import { buildBalanceBands } from './lib/balanceSeries';
 import { ImportSummary } from './components/ImportSummary';
-import { closureSuggestions, loanOwedBy } from './lib/closure';
+import { closureSuggestions, loanOwedBy, settlementFor } from './lib/closure';
+import { payMonthRuleOf } from './lib/loanProjection';
 import { todayIso } from './lib/statements/amounts';
 import { deriveCycleSummary } from './lib/cycleSummary';
 import {
@@ -183,11 +184,23 @@ export default function App() {
       suggestions,
       closed: closedAccounts,
       today: todayIso(today),
+      // Any open account can be closed by hand, whether or not the app noticed it had finished.
+      openAccounts: accounts.filter((a) => !a.closedOn && !a.external),
+      preview: (accountId, closedOn) => {
+        const account = accounts.find((a) => a.id === accountId);
+        return settlementFor({
+          account,
+          data: rawData,
+          closedOn,
+          payMonthOf: payMonthRuleOf(storedData ?? []),
+          owed: loanOwedBy(rawData ?? [], accounts).get(accountId),
+        });
+      },
       onClose: closeAccounts,
       onDismiss: (ids) => settings.set('closureDismissed', [...new Set([...closureDismissed, ...ids])]),
       onReopen: reopenAccount,
     }),
-    [suggestions, closedAccounts, today, closeAccounts, reopenAccount, settings, closureDismissed],
+    [suggestions, closedAccounts, accounts, today, closeAccounts, reopenAccount, settings, closureDismissed, rawData, storedData],
   );
 
   const processed = useTransactionData(data, selectedAccounts, monthRange, txnOverrides);

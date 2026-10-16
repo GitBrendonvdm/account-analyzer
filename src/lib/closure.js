@@ -17,8 +17,9 @@ import { payMonthRuleOf } from './loanProjection';
  *     like a settlement ("CAR PAYOFF", "SETTLEMENT") or like a transfer. The estimate and the
  *     payment are independent, so agreement between them is real evidence; the date of that
  *     payment is when it closed.
- *   IDLE — no row for a month or more while the rest of the data carries on, no payment still
- *     arriving, and no balance of any size recorded. The account's last row is when it ended.
+ *   IDLE — no row for a month or more (but not for years: that is not news) while the rest of the
+ *     data carries on, no payment still arriving, and no balance of any size recorded. The account's
+ *     last row is when it ended.
  *
  * What it never suggests: an external account (it has no rows to go quiet), one already closed or
  * dismissed, an account that holds money, or one that is still being paid.
@@ -32,6 +33,8 @@ import { payMonthRuleOf } from './loanProjection';
 
 const DAY_MS = 86400000;
 const IDLE_DAYS = 30;
+// An account that went quiet years ago is not news, and nothing is still expected of it.
+const IDLE_MAX_DAYS = 400;
 const EVIDENCE_DAYS = 60;
 const MATCH_RATIO = 0.15;
 const MIN_PAYOFF = 1000;
@@ -109,7 +112,7 @@ export function closureSuggestions({ accounts, stored, inferred = [], dismissed 
     // ---- idle: it went quiet and nothing is still arriving ---------------------------------
     const stillPaid = estimate.has(account.id) && estimate.get(account.id).payments > 0;
     const holds = Number.isFinite(account.currentBalance) && Math.abs(account.currentBalance) >= 1;
-    if (through - dayNumber(last) >= IDLE_DAYS && !stillPaid && !holds) {
+    if (through - dayNumber(last) >= IDLE_DAYS && through - dayNumber(last) <= IDLE_MAX_DAYS && !stillPaid && !holds) {
       out.push({
         accountId: account.id,
         label,
